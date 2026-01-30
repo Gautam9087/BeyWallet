@@ -12,13 +12,17 @@ export default function TabOneScreen() {
           <Paragraph color="$gray11">
             Modern, Secure, and Lightning Fast
           </Paragraph>
+          <H2>$1542.00</H2>
+          <Paragraph color="$gray11">
+            Total Balance
+          </Paragraph>
         </YStack>
 
         <ThemeSelector />
 
         <ToastControl />
 
-        <YStack items="center" gap="$4" w="100%" mt="$4">
+        <YStack items="center" gap="$4" width="100%" mt="$4">
           <Paragraph fontSize="$4">
             Configure your app in
           </Paragraph>

@@ -69,7 +69,7 @@ function RootLayoutNav() {
           name="modal"
           options={{
             title: 'Tamagui + Expo',
-            presentation: 'modal',
+            presentation: 'formSheet',
             animation: 'slide_from_right',
             gestureEnabled: true,
             gestureDirection: 'horizontal',

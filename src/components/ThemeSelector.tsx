@@ -13,7 +13,7 @@ export function ThemeSelector() {
     ] as const
 
     return (
-        <YStack gap="$4" p="$4" bg="$background" rounded="$4" borderWidth={1} borderColor="$borderColor">
+        <YStack gap="$4" width="100%" p="$4" bg="$background" rounded="$4" borderWidth={1} borderColor="$borderColor">
             <Text fontSize="$4" fontWeight="600" color="$color">Appearance</Text>
             <XStack gap="$2">
                 {modes.map((mode) => {
@@ -26,7 +26,7 @@ export function ThemeSelector() {
                             flex={1}
                             flexDirection="column"
                             height={80}
-                            padding="$2"
+                            p="$2"
                             bg={isActive ? '$blue5' : '$background'}
                             borderColor={isActive ? '$blue10' : '$borderColor'}
                             borderWidth={isActive ? 2 : 1}
