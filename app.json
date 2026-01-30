@@ -31,7 +31,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./src/assets/fonts/Basel-Grotesk-Book.otf",
+            "./src/assets/fonts/Basel-Grotesk-Medium.otf"
+          ]
+        }
+      ],
       [
         "expo-build-properties",
         {

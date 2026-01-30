@@ -7,6 +7,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font'
 import { SplashScreen, Stack } from 'expo-router'
 import { Provider } from 'components/Provider'
+
 import { useTheme } from 'tamagui'
 
 export {
@@ -23,19 +24,19 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
-  const [interLoaded, interError] = useFonts({
-    Inter: require('@tamagui/font-inter/otf/Inter-Medium.otf'),
-    InterBold: require('@tamagui/font-inter/otf/Inter-Bold.otf'),
+  const [loaded, error] = useFonts({
+    BaselGroteskBook: require('../assets/fonts/Basel-Grotesk-Book.otf'),
+    BaselGroteskMedium: require('../assets/fonts/Basel-Grotesk-Medium.otf'),
   })
 
   useEffect(() => {
-    if (interLoaded || interError) {
+    if (loaded || error) {
       // Hide the splash screen after the fonts have loaded (or an error was returned) and the UI is ready.
       SplashScreen.hideAsync()
     }
-  }, [interLoaded, interError])
+  }, [loaded, error])
 
-  if (!interLoaded && !interError) {
+  if (!loaded && !error) {
     return null
   }
 
