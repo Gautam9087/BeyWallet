@@ -63,6 +63,17 @@ export const config = createTamagui({
     heading: baselGroteskFont,
     body: baselGroteskFont,
   },
+  themes: {
+    ...defaultConfig.themes,
+    light: {
+      ...defaultConfig.themes.light,
+      background: '#fff',
+    },
+    dark: {
+      ...defaultConfig.themes.dark,
+      background: '#000',
+    },
+  },
 })
 
 export default config

@@ -1,6 +1,7 @@
 import { Moon, Sun, Monitor } from '@tamagui/lucide-icons'
 import { Button, XStack, YStack, Text, useTheme } from 'tamagui'
 import { useAppTheme } from '../context/ThemeContext'
+import * as Haptics from 'expo-haptics'
 
 export function ThemeSelector() {
     const { themeMode, setThemeMode } = useAppTheme()
@@ -11,6 +12,11 @@ export function ThemeSelector() {
         { id: 'dark', icon: Moon, label: 'Dark' },
         { id: 'system', icon: Monitor, label: 'System' },
     ] as const
+
+    const handleThemeChange = (mode: typeof modes[number]['id']) => {
+        setThemeMode(mode)
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
 
     return (
         <YStack gap="$4" width="100%" p="$4" bg="$background" rounded="$4" borderWidth={1} borderColor="$borderColor">
@@ -30,7 +36,7 @@ export function ThemeSelector() {
                             bg={isActive ? '$blue5' : '$background'}
                             borderColor={isActive ? '$blue10' : '$borderColor'}
                             borderWidth={isActive ? 2 : 1}
-                            onPress={() => setThemeMode(mode.id)}
+                            onPress={() => handleThemeChange(mode.id)}
                             hoverStyle={{ bg: isActive ? '$blue6' : '$backgroundHover' }}
                             pressStyle={{ bg: isActive ? '$blue4' : '$backgroundPress' }}
                         >

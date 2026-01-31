@@ -2,6 +2,7 @@ import { ExternalLink } from '@tamagui/lucide-icons'
 import { Anchor, H2, Paragraph, XStack, YStack, ScrollView } from 'tamagui'
 import { ToastControl } from 'components/CurrentToast'
 import { ThemeSelector } from 'components/ThemeSelector'
+import { LocalizationTest } from 'components/LocalizationTest'
 
 export default function TabOneScreen() {
   return (
@@ -19,6 +20,8 @@ export default function TabOneScreen() {
         </YStack>
 
         <ThemeSelector />
+
+        <LocalizationTest />
 
         <ToastControl />
 

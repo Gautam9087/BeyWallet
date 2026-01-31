@@ -21,10 +21,16 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/images/adaptive-icon.png",
+        "foregroundImage": "./src/assets/icons/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.thehussein01.Bey"
+      "package": "com.thehussein01.Bey",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -104,13 +110,22 @@
         }
       ],
       "expo-web-browser",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-localization",
+      "expo-asset",
+      "expo-document-picker",
+      "expo-av",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {},
+      "eas": {
+        "projectId": "ee0cc709-bc28-4c1c-8eed-a4c31f7581f2"
+      }
+    },
+    "owner": "thehussein01"
   }
 }
