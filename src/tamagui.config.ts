@@ -1,5 +1,25 @@
+import { createAnimations } from '@tamagui/animations-react-native'
 import { createFont, createTamagui } from 'tamagui'
 import { defaultConfig } from '@tamagui/config/v5'
+
+const animations = createAnimations({
+  bouncy: {
+    type: 'spring',
+    damping: 10,
+    mass: 0.9,
+    stiffness: 100,
+  },
+  lazy: {
+    type: 'timing',
+    duration: 300,
+  },
+  quick: {
+    type: 'spring',
+    damping: 20,
+    mass: 1,
+    stiffness: 250,
+  },
+})
 
 const baselGroteskFont = createFont({
   family: 'BaselGroteskBook',
@@ -58,6 +78,7 @@ const baselGroteskFont = createFont({
 
 export const config = createTamagui({
   ...defaultConfig,
+  animations,
   fonts: {
     ...defaultConfig.fonts,
     heading: baselGroteskFont,

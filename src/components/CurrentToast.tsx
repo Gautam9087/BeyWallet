@@ -10,7 +10,7 @@ export function CurrentToast() {
   return (
     <Toast
       key={currentToast.id}
-      duration={1000000}
+      duration={5000}
       viewportName={currentToast.viewportName}
       enterStyle={{ opacity: 0, scale: 0.5, y: -25 }}
       exitStyle={{ opacity: 0, scale: 1, y: -20 }}
