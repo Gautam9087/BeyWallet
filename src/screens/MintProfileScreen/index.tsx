@@ -1,38 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { YStack, XStack, Text, Button, H2, H3, H4, Separator, ScrollView, View, Spinner, Image, Card } from 'tamagui';
-import { Link, Mail, Globe, Info, Copy, Check, ChevronLeft, Sprout, Share2, MessageSquare, ShieldCheck, Cpu } from '@tamagui/lucide-icons';
+import { YStack, XStack, Text, Button, H2, H3, H4, Separator, ScrollView, View, Image, Card } from 'tamagui';
+import { Spinner } from '../../components/UI/Spinner';
+import { Link, Mail, Globe, Info, Copy, Check, ChevronLeft, Sprout, Share2, MessageSquare, ShieldCheck, Cpu, Plus } from '@tamagui/lucide-icons';
 import { useRouter, Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from "react-native-qrcode-svg";
 import { mintRecommendationService } from '../../services/mintRecommendationService';
 import { useToastController } from '@tamagui/toast';
+import { useQuery } from '@tanstack/react-query';
+import { useWalletStore } from '../../store/walletStore';
+import { AppBottomSheetRef } from '../../components/UI/AppBottomSheet';
+import { TrustingMint } from '../HomeTabScreen/components/TrustingMint';
 
 interface MintProfileScreenProps {
     url: string;
 }
 
 export function MintProfileScreen({ url }: MintProfileScreenProps) {
-    const [info, setInfo] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
     const [showQr, setShowQr] = useState(false);
     const router = useRouter();
     const toast = useToastController();
+    const { addMint, mints } = useWalletStore();
 
-    useEffect(() => {
-        const loadInfo = async () => {
-            setLoading(true);
-            try {
-                const data = await mintRecommendationService.fetchMintMetadata(url);
-                setInfo(data);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadInfo();
-    }, [url]);
+    const trustSheetRef = React.useRef<AppBottomSheetRef>(null!);
+    const isAlreadyAdded = mints.includes(url) || mints.includes(url + '/');
+
+    const { data: info, isLoading, error: fetchError } = useQuery({
+        queryKey: ['mint-metadata', url],
+        queryFn: () => mintRecommendationService.fetchMintMetadata(url),
+        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+        retry: 2,
+    });
 
     const handleCopy = async (text: string, label: string) => {
         await Clipboard.setStringAsync(text);
@@ -42,7 +41,7 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
         });
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <YStack flex={1} items="center" justify="center" bg="$background">
                 <Spinner size="large" color="$accentColor" />
@@ -51,7 +50,7 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
         );
     }
 
-    if (!info) {
+    if (fetchError || !info) {
         return (
             <YStack flex={1} items="center" justify="center" bg="$background" p="$4" gap="$4">
                 <Text color="$red10">Failed to fetch mint information.</Text>
@@ -129,7 +128,7 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
 
                     {/* MOTD */}
                     {motd && (
-                        <View theme="purple" bg="$color5" rounded="$4" p="$4" borderLeftWidth={4} borderLeftColor="$color1" opacity={0.9}>
+                        <View bg="$color5" rounded="$4" p="$4" >
                             <XStack gap="$3">
                                 <MessageSquare color="$color" size={20} />
                                 <YStack flex={1}>
@@ -244,6 +243,39 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
                     )}
                 </YStack>
             </ScrollView>
+
+            <YStack p="$4" bg="$background" borderTopWidth={1} borderTopColor="$gray4">
+                <Button
+                    size="$4"
+                    fontWeight="bold"
+                    theme={isAlreadyAdded ? 'gray' : 'accent'}
+                    disabled={isAlreadyAdded}
+                    icon={isAlreadyAdded ? <Check size={18} /> : <Plus size={18} />}
+                    onPress={() => trustSheetRef.current?.present()}
+                >
+                    {isAlreadyAdded ? 'Already Connected' : 'Connect to this Mint'}
+                </Button>
+            </YStack>
+
+            <TrustingMint
+                bottomSheetRef={trustSheetRef}
+                mintUrl={url}
+                onConfirm={async (url) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    try {
+                        await addMint(url);
+                        toast.show('Mint Added', {
+                            message: `Successfully connected to ${url}`,
+                            type: 'success'
+                        });
+                    } catch (err: any) {
+                        toast.show('Error', {
+                            message: err.message || 'Failed to add mint',
+                            theme: 'red'
+                        });
+                    }
+                }}
+            />
         </YStack>
     );
 }

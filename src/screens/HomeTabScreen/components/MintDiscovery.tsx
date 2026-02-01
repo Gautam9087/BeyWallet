@@ -1,23 +1,36 @@
 import React, { useEffect } from 'react';
-import { YStack, XStack, Text, Button, Card, H3, H4, Spinner, Image, View } from 'tamagui';
+import { YStack, XStack, Text, Button, Card, H3, H4, Image, View } from 'tamagui';
+import { Spinner } from '../../../components/UI/Spinner';
 import { Search, Star, MessageSquare, Plus, RefreshCw, Check, Sprout, Info, ExternalLink } from '@tamagui/lucide-icons';
-import { useMintRecommendationStore } from '../../../store/mintRecommendationStore';
+import { useQuery } from '@tanstack/react-query';
+import { mintRecommendationService } from '../../../services/mintRecommendationService';
 import { useWalletStore } from '../../../store/walletStore';
 import * as Haptics from 'expo-haptics';
 import { useToastController } from '@tamagui/toast';
 import { useRouter } from 'expo-router';
+import { AppBottomSheetRef } from '../../../components/UI/AppBottomSheet';
+import { TrustingMint } from './TrustingMint';
 
 export function MintDiscovery() {
-    const { recommendations, isLoading, fetchRecommendations, error } = useMintRecommendationStore();
+    const { data: recommendations = [], isLoading, error, refetch, isRefetching } = useQuery({
+        queryKey: ['mint-recommendations'],
+        queryFn: () => mintRecommendationService.discoverMints(),
+        staleTime: 1000 * 60 * 10, // 10 minutes
+    });
     const { addMint, mints } = useWalletStore();
     const toast = useToastController();
     const router = useRouter();
 
-    useEffect(() => {
-        fetchRecommendations();
-    }, []);
+    const trustSheetRef = React.useRef<AppBottomSheetRef>(null!);
+    const [pendingMintUrl, setPendingMintUrl] = React.useState<string>('');
 
     const handleAddMint = async (url: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setPendingMintUrl(url);
+        trustSheetRef.current?.present();
+    };
+
+    const confirmAddMint = async (url: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             await addMint(url);
@@ -35,7 +48,7 @@ export function MintDiscovery() {
 
     const handleRefresh = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        fetchRecommendations(true);
+        refetch();
     };
 
     const handleViewProfile = (url: string) => {
@@ -52,10 +65,9 @@ export function MintDiscovery() {
                 <H3>Discover Mints</H3>
                 <Button
                     size="$2"
-
-                    icon={isLoading ? <Spinner size="small" /> : <RefreshCw size={14} />}
+                    icon={(isLoading || isRefetching) ? <Spinner size="small" /> : <RefreshCw size={14} />}
                     onPress={handleRefresh}
-                    disabled={isLoading}
+                    disabled={isLoading || isRefetching}
                 />
             </XStack>
 
@@ -69,7 +81,7 @@ export function MintDiscovery() {
             {error && recommendations.length === 0 && (
                 <YStack height={100} items="center" justify="center" gap="$2">
                     <Text color="$red10">Failed to load recommendations</Text>
-                    <Button size="$3" onPress={() => fetchRecommendations(true)}>Retry</Button>
+                    <Button size="$3" onPress={() => refetch()}>Retry</Button>
                 </YStack>
             )}
 
@@ -80,8 +92,9 @@ export function MintDiscovery() {
             )}
 
             <YStack gap="$3">
-                {recommendations.map((mint) => {
+                {recommendations.map((mint, index) => {
                     const isAlreadyAdded = mints.includes(mint.url) || mints.includes(mint.url + '/');
+                    const isMostRecommended = index < 2;
 
                     return (
                         <Card
@@ -129,6 +142,15 @@ export function MintDiscovery() {
                                             />
                                         </XStack>
 
+                                        {isMostRecommended && (
+                                            <XStack items="center" gap="$1" theme="green" bg="$color5" px="$2" py="$1" rounded="$2" self="flex-start" mb="$1">
+                                                <Star size={10} color="$color" fill="$color" />
+                                                <Text fontSize="$1" fontWeight="800" color="$color" letterSpacing={0.5}>
+                                                    MOST RECOMMENDED
+                                                </Text>
+                                            </XStack>
+                                        )}
+
                                         <Text color="$gray10" fontSize="$3" numberOfLines={2}>
                                             {mint.description || mint.url}
                                         </Text>
@@ -141,6 +163,7 @@ export function MintDiscovery() {
                                             <MessageSquare size={12} color="$gray9" />
                                             <Text fontSize="$2" color="$gray9">{mint.reviewsCount} reviews</Text>
                                         </XStack>
+
                                         <XStack items="center" gap="$1">
                                             <Star size={14} color="#FFD700" fill="#FFD700" />
                                             <Text fontSize="$3" fontWeight="bold">
@@ -165,6 +188,12 @@ export function MintDiscovery() {
                     );
                 })}
             </YStack>
+
+            <TrustingMint
+                bottomSheetRef={trustSheetRef}
+                mintUrl={pendingMintUrl}
+                onConfirm={confirmAddMint}
+            />
         </YStack>
     );
 }

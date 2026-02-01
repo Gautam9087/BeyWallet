@@ -5,6 +5,9 @@ import { Provider } from '../Provider'
 import { RootLayoutNav } from './RootLayoutNav'
 import { cocoService } from '../../services/cocoService'
 import { useWalletStore } from '../../store/walletStore'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync()
@@ -51,8 +54,10 @@ export function RootLayout() {
 
 const Providers = ({ children, cocoManager }: { children: React.ReactNode; cocoManager: any }) => {
     return (
-        <Provider cocoManager={cocoManager}>
-            {children}
-        </Provider>
+        <QueryClientProvider client={queryClient}>
+            <Provider cocoManager={cocoManager}>
+                {children}
+            </Provider>
+        </QueryClientProvider>
     )
 }
