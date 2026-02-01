@@ -42,8 +42,8 @@ export default function TabLayout() {
 
 
   const DefaultHeaderTitle = ({ children }: { children: string }) => (
-    <Text fontWeight="700" fontSize={18} color="$color">
-      {children}
+    <Text fontWeight="700" fontSize={20} color="$color">
+      {children.charAt(0).toUpperCase() + children.slice(1)}
     </Text>
   )
 

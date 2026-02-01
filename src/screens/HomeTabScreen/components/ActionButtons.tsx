@@ -1,16 +1,22 @@
-import { Button, XStack } from "tamagui";
-import { Landmark } from "@tamagui/lucide-icons";
+import { Button, XStack, YStack, Text, ListItem } from "tamagui";
+import { Landmark, ArrowUpRight, ArrowDownLeft, Flame, ArrowDownRight, ArrowRight } from "@tamagui/lucide-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef } from "react";
 import * as Haptics from 'expo-haptics';
 import SwapIcon from "~/components/icons/Swap";
 import ArrowDownIcon from "~/components/icons/ArrowDown";
 import SendIcon from "~/components/icons/Send";
-import MintModal from "./MintModal";
+import AppBottomSheet, { AppBottomSheetRef } from "~/components/UI/AppBottomSheet";
 
 export default function ActionButtons() {
     const router = useRouter();
-    const [mintModalOpen, setMintModalOpen] = useState(false);
+    const sheetRef = useRef<AppBottomSheetRef>(null);
+
+    const handleOptionPress = (path: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        sheetRef.current?.dismiss();
+        router.push(path as any);
+    };
 
     return (
         <>
@@ -23,7 +29,7 @@ export default function ActionButtons() {
                     icon={<Landmark size={32} />}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        setMintModalOpen(true);
+                        sheetRef.current?.present();
                     }}
                 />
                 <Button
@@ -59,7 +65,42 @@ export default function ActionButtons() {
                     icon={<SendIcon size={32} />}
                 />
             </XStack>
-            <MintModal open={mintModalOpen} onOpenChange={setMintModalOpen} />
+
+            <AppBottomSheet ref={sheetRef}>
+                <YStack p="$4" gap="$2">
+                    <XStack justify="center">
+                        <Text fontSize="$6" color="$accent5" fontWeight="bold" mb="$2" px="$2">Select action</Text>
+                    </XStack>
+                    <ListItem
+                        hoverTheme
+                        pressTheme
+                        title="Mint"
+                        size="$6"
+
+                        subTitle="Add funds via Lightning."
+                        iconAfter={<ArrowRight size={24} color="$color" />}
+                        icon={<ArrowDownLeft size={24} color="$color" />}
+                        onPress={() => handleOptionPress("/mint")}
+                        rounded="$7"
+                        borderWidth={2}
+                        borderColor="$color3"
+                    />
+                    <ListItem
+                        hoverTheme
+                        pressTheme
+                        title="Melt"
+                        size="$6"
+
+                        iconAfter={<ArrowRight size={24} color="$color" />}
+                        subTitle="Withdraw via Lightning."
+                        icon={<Flame size={24} color="$color" />}
+                        onPress={() => handleOptionPress("/melt")}
+                        rounded="$7"
+                        borderWidth={2}
+                        borderColor="$color3"
+                    />
+                </YStack>
+            </AppBottomSheet>
         </>
     )
 }

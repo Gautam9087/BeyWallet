@@ -65,7 +65,11 @@ export function RootLayoutNav() {
                     name="(modals)"
                     options={{
                         headerShown: false,
-                        presentation: 'modal',
+
+                        presentation: "modal",
+                        animation: "ios_from_right",
+                        gestureEnabled: true,
+                        gestureDirection: 'horizontal',
                     }}
                 />
 

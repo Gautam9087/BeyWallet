@@ -13,7 +13,7 @@ interface WalletState {
     initialize: () => Promise<void>;
     setActiveMint: (url: string) => void;
     addMint: (url: string) => Promise<void>;
-    refreshBalance: () => void;
+    refreshBalance: () => Promise<void>;
 }
 
 export const useWalletStore = create<WalletState>((set, get) => ({
@@ -24,27 +24,40 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
     initialize: async () => {
         set({ isInitializing: true, error: null });
+        console.log('[WalletStore] Starting initialization...');
         try {
+            console.log('[WalletStore] Calling cocoService.init()');
             const manager = await cocoService.init();
+            console.log('[WalletStore] cocoService initialized');
+
             const defaultMint = "https://testnut.cashu.space";
 
             // Check if we already have mints
-            const existingMints = manager.mintManager.mints;
-            const hasDefault = existingMints.some(m => m.url === defaultMint);
+            const existingMints = await manager.mint.getAllMints();
+            console.log(`[WalletStore] Existing mints: ${existingMints.length}`);
+            const hasDefault = existingMints.some(m => m.mintUrl === defaultMint);
 
             if (!hasDefault) {
+                console.log(`[WalletStore] Adding default mint: ${defaultMint}`);
                 // Add the default mint if it doesn't exist
-                await mintService.addMint(defaultMint);
+                await manager.mint.addMint(defaultMint);
+                console.log('[WalletStore] Default mint added');
             }
 
             // Always ensure the default test mint is active for the user's request
-            set({ activeMintUrl: defaultMint });
+            if (!get().activeMintUrl) {
+                console.log('[WalletStore] Setting active mint URL');
+                set({ activeMintUrl: defaultMint });
+            }
 
             // Sync balance (initially)
-            get().refreshBalance();
+            console.log('[WalletStore] Refreshing balance');
+            await get().refreshBalance();
 
             set({ isInitializing: false });
+            console.log('[WalletStore] Initialization complete');
         } catch (err: any) {
+            console.error('[WalletStore] Initialization failed:', err);
             set({ error: err.message, isInitializing: false });
         }
     },
@@ -64,7 +77,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
     },
 
-    refreshBalance: () => {
+    refreshBalance: async () => {
         try {
             const manager = cocoService.getManager();
             const activeUrl = get().activeMintUrl;
@@ -74,7 +87,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             }
 
             // Calculate balance for the active mint
-            const balance = manager.proofManager.getBalance(activeUrl);
+            const balances = await manager.wallet.getBalances();
+            const balance = balances[activeUrl] || 0;
             set({ balance });
         } catch (err) {
             console.error('Error refreshing balance:', err);

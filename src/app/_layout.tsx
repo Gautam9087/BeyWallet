@@ -1,3 +1,6 @@
+// Polyfills - MUST BE IMPORTED FIRST
+import '../polyfills';
+
 import '../../tamagui-web.css'
 import { RootLayout } from '../components/layout/RootLayout'
 

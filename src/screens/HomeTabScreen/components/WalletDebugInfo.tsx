@@ -6,7 +6,7 @@ import { Shield, Coins, Link, RefreshCcw } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 
 export function WalletDebugInfo() {
-    const { activeMintUrl, balance, isInitializing, initialize, refreshBalance } = useWalletStore();
+    const { activeMintUrl, balance, isInitializing, initialize, refreshBalance, error } = useWalletStore();
     const [mnemonic, setMnemonic] = useState<string | null>(null);
     const [showMnemonic, setShowMnemonic] = useState(false);
 
@@ -45,6 +45,15 @@ export function WalletDebugInfo() {
                 <Shield size={20} color="$blue10" />
                 <Text fontSize="$5" fontWeight="700">Wallet Debug Info</Text>
             </XStack>
+
+            {error && (
+                <YStack bg="$red3" p="$3" rounded="$3">
+                    <XStack items="center" gap="$2">
+                        <Shield size={16} color="$red10" />
+                        <Text color="$red11" fontSize="$3">{error}</Text>
+                    </XStack>
+                </YStack>
+            )}
 
             {mnemonic ? (
                 <YStack gap="$3">

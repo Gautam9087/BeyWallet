@@ -14,11 +14,10 @@ export function HomeTabScreen() {
             <YStack flex={1} items="center" gap="$2" px="$4" pt="$2" pb="$20">
                 <WalletCard />
                 <ActionButtons />
-                <WalletDebugInfo />
 
                 <ToastControl />
 
-
+                <WalletDebugInfo />
             </YStack>
         </ScrollView>
     )

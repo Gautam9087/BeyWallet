@@ -6,6 +6,12 @@ export default function ModalLayout() {
     const theme = useTheme()
     const router = useRouter()
 
+    const DefaultHeaderTitle = ({ children }: { children: string }) => (
+        <Text fontWeight="700" fontSize={20} color="$color">
+            {children.charAt(0).toUpperCase() + children.slice(1)}
+        </Text>
+    )
+
     return (
         <Stack
             screenOptions={{
@@ -16,10 +22,13 @@ export default function ModalLayout() {
                 },
                 headerTitleStyle: {
                     color: theme.color.val,
-                    fontWeight: '700',
+                    fontWeight: '500',
+
                 },
+                headerTitleAlign: 'center',
                 headerTintColor: theme.color.val,
                 headerShadowVisible: false,
+                headerTitle: ({ children }) => <DefaultHeaderTitle>{children}</DefaultHeaderTitle>,
                 headerLeft: () => (
                     <Button
                         circular
