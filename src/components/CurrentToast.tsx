@@ -1,33 +1,84 @@
-import { Check, Info } from '@tamagui/lucide-icons'
+import { Check, Loader } from '@tamagui/lucide-icons'
 import { Toast, useToastController, useToastState } from '@tamagui/toast'
-import { Button, H4, View, XStack, YStack, isWeb } from 'tamagui'
+import { Button, H4, View, XStack, YStack, Spinner } from 'tamagui'
+import * as Haptics from 'expo-haptics'
+import React, { useEffect } from 'react'
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing } from 'react-native-reanimated'
+
+const SpinningLoader = ({ size, color }: { size: number, color: any }) => {
+  const rotation = useSharedValue(0)
+
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withTiming(360, {
+        duration: 1000,
+        easing: Easing.linear,
+      }),
+      -1,
+      false
+    )
+  }, [])
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }],
+    }
+  })
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Loader strokeWidth={3} size={size} color={color} />
+    </Animated.View>
+  )
+}
 
 export function CurrentToast() {
   const currentToast = useToastState()
 
+  useEffect(() => {
+    if (currentToast) {
+      if (currentToast.title === 'Success' || currentToast.title === 'Loaded successfully!') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      }
+    }
+  }, [currentToast?.id, currentToast?.title])
+
   if (!currentToast || currentToast.isHandledNatively) return null
+
+  const isLoading = currentToast.title === 'Loading...'
 
   return (
     <Toast
       key={currentToast.id}
-      duration={5000}
+      duration={currentToast.duration || 3000}
       viewportName={currentToast.viewportName}
       enterStyle={{ opacity: 0, scale: 0.5, y: -25 }}
       exitStyle={{ opacity: 0, scale: 1, y: -20 }}
       width={350}
-      theme="green"
+      theme={isLoading ? "gray" : "green"}
       rounded="$5"
       transition="quick"
-    >
-      <XStack gap="$1" items="center" p="$1">
+      p="$3"
 
-        <View>
-          <Check size={20} />
-        </View>
-        <YStack width={'100%'} p="$1" gap="$1">
-          <Toast.Title fontWeight="bold">{currentToast.title}</Toast.Title>
+      borderWidth={1}
+      borderColor="$borderColor"
+    >
+      <XStack gap="$3" items="center" px="$2">
+        {isLoading ? (
+          <SpinningLoader size={18} color="$color" />
+        ) : (
+
+          <Check size={18} strokeWidth={3} color="$green12" />
+
+        )}
+        <YStack flex={1} justify="center">
+          <Toast.Title fontWeight="700" fontSize="$4">{currentToast.title}</Toast.Title>
           {!!currentToast.message && (
-            <Toast.Description>{currentToast.message}</Toast.Description>
+            <Toast.Description color="$color" opacity={0.6} fontSize="$3" mt="$-1">
+              {currentToast.message}
+            </Toast.Description>
           )}
         </YStack>
       </XStack>
@@ -38,19 +89,39 @@ export function CurrentToast() {
 export function ToastControl() {
   const toast = useToastController()
 
+  const showLoaderDemo = () => {
+    const id = 'demo-loader'
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    toast.show('Loading...', {
+      id,
+    })
+
+    setTimeout(() => {
+      toast.show('Loaded successfully!', {
+        id,
+      })
+    }, 2000)
+  }
+
   return (
     <YStack gap="$2" items="center">
       <H4>Toast demo</H4>
-      <XStack gap="$2" justify="center">
+      <XStack gap="$2" justify="center" flexWrap="wrap">
         <Button
           onPress={() => {
-            toast.show('Successfully saved!', {
-              message: "Don't worry, we've got your data.",
-            })
+            toast.show('Successfully saved!')
           }}
         >
-          Show
+          Simple Success
         </Button>
+
+        <Button
+          theme="blue"
+          onPress={showLoaderDemo}
+        >
+          Show Loader
+        </Button>
+
         <Button
           onPress={() => {
             toast.hide()

@@ -7,6 +7,7 @@ import { BiometricUnlock } from './components/BiometricUnlock'
 import WalletCard from './components/WalletCard'
 import ActionButtons from './components/ActionButtons'
 import { WalletDebugInfo } from './components/WalletDebugInfo'
+import { MintDiscovery } from './components/MintDiscovery'
 
 export function HomeTabScreen() {
     return (
@@ -14,6 +15,8 @@ export function HomeTabScreen() {
             <YStack flex={1} items="center" gap="$2" px="$4" pt="$2" pb="$20">
                 <WalletCard />
                 <ActionButtons />
+
+                {/* <MintDiscovery /> */}
 
                 <ToastControl />
 

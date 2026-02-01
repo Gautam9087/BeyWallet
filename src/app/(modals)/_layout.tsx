@@ -8,7 +8,7 @@ export default function ModalLayout() {
 
     const DefaultHeaderTitle = ({ children }: { children: string }) => (
         <Text fontWeight="700" fontSize={20} color="$color">
-            {children.charAt(0).toUpperCase() + children.slice(1)}
+            {children}
         </Text>
     )
 
@@ -47,6 +47,24 @@ export default function ModalLayout() {
                 name="send"
                 options={{
                     title: 'Send',
+                }}
+            />
+            <Stack.Screen
+                name="mint-profile"
+                options={{
+                    title: 'Mint Profile',
+                }}
+            />
+            <Stack.Screen
+                name="mint"
+                options={{
+                    title: 'Mint Cash',
+                }}
+            />
+            <Stack.Screen
+                name="melt"
+                options={{
+                    title: 'Send Cash',
                 }}
             />
         </Stack>

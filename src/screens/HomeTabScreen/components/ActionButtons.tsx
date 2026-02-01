@@ -74,25 +74,27 @@ export default function ActionButtons() {
                     <ListItem
                         hoverTheme
                         pressTheme
-                        title="Mint"
+                        title="Deposit or receive"
                         size="$6"
 
-                        subTitle="Add funds via Lightning."
+                        subTitle="Add funds to Mint."
                         iconAfter={<ArrowRight size={24} color="$color" />}
                         icon={<ArrowDownLeft size={24} color="$color" />}
                         onPress={() => handleOptionPress("/mint")}
+                        px="$4"
                         rounded="$7"
                         borderWidth={2}
                         borderColor="$color3"
                     />
                     <ListItem
+                        px="$4"
                         hoverTheme
                         pressTheme
-                        title="Melt"
+                        title="Withdraw or send"
                         size="$6"
 
                         iconAfter={<ArrowRight size={24} color="$color" />}
-                        subTitle="Withdraw via Lightning."
+                        subTitle="Remove funds from Mint."
                         icon={<Flame size={24} color="$color" />}
                         onPress={() => handleOptionPress("/melt")}
                         rounded="$7"

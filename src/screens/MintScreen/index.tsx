@@ -1,32 +1,77 @@
-import { YStack, XStack, H2, Text, Button, Input } from "tamagui";
+import { YStack } from "tamagui";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "@tamagui/lucide-icons";
 import { useState } from "react";
+import { AmountStage } from "./AmountStage";
+import { ConfirmStage } from "./ConfirmStage";
+import { PaymentStage } from "./PaymentStage";
+import { ResultStage } from "./ResultStage";
+
+type MintStep = 'amount' | 'confirm' | 'payment' | 'result';
+type MintResultStatus = 'success' | 'error' | 'cancelled';
 
 export default function MintScreen() {
     const router = useRouter();
-    const [amount, setAmount] = useState("");
+    const [step, setStep] = useState<MintStep>('amount');
+    const [amount, setAmount] = useState("0");
+    const [status, setStatus] = useState<MintResultStatus>('success');
+
+    const handleNext = () => {
+        if (step === 'amount') setStep('confirm');
+        else if (step === 'confirm') setStep('payment');
+        else if (step === 'payment') {
+            setStatus('success');
+            setStep('result');
+        }
+    };
+
+    const handleBack = () => {
+        if (step === 'confirm') setStep('amount');
+        else router.back();
+    };
+
+    const handleCancel = () => {
+        setStatus('cancelled');
+        setStep('result');
+    };
+
+    const handlePaid = () => {
+        setStatus('success');
+        setStep('result');
+    };
 
     return (
-        <YStack flex={1} bg="$background" p="$4" gap="$4" pt="$8">
-            <XStack items="center" gap="$4">
-                <Button icon={<ArrowLeft />} circular onPress={() => router.back()} />
-                <H2>Mint</H2>
-            </XStack>
-
-            <YStack flex={1} gap="$4" pt="$4">
-                <Text fontSize="$5">How much do you want to deposit?</Text>
-                <Input
-                    placeholder="Amount in SATS"
-                    value={amount}
-                    onChangeText={setAmount}
-                    keyboardType="numeric"
-                    size="$6"
+        <YStack flex={1} bg="$background" p="$4">
+            {step === 'amount' && (
+                <AmountStage
+                    amount={amount}
+                    setAmount={setAmount}
+                    onContinue={handleNext}
                 />
-                <Button theme="green" size="$6" mt="auto">
-                    Next
-                </Button>
-            </YStack>
+            )}
+
+            {step === 'confirm' && (
+                <ConfirmStage
+                    amount={amount}
+                    onConfirm={handleNext}
+                    onBack={handleBack}
+                />
+            )}
+
+            {step === 'payment' && (
+                <PaymentStage
+                    amount={amount}
+                    onPaid={handlePaid}
+                    onCancel={handleCancel}
+                />
+            )}
+
+            {step === 'result' && (
+                <ResultStage
+                    status={status}
+                    amount={amount}
+                    onClose={() => router.back()}
+                />
+            )}
         </YStack>
     );
 }

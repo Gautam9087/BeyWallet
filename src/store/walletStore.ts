@@ -8,6 +8,7 @@ interface WalletState {
     balance: number;
     isInitializing: boolean;
     error: string | null;
+    mints: string[]; // List of registered mint URLs
 
     // Actions
     initialize: () => Promise<void>;
@@ -21,6 +22,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     balance: 0,
     isInitializing: false,
     error: null,
+    mints: [],
 
     initialize: async () => {
         set({ isInitializing: true, error: null });
@@ -54,7 +56,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             console.log('[WalletStore] Refreshing balance');
             await get().refreshBalance();
 
-            set({ isInitializing: false });
+            // Store list of mint URLs
+            const finalMints = await manager.mint.getAllMints();
+            set({
+                isInitializing: false,
+                mints: finalMints.map(m => m.mintUrl)
+            });
             console.log('[WalletStore] Initialization complete');
         } catch (err: any) {
             console.error('[WalletStore] Initialization failed:', err);
@@ -70,7 +77,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addMint: async (url: string) => {
         try {
             await mintService.addMint(url);
-            set({ activeMintUrl: url });
+            const manager = cocoService.getManager();
+            const allMints = await manager.mint.getAllMints();
+            set({
+                activeMintUrl: url,
+                mints: allMints.map(m => m.mintUrl)
+            });
             get().refreshBalance();
         } catch (err: any) {
             set({ error: err.message });

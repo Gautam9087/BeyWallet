@@ -133,12 +133,12 @@ export default function TabLayout() {
 
 
       <Tabs.Screen
-        name="two"
+        name="explore"
         listeners={{
           tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
         }}
         options={{
-          title: 'Two',
+          title: 'Explore',
           tabBarIcon: ({ color }) => <Globe color={color as any} />,
           headerRight: () => (
             <XStack pr="$4">

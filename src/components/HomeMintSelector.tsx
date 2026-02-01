@@ -15,7 +15,7 @@ export default function HomeHeaderMintSelector() {
         <>
             <Button
                 size="$2.5"
-                theme="orange"
+                theme="gray"
                 borderWidth={1}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
@@ -39,16 +39,18 @@ export default function HomeHeaderMintSelector() {
             <AppBottomSheet ref={sheetRef}>
                 <YStack p="$4" gap="$3">
                     <XStack justify="center">
-                        <Paragraph fontSize="$6" color="$accent5" fontWeight="bold" mb="$2" px="$2">Mints</Paragraph>
+                        <Paragraph fontSize="$6" color="$accent5" fontWeight="bold" mb="$2" px="$2">Select Mint</Paragraph>
                     </XStack>
 
                     <ListItem
-                        size="$6"
+                        size="$4"
+                        px="$0"
                         hoverTheme
                         pressTheme
-                        rounded="$7"
-                        borderWidth={2}
-                        borderColor="$color3"
+                        rounded="$5"
+                        borderWidth={0}
+                        borderColor="$borderColor"
+
                         onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             sheetRef.current?.dismiss();
@@ -56,10 +58,54 @@ export default function HomeHeaderMintSelector() {
                         title="Cashu Testnut"
                         subTitle="https://testnut.cashu.space"
                         iconAfter={
-                            <XStack items="center" gap="$2">
-                                <Text fontWeight="bold" fontSize="$5">{balance}</Text>
+                            <YStack items="flex-end" gap="$0">
+                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
                                 <Text fontSize="$2" opacity={0.6}>SATS</Text>
-                            </XStack>
+                            </YStack>
+                        }
+                    />
+                    <ListItem
+                        size="$4"
+                        px="$0"
+                        hoverTheme
+                        pressTheme
+                        rounded="$5"
+                        borderWidth={0}
+                        borderColor="$borderColor"
+
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            sheetRef.current?.dismiss();
+                        }}
+                        title="Cashu Testnut"
+                        subTitle="https://testnut.cashu.space"
+                        iconAfter={
+                            <YStack items="flex-end" gap="$0">
+                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
+                                <Text fontSize="$2" opacity={0.6}>SATS</Text>
+                            </YStack>
+                        }
+                    />
+                    <ListItem
+                        size="$4"
+                        px="$0"
+                        hoverTheme
+                        pressTheme
+                        rounded="$5"
+                        borderWidth={0}
+                        borderColor="$borderColor"
+
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            sheetRef.current?.dismiss();
+                        }}
+                        title="Cashu Testnut"
+                        subTitle="https://testnut.cashu.space"
+                        iconAfter={
+                            <YStack items="flex-end" gap="$0">
+                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
+                                <Text fontSize="$2" opacity={0.6}>SATS</Text>
+                            </YStack>
                         }
                     />
                 </YStack>
