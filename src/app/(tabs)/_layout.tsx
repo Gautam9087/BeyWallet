@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router'
+import { router, Tabs } from 'expo-router'
 import { Button, XStack, Text, useTheme, Image } from 'tamagui'
 import {
   History,
@@ -10,13 +10,16 @@ import {
   Filter,
   ChevronDown,
   Sprout,
-  Globe
+  Globe,
+  ArrowLeft
 } from '@tamagui/lucide-icons'
 import { useAppTheme } from '~/context/ThemeContext'
 import { useAuthStore } from '~/store/authStore'
 import HomeHeaderMintSelector from '~/components/HomeMintSelector'
 import SettingsIcon from '~/components/icons/Settings'
 import WalletIcon from '~/components/icons/Wallet'
+import LockIcon from '~/components/icons/Lock'
+import * as Haptics from 'expo-haptics'
 
 export default function TabLayout() {
   const theme = useTheme()
@@ -24,7 +27,7 @@ export default function TabLayout() {
   const { lock } = useAuthStore()
 
   const HeaderLeft = () => (
-    <XStack pl="$4" items="center">
+    <XStack pl="$5" items="center">
       <Image
         source={resolvedTheme === 'dark'
           ? require('../../assets/icons/Bey-dark-logo.png')
@@ -69,8 +72,10 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="index"
+        listeners={{
+          tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        }}
         options={{
-
           title: 'Home',
           headerTitle: () => <HomeHeaderMintSelector />,
           tabBarIcon: ({ color }) => <WalletIcon size={28} color={color as any} />,
@@ -80,15 +85,21 @@ export default function TabLayout() {
                 circular
                 size="$3"
                 chromeless
-                icon={<Scan size={24} color="$color" />}
-                onPress={() => console.log('Scan')}
+                icon={<Scan strokeWidth={3} size={24} color="$color9" />}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  console.log('Scan')
+                }}
               />
               <Button
                 circular
                 size="$3"
                 chromeless
-                icon={<Lock size={24} color="$color" />}
-                onPress={lock}
+                icon={<LockIcon size={24} color={theme.color9.val} />}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+                  lock()
+                }}
               />
             </XStack>
           ),
@@ -97,8 +108,10 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="history"
+        listeners={{
+          tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        }}
         options={{
-
           title: 'History',
           tabBarIcon: ({ color }) => <History strokeWidth={2.5} color={color as any} />,
           headerRight: () => (
@@ -108,7 +121,10 @@ export default function TabLayout() {
                 size="$3"
                 chromeless
                 icon={<Filter size={24} color="$color" />}
-                onPress={() => console.log('Filter')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  console.log('Filter')
+                }}
               />
             </XStack>
           ),
@@ -118,6 +134,9 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="two"
+        listeners={{
+          tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        }}
         options={{
           title: 'Two',
           tabBarIcon: ({ color }) => <Globe color={color as any} />,
@@ -128,7 +147,10 @@ export default function TabLayout() {
                 size="$3"
                 chromeless
                 icon={<HelpCircle size={24} color="$color" />}
-                onPress={() => console.log('Help')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  console.log('Help')
+                }}
               />
             </XStack>
           ),
@@ -136,11 +158,28 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="settings"
+        listeners={{
+          tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        }}
         options={{
           tabBarStyle: {
             display: 'none',
           },
           title: 'Settings',
+          headerLeft: () => (
+            <XStack pl="$4">
+              <Button
+                circular
+                size="$3"
+                chromeless
+                icon={<ArrowLeft size={24} color={"$color"} />}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  router.back()
+                }}
+              />
+            </XStack>
+          ),
           tabBarIcon: ({ color }) => <SettingsIcon color={color as any} />,
           headerRight: () => (
             <XStack pr="$4">
@@ -149,7 +188,10 @@ export default function TabLayout() {
                 size="$3"
                 chromeless
                 icon={<HelpCircle size={24} color="$color" />}
-                onPress={() => console.log('Help')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  console.log('Help')
+                }}
               />
             </XStack>
           ),

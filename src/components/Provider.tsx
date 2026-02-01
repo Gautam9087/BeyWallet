@@ -1,24 +1,26 @@
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
+import { CocoProvider } from 'coco-cashu-react'
 import { CurrentToast } from './CurrentToast'
 import { config } from '../tamagui.config'
 import { ThemeProvider, useAppTheme } from '../context/ThemeContext'
 
 export function Provider({
   children,
+  cocoManager,
   ...rest
-}: Omit<TamaguiProviderProps, 'config' | 'defaultTheme'>) {
+}: any) {
   return (
     <ThemeProvider>
-      <InnerProvider {...rest}>{children}</InnerProvider>
+      <InnerProvider cocoManager={cocoManager} {...rest}>{children}</InnerProvider>
     </ThemeProvider>
   )
 }
 
-function InnerProvider({ children, ...rest }: any) {
+function InnerProvider({ children, cocoManager, ...rest }: any) {
   const { resolvedTheme } = useAppTheme()
 
-  return (
+  const content = (
     <TamaguiProvider
       config={config}
       defaultTheme={resolvedTheme}
@@ -35,4 +37,14 @@ function InnerProvider({ children, ...rest }: any) {
       </ToastProvider>
     </TamaguiProvider>
   )
+
+  if (cocoManager) {
+    return (
+      <CocoProvider manager={cocoManager}>
+        {content}
+      </CocoProvider>
+    )
+  }
+
+  return content
 }

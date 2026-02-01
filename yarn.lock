@@ -2121,6 +2121,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@cashu/cashu-ts@npm:^2.7.2":
+  version: 2.9.0
+  resolution: "@cashu/cashu-ts@npm:2.9.0"
+  dependencies:
+    "@noble/curves": "npm:^2.0.1"
+    "@noble/hashes": "npm:^2.0.1"
+    "@scure/bip32": "npm:^1.5.0"
+  checksum: 10/9bcede5aac9ea1a5811e481ce3e418c20989fe77185a9dda255844b68a5910200e49bbd419553330e5a288e292fe1794e7beb68cb382d1d7994f958fc512fa80
+  languageName: node
+  linkType: hard
+
 "@cashu/cashu-ts@npm:^3.3.0":
   version: 3.3.0
   resolution: "@cashu/cashu-ts@npm:3.3.0"
@@ -3516,17 +3527,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@noble/curves@npm:~1.9.0":
+  version: 1.9.7
+  resolution: "@noble/curves@npm:1.9.7"
+  dependencies:
+    "@noble/hashes": "npm:1.8.0"
+  checksum: 10/3cfe2735ea94972988ca9e217e0ebb2044372a7160b2079bf885da789492a6291fc8bf76ca3d8bf8dee477847ee2d6fac267d1e6c4f555054059f5e8c4865d44
+  languageName: node
+  linkType: hard
+
+"@noble/hashes@npm:1.8.0, @noble/hashes@npm:^1.2.0, @noble/hashes@npm:~1.8.0":
+  version: 1.8.0
+  resolution: "@noble/hashes@npm:1.8.0"
+  checksum: 10/474b7f56bc6fb2d5b3a42132561e221b0ea4f91e590f4655312ca13667840896b34195e2b53b7f097ec080a1fdd3b58d902c2a8d0fbdf51d2e238b53808a177e
+  languageName: node
+  linkType: hard
+
 "@noble/hashes@npm:2.0.1, @noble/hashes@npm:^2.0.1":
   version: 2.0.1
   resolution: "@noble/hashes@npm:2.0.1"
   checksum: 10/f4d00e7564eb4ff4e6d16be151dd0e404aede35f91e4372b0a8a6ec888379c1dd1e02c721b480af8e7853bea9637185b5cb9533970c5b77d60c254ead0cfd8f7
-  languageName: node
-  linkType: hard
-
-"@noble/hashes@npm:^1.2.0":
-  version: 1.8.0
-  resolution: "@noble/hashes@npm:1.8.0"
-  checksum: 10/474b7f56bc6fb2d5b3a42132561e221b0ea4f91e590f4655312ca13667840896b34195e2b53b7f097ec080a1fdd3b58d902c2a8d0fbdf51d2e238b53808a177e
   languageName: node
   linkType: hard
 
@@ -4714,6 +4734,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@scure/base@npm:~1.2.5":
+  version: 1.2.6
+  resolution: "@scure/base@npm:1.2.6"
+  checksum: 10/c1a7bd5e0b0c8f94c36fbc220f4a67cc832b00e2d2065c7d8a404ed81ab1c94c5443def6d361a70fc382db3496e9487fb9941728f0584782b274c18a4bed4187
+  languageName: node
+  linkType: hard
+
 "@scure/bip32@npm:2.0.1, @scure/bip32@npm:^2.0.1":
   version: 2.0.1
   resolution: "@scure/bip32@npm:2.0.1"
@@ -4722,6 +4749,17 @@ __metadata:
     "@noble/hashes": "npm:2.0.1"
     "@scure/base": "npm:2.0.0"
   checksum: 10/d1248fdc45a3f45ede5bd049669d336eff008d0bb9693dea99ac401c5750f881f50ea727459959e116c8eb7f4b9f8325f6ab740396ed4baa9b095b109b6709d5
+  languageName: node
+  linkType: hard
+
+"@scure/bip32@npm:^1.5.0":
+  version: 1.7.0
+  resolution: "@scure/bip32@npm:1.7.0"
+  dependencies:
+    "@noble/curves": "npm:~1.9.0"
+    "@noble/hashes": "npm:~1.8.0"
+    "@scure/base": "npm:~1.2.5"
+  checksum: 10/f90e0c23ab6a31a164856ae9cb9a8cae2886df608c74a6c0c4875095b017e30ffd92f28f73b8c52890d9a89fca86d19f6d60bb1ea7cad64c7987f92ae83509ad
   languageName: node
   linkType: hard
 
@@ -7481,6 +7519,9 @@ __metadata:
     bip39: "npm:^3.1.0"
     buffer: "npm:^6.0.3"
     burnt: "npm:^0.12.2"
+    coco-cashu-core: "npm:1.0.0-rc11"
+    coco-cashu-expo-sqlite: "npm:^1.0.0-rc11"
+    coco-cashu-react: "npm:^1.1.1"
     events: "npm:^3.3.0"
     expo: "npm:^54.0.23"
     expo-application: "npm:~7.0.8"
@@ -8121,6 +8162,37 @@ __metadata:
   version: 1.0.4
   resolution: "clone@npm:1.0.4"
   checksum: 10/d06418b7335897209e77bdd430d04f882189582e67bd1f75a04565f3f07f5b3f119a9d670c943b6697d0afb100f03b866b3b8a1f91d4d02d72c4ecf2bb64b5dd
+  languageName: node
+  linkType: hard
+
+"coco-cashu-core@npm:1.0.0-rc11":
+  version: 1.0.0-rc11
+  resolution: "coco-cashu-core@npm:1.0.0-rc11"
+  dependencies:
+    "@cashu/cashu-ts": "npm:^2.7.2"
+  peerDependencies:
+    typescript: ^5
+  checksum: 10/03a200cabda498f2472dfe859d789143211f058ba0535f526cd01a660fabe31e549866865eee503379dedc1f4541a6dda78de78ec079ba2ce0569cc2caff2137
+  languageName: node
+  linkType: hard
+
+"coco-cashu-expo-sqlite@npm:^1.0.0-rc11":
+  version: 1.0.0-rc11
+  resolution: "coco-cashu-expo-sqlite@npm:1.0.0-rc11"
+  peerDependencies:
+    coco-cashu-core: ^1.0.0-rc9
+    expo-sqlite: "*"
+    typescript: ^5
+  checksum: 10/742e4c44b865b97a22925ffd26aaa175bc83d04ccc7be5dcbfde39facd690c871fc3b9ec8140617c8aa62238f89be270e10b04299200907c4f4a6867bf20eeda
+  languageName: node
+  linkType: hard
+
+"coco-cashu-react@npm:^1.1.1":
+  version: 1.1.1
+  resolution: "coco-cashu-react@npm:1.1.1"
+  peerDependencies:
+    react: ^19
+  checksum: 10/8055b583f89b99c15bd774a6b6d5c5e3cf33f1afe53a58e597743d7f0b4f23b5db7e7eeed28482015dfde764f918d97bc9a7022c917850f57aa5d17ce365a126
   languageName: node
   linkType: hard
 
