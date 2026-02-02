@@ -12,7 +12,13 @@ import { useRouter } from 'expo-router';
 import { AppBottomSheetRef } from '../../../components/UI/AppBottomSheet';
 import { TrustingMint } from './TrustingMint';
 
-export function MintDiscovery() {
+interface MintDiscoveryProps {
+    refreshTrigger?: number;
+    onRefreshStarted?: () => void;
+    onRefreshFinished?: () => void;
+}
+
+export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinished }: MintDiscoveryProps) {
     const [loadingMessage, setLoadingMessage] = React.useState('Loading...');
     const { data: recommendations = [], isLoading, error, refetch, isRefetching } = useQuery({
         queryKey: ['mint-recommendations'],
@@ -40,6 +46,7 @@ export function MintDiscovery() {
     });
 
     const handleRefresh = async () => {
+        onRefreshStarted?.();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setLoadingMessage('Syncing with the Nostr network...');
 
@@ -54,8 +61,17 @@ export function MintDiscovery() {
             }
         } catch (e) {
             console.error('[MintDiscovery] Refresh failed:', e);
+        } finally {
+            onRefreshFinished?.();
         }
     };
+
+    // Watch for external refresh trigger
+    React.useEffect(() => {
+        if (refreshTrigger && refreshTrigger > 0) {
+            handleRefresh();
+        }
+    }, [refreshTrigger]);
     const { addMint, mints } = useWalletStore();
     const toast = useToastController();
     const router = useRouter();

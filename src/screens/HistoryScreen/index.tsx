@@ -4,11 +4,12 @@ import { RefreshCw, Database, ArrowUpRight, ArrowDownLeft, Clock, Info } from '@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cocoService } from '../../services/cocoService';
 import { Spinner } from '../../components/UI/Spinner';
+import { RefreshControl } from 'react-native';
 
 export function HistoryScreen() {
     const queryClient = useQueryClient();
 
-    const { data: history = [], isLoading, refetch } = useQuery({
+    const { data: history = [], isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['history'],
         queryFn: async () => {
             const repo = cocoService.getRepo();
@@ -27,7 +28,7 @@ export function HistoryScreen() {
         },
     });
 
-    if (isLoading) {
+    if (isLoading && !isRefetching) {
         return (
             <YStack flex={1} items="center" justify="center" bg="$background">
                 <Spinner size="large" />
@@ -63,7 +64,18 @@ export function HistoryScreen() {
                 </XStack>
             </XStack>
 
-            <ScrollView flex={1} px="$4" pb="$4">
+            <ScrollView
+                flex={1}
+                px="$4"
+                pb="$4"
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefetching}
+                        onRefresh={refetch}
+                        tintColor="#FFD700"
+                    />
+                }
+            >
                 <YStack gap="$3">
                     {history.length === 0 ? (
                         <YStack py="$10" items="center" justify="center" gap="$2">

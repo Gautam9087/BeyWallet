@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { YStack, Text, Button, Spinner, H2 } from 'tamagui'
+import { YStack, Text, Button, Spinner, H2, Image, View, Circle } from 'tamagui'
 import { Fingerprint, Lock } from '@tamagui/lucide-icons'
 import { biometricService } from '../services/biometricService'
 import * as Haptics from 'expo-haptics'
-
 import { AppState, AppStateStatus } from 'react-native'
+import { useAppTheme } from '../context/ThemeContext'
 
 export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     const [isAuthenticating, setIsAuthenticating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const { resolvedTheme } = useAppTheme()
 
     const handleAuthenticate = async () => {
         if (isAuthenticating) return
@@ -53,55 +54,73 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }, [])
 
     return (
-        <YStack flex={1} bg="$background" px="$6" py="$10">
-            <YStack flex={1} items="center" justify="center" gap="$10">
+        <YStack flex={1} bg="$background" px="$3" py="$5" justify="space-between">
+            {/* Top Section */}
+            <YStack items="center" gap="$3" mt="$4">
 
-                <YStack items="center" gap="$6" width="100%">
-                    <Button
-                        size="$8"
-                        circular
-                        width={120}
-                        height={120}
-                        theme="blue"
-                        onPress={handleAuthenticate}
-                        disabled={isAuthenticating}
-                        elevation={20}
-                        shadowColor="$blue10"
-                        shadowRadius={30}
-                        pressStyle={{ scale: 0.95 }}
-                    >
-                        {isAuthenticating ? (
-                            <Spinner size="large" color="white" />
-                        ) : (
-                            <Fingerprint size={56} color="white" />
-                        )}
-                    </Button>
-
-                    <YStack height={60} justify="center" items="center" width="100%">
-                        <Text
-                            color={error ? "$red10" : "$gray9"}
-                            fontWeight={error ? "600" : "400"}
-                            fontSize={error ? "$4" : "$3"}
-                            animation="quick"
-                            enterStyle={{ opacity: 0, y: 10 }}
-                        >
-                            {error || 'Tap fingerprint to unlock'}
-                        </Text>
-                    </YStack>
+                <YStack items="center" gap="$1">
+                    <H2 fontSize="$8" fontWeight="700" color="$color">Bey Wallet is Locked</H2>
+                    <Text color="$gray10" fontSize="$3">Your funds are securely protected</Text>
                 </YStack>
+            </YStack>
 
-                <Button
-                    size="$5"
-                    onPress={handleAuthenticate}
-                    disabled={isAuthenticating}
+            {/* Middle Section - App Logo */}
+            <YStack flex={1} justify="center" items="center">
+                <View
+                    width={160}
+                    height={160}
+                    rounded="$10"
+                    bg="$color"
+                    items="center"
+                    justify="center"
+                    overflow="hidden"
 
                     borderWidth={1}
                     borderColor="$borderColor"
-                    hoverStyle={{ bg: '$backgroundHover' }}
-                    pressStyle={{ scale: 0.98 }}
                 >
-                    Try Again
-                </Button>
+                    <Image
+                        source={resolvedTheme === 'dark'
+                            ? require('../assets/icons/Bey-light-logo.png')
+                            : require('../assets/icons/Bey-dark-logo.png')}
+                        style={{ width: 100, height: 100 }}
+                        resizeMode="contain"
+                    />
+                </View>
+            </YStack>
+
+            {/* Bottom Section - Unlock Button */}
+            <YStack gap="$4" height={200} items="center" justify="flex-end">
+                {error && (
+                    <View px="$2" items="center">
+
+                        <Text color="$red10" bg="$red2" px="$4" py="$2" rounded="$2" text="center" fontSize="$3" fontWeight="600" animation="quick" enterStyle={{ opacity: 0, y: 10 }}>
+                            {error}
+                        </Text>
+                    </View>
+                )}
+                <View items="center">
+
+                    <Button
+                        size="$5"
+                        theme="accent"
+
+                        onPress={handleAuthenticate}
+
+                        icon={isAuthenticating ? <Spinner /> : <Fingerprint size={24} />}
+                        fontSize="$6"
+                        fontWeight="700"
+
+                        rounded="$6"
+
+                        pressStyle={{ scale: 0.98, opacity: 0.9 }}
+                    >
+                        {isAuthenticating ? 'Authenticating...' : 'Unlock Wallet'}
+                    </Button>
+                </View>
+
+                <Text text="center" color="$gray9" fontSize="$2" opacity={0.7}>
+                    Supports FaceID, TouchID or Passcode
+                </Text>
             </YStack>
         </YStack>
     )

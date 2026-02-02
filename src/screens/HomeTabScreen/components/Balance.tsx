@@ -1,4 +1,4 @@
-import { H2, Paragraph, Text, XStack, YStack } from "tamagui";
+import { H1, H2, Paragraph, Text, XStack, YStack } from "tamagui";
 import { useWalletStore } from "../../../store/walletStore";
 
 export default function Balance() {
@@ -12,16 +12,18 @@ export default function Balance() {
             <XStack justify="space-between" py="$2" items="flex-end">
 
                 <Text
+
                     letterSpacing={-1}
                     fontSize={35}
                     fontWeight="500"
                     maxW={"82%"}
-                    color="$accent4"
+                    color="$accent1"
                     numberOfLines={1}
                     ellipsizeMode="tail"
                     fontVariant={['tabular-nums']}
                 >
-                    {balance.toLocaleString()}
+                    {/* {balance.toLocaleString()} */}
+                    $9820.30
                 </Text>
                 <Text color="$accent9">SATS</Text>
             </XStack>
