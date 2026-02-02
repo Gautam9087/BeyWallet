@@ -5,6 +5,7 @@ import { Search, Star, MessageSquare, Plus, RefreshCw, Check, Sprout, Info, Exte
 import { useQuery } from '@tanstack/react-query';
 import { mintRecommendationService } from '../../../services/mintRecommendationService';
 import { useWalletStore } from '../../../store/walletStore';
+import { cocoService } from '../../../services/cocoService';
 import * as Haptics from 'expo-haptics';
 import { useToastController } from '@tamagui/toast';
 import { useRouter } from 'expo-router';
@@ -12,11 +13,49 @@ import { AppBottomSheetRef } from '../../../components/UI/AppBottomSheet';
 import { TrustingMint } from './TrustingMint';
 
 export function MintDiscovery() {
+    const [loadingMessage, setLoadingMessage] = React.useState('Loading...');
     const { data: recommendations = [], isLoading, error, refetch, isRefetching } = useQuery({
         queryKey: ['mint-recommendations'],
-        queryFn: () => mintRecommendationService.discoverMints(),
-        staleTime: 1000 * 60 * 10, // 10 minutes
+        queryFn: async () => {
+            const repo = cocoService.getRepo();
+
+            setLoadingMessage('Fetching from local database...');
+            // 1. Try to get from Cache (DB)
+            const cached = await repo.mintRecommendationRepository.getAll();
+
+            // 2. If it's the first time (empty), or we explicitly want to refresh (handled by refetch)
+            // Note: querySync in discoverMints is slow, so we only do it if necessary or triggered
+            if (cached.length === 0) {
+                setLoadingMessage('Searching the Nostr network...');
+                const discovered = await mintRecommendationService.discoverMints();
+                if (discovered.length > 0) {
+                    await repo.mintRecommendationRepository.saveAll(discovered);
+                    return discovered;
+                }
+            }
+
+            return cached;
+        },
+        staleTime: Infinity, // Rely on manual refresh to update DB
     });
+
+    const handleRefresh = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setLoadingMessage('Syncing with the Nostr network...');
+
+        // Forced discovery and cache update
+        try {
+            const discovered = await mintRecommendationService.discoverMints();
+            if (discovered.length > 0) {
+                const repo = cocoService.getRepo();
+                await repo.mintRecommendationRepository.deleteAll();
+                await repo.mintRecommendationRepository.saveAll(discovered);
+                refetch();
+            }
+        } catch (e) {
+            console.error('[MintDiscovery] Refresh failed:', e);
+        }
+    };
     const { addMint, mints } = useWalletStore();
     const toast = useToastController();
     const router = useRouter();
@@ -46,10 +85,6 @@ export function MintDiscovery() {
         }
     };
 
-    const handleRefresh = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        refetch();
-    };
 
     const handleViewProfile = (url: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -71,10 +106,10 @@ export function MintDiscovery() {
                 />
             </XStack>
 
-            {isLoading && recommendations.length === 0 && (
+            {(isLoading || isRefetching) && recommendations.length === 0 && (
                 <YStack height={200} items="center" justify="center">
                     <Spinner size="large" color="$accentColor" />
-                    <Text mt="$2" color="$gray10">Searching the Nostr network...</Text>
+                    <Text mt="$2" color="$gray10">{loadingMessage}</Text>
                 </YStack>
             )}
 
@@ -103,6 +138,7 @@ export function MintDiscovery() {
                             p="$3"
                             bg="$gray3"
                             minH={150}
+
                             pressStyle={{ scale: 0.98 }}
                         >
                             <YStack justify="space-between" flex={1}>
@@ -142,15 +178,6 @@ export function MintDiscovery() {
                                             />
                                         </XStack>
 
-                                        {isMostRecommended && (
-                                            <XStack items="center" gap="$1" theme="green" bg="$color5" px="$2" py="$1" rounded="$2" self="flex-start" mb="$1">
-                                                <Star size={10} color="$color" fill="$color" />
-                                                <Text fontSize="$1" fontWeight="800" color="$color" letterSpacing={0.5}>
-                                                    MOST RECOMMENDED
-                                                </Text>
-                                            </XStack>
-                                        )}
-
                                         <Text color="$gray10" fontSize="$3" numberOfLines={2}>
                                             {mint.description || mint.url}
                                         </Text>
@@ -174,6 +201,7 @@ export function MintDiscovery() {
 
                                     <Button
                                         size="$3"
+                                        fontWeight="bold"
                                         fontSize="$4"
                                         theme={isAlreadyAdded ? 'gray' : 'accent'}
                                         disabled={isAlreadyAdded}
@@ -184,6 +212,29 @@ export function MintDiscovery() {
                                     </Button>
                                 </XStack>
                             </YStack>
+
+                            {isMostRecommended && (
+                                <XStack
+                                    position="absolute"
+                                    t={-10}
+                                    r={15}
+                                    bg="gold"
+                                    px="$2"
+                                    py="$1"
+                                    rounded="$2"
+                                    borderWidth={1}
+                                    borderColor="$yellow10"
+                                    items="center"
+                                    gap="$1"
+                                    z={10}
+                                    elevation={3}
+                                >
+                                    <Star size={10} color="black" fill="black" />
+                                    <Text fontSize="$1" fontWeight="800" color="black" letterSpacing={0.5}>
+                                        Top Best
+                                    </Text>
+                                </XStack>
+                            )}
                         </Card>
                     );
                 })}

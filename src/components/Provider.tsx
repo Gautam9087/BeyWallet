@@ -27,6 +27,7 @@ function InnerProvider({ children, cocoManager, ...rest }: any) {
   const content = (
     <TamaguiProvider
       config={config}
+
       defaultTheme={resolvedTheme}
       {...rest}
     >

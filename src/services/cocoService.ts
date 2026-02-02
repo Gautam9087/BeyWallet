@@ -4,6 +4,7 @@ import * as SQLite from 'expo-sqlite';
 import { seedService } from './seedService';
 
 let cocoManager: Manager | null = null;
+let repo: ExpoSqliteRepositories | null = null;
 
 export const cocoService = {
     /**
@@ -61,7 +62,19 @@ export const cocoService = {
         });
         console.log('[CocoService] CocoManager ready');
 
+        repo = repositoriesInstance;
+
         return cocoManager;
+    },
+
+    /**
+     * Returns the repositories instance.
+     */
+    getRepo: (): ExpoSqliteRepositories => {
+        if (!repo) {
+            throw new Error('Repositories not initialized');
+        }
+        return repo;
     },
 
     /**

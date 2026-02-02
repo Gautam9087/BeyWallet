@@ -12,7 +12,7 @@ import type {
     RepositoryTransactionScope,
 } from 'coco-cashu-core';
 import { ExpoSqliteDb, type ExpoSqliteDbOptions } from './db';
-import { ensureSchema, ensureSchemaUpTo, MIGRATIONS, type Migration } from './schema';
+import { ensureSchema, ensureSchemaUpTo, MIGRATIONS, seedMockData, type Migration } from './schema';
 import { ExpoMintRepository } from './repositories/MintRepository';
 import { ExpoKeysetRepository } from './repositories/KeysetRepository';
 import { ExpoKeyRingRepository } from './repositories/KeyRingRepository';
@@ -23,6 +23,8 @@ import { ExpoMeltQuoteRepository } from './repositories/MeltQuoteRepository';
 import { ExpoHistoryRepository } from './repositories/HistoryRepository';
 import { ExpoSendOperationRepository } from './repositories/SendOperationRepository';
 import { ExpoMeltOperationRepository } from './repositories/MeltOperationRepository';
+import { ExpoSettingsRepository } from './repositories/SettingsRepository';
+import { ExpoMintRecommendationRepository } from './repositories/MintRecommendationRepository';
 
 export interface ExpoSqliteRepositoriesOptions extends ExpoSqliteDbOptions { }
 
@@ -37,6 +39,8 @@ export class ExpoSqliteRepositories implements Repositories {
     readonly historyRepository: ExpoHistoryRepository;
     readonly sendOperationRepository: SendOperationRepository;
     readonly meltOperationRepository: MeltOperationRepository;
+    readonly settingsRepository: ExpoSettingsRepository;
+    readonly mintRecommendationRepository: ExpoMintRecommendationRepository;
     readonly db: ExpoSqliteDb;
 
     constructor(options: ExpoSqliteRepositoriesOptions) {
@@ -51,11 +55,18 @@ export class ExpoSqliteRepositories implements Repositories {
         this.historyRepository = new ExpoHistoryRepository(this.db);
         this.sendOperationRepository = new ExpoSendOperationRepository(this.db);
         this.meltOperationRepository = new ExpoMeltOperationRepository(this.db);
+        this.settingsRepository = new ExpoSettingsRepository(this.db);
+        this.mintRecommendationRepository = new ExpoMintRecommendationRepository(this.db);
     }
 
     async init(): Promise<void> {
         // Ensure schema is up to date
         await ensureSchema(this.db);
+        console.log('[Database] Schema initialized and verified');
+    }
+
+    async seedMockData(): Promise<void> {
+        await seedMockData(this.db);
     }
 
     async withTransaction<T>(fn: (repos: RepositoryTransactionScope) => Promise<T>): Promise<T> {

@@ -57,7 +57,7 @@ export function TrustingMint({ bottomSheetRef, mintUrl, onConfirm }: TrustingMin
                     <Checkbox
                         value={isTrusted}
                         onValueChange={setIsTrusted}
-                        color={isTrusted ? '$color' : undefined}
+                        color={isTrusted ? '' : undefined}
                     />
                     <Label
                         onPress={() => setIsTrusted(!isTrusted)}
@@ -74,6 +74,7 @@ export function TrustingMint({ bottomSheetRef, mintUrl, onConfirm }: TrustingMin
                     <Button
                         flex={1}
                         theme="red"
+                        fontWeight="bold"
                         onPress={handleCancel}
                         icon={<X size={16} />}
                     >
@@ -81,12 +82,13 @@ export function TrustingMint({ bottomSheetRef, mintUrl, onConfirm }: TrustingMin
                     </Button>
                     <Button
                         flex={1}
-                        theme="accent"
-                        disabled={!isTrusted || isAdding}
+                        fontWeight="bold"
+                        theme={isTrusted ? 'accent' : 'gray'}
+                        disabled={isTrusted ? false : isAdding ? true : false}
                         onPress={handleConfirm}
                         icon={isAdding ? undefined : <ShieldCheck size={16} />}
                     >
-                        {isAdding ? 'Connecting...' : 'I Trust, Add Mint'}
+                        {isAdding ? 'Connecting...' : 'Add Mint'}
                     </Button>
                 </XStack>
             </YStack>
