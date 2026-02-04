@@ -10,6 +10,7 @@ import { WalletDebugInfo } from './components/WalletDebugInfo'
 import { MintDiscovery } from './components/MintDiscovery'
 import { useWalletStore } from '../../store/walletStore'
 import React from 'react'
+import ManageBalances from './components/ManageBalances'
 
 export function HomeTabScreen() {
     const { refreshBalance } = useWalletStore()
@@ -32,15 +33,15 @@ export function HomeTabScreen() {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFD700" />
             }
         >
-            <YStack flex={1} items="center" gap="$2" px="$4" pt="$2" pb="$20">
+            <YStack flex={1} items="center" gap="$4" px="$4" pt="$2" pb="$20">
                 <WalletCard />
                 <ActionButtons />
-
+                <ManageBalances />
                 {/* <MintDiscovery /> */}
-
+                {/* 
                 <ToastControl />
 
-                <WalletDebugInfo />
+                <WalletDebugInfo /> */}
             </YStack>
         </ScrollView>
     )

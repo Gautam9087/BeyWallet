@@ -49,6 +49,7 @@ export default function ActionButtons() {
                     rounded="$4"
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.push("/receive");
                     }}
                     icon={<ArrowDownIcon size={36} />}
                 />

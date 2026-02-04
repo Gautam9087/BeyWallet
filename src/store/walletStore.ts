@@ -10,6 +10,8 @@ interface WalletState {
     error: string | null;
     mints: string[]; // List of registered mint URLs
 
+    refreshCounter: number;
+
     // Actions
     initialize: () => Promise<void>;
     setActiveMint: (url: string) => void;
@@ -23,6 +25,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     isInitializing: false,
     error: null,
     mints: [],
+    refreshCounter: 0,
 
     initialize: async () => {
         set({ isInitializing: true, error: null });
@@ -101,7 +104,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             // Calculate balance for the active mint
             const balances = await manager.wallet.getBalances();
             const balance = balances[activeUrl] || 0;
-            set({ balance });
+            set({ balance, refreshCounter: get().refreshCounter + 1 });
         } catch (err) {
             console.error('Error refreshing balance:', err);
         }

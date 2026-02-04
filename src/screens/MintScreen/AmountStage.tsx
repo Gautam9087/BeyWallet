@@ -21,9 +21,9 @@ export function AmountStage({ amount, setAmount, onContinue }: AmountStageProps)
                     <ChevronDown size={18} color="$color" />
                 </XStack>
 
-                <YStack items="center" gap="$3">
+                <YStack items="center" gap="$1">
                     <Text color="$gray10" fontSize="$3">How much to deposit?</Text>
-                    <H1 fontWeight="400" fontSize={60}>${amount}</H1>
+                    <H1 fontWeight="400" py="$2">${amount}</H1>
                     <Text color="$gray10" fontSize="$3" mt="$-2">≈ {Number(amount) * 3000} SATS</Text>
                 </YStack>
 

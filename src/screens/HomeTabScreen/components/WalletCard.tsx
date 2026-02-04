@@ -20,7 +20,7 @@ export default function WalletCard() {
                     </YStack>
                 </XStack>
             </XStack>
-            <HomeHeaderMintSelector />
+            {/* <HomeHeaderMintSelector /> */}
             <Balance />
         </YStack>
     )

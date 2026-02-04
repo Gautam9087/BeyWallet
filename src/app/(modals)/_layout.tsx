@@ -44,6 +44,12 @@ export default function ModalLayout() {
             }}
         >
             <Stack.Screen
+                name="receive"
+                options={{
+                    title: 'Receive Ecash',
+                }}
+            />
+            <Stack.Screen
                 name="send"
                 options={{
                     title: 'Send',

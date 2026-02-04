@@ -1,61 +1,67 @@
 import React, { useState } from 'react'
-import { YStack, XStack, Text, Button } from 'tamagui'
+import { YStack } from 'tamagui'
 import { useRouter } from 'expo-router'
-import * as Haptics from 'expo-haptics'
-import { useToastController } from '@tamagui/toast'
 import { useWalletStore } from '~/store/walletStore'
-import { NumericKeypad } from '~/components/UI/NumericKeypad'
-import { ArrowLeft } from '@tamagui/lucide-icons'
+import { AmountStage } from './AmountStage'
+import { ResultStage } from './ResultStage'
+import { biometricService } from '~/services/biometricService'
+import * as Haptics from 'expo-haptics'
+
+type SendStep = 'amount' | 'result';
 
 export function SendModalScreen() {
+    const [step, setStep] = useState<SendStep>('amount')
     const [amount, setAmount] = useState('0')
-    const [isLoading, setIsLoading] = useState(false)
+    const [status, setStatus] = useState<'success' | 'error'>('success')
     const router = useRouter()
-    const toast = useToastController()
     const { balance } = useWalletStore()
 
-    const handleContinue = async () => {
-        setIsLoading(true)
+    const handleAuthenticate = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
 
         try {
-            // --- ACTUAL SEND LOGIC WOULD GO HERE ---
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            // --------------------------------------
+            const success = await biometricService.authenticateAsync(`Authorize creating ₿${amount} ecash`)
 
-            // Success Haptics
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-
-            // Show Success Toast
-            toast.show('Sent Successfully', {
-                message: `${amount} SATS has been sent.`,
-                theme: 'success'
-            })
-
-            // Go back after success
-            router.back()
+            if (success) {
+                setStatus('success')
+                setStep('result')
+            } else {
+                // If they cancel or fail, we stay on amount stage or show error
+                // For now, let's just stay on amount stage unless it's a hard error
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+            }
         } catch (error) {
-            toast.show('Error', {
-                message: 'Failed to send payment',
-                theme: 'red'
-            })
-        } finally {
-            setIsLoading(false)
+            setStatus('error')
+            setStep('result')
+        }
+    }
+
+    const handleNext = () => {
+        if (step === 'amount') {
+            handleAuthenticate()
         }
     }
 
     return (
-        <YStack flex={1} bg="$background" p="$4" pt="$0">
+        <YStack flex={1} bg="$background" p="$4">
+            {step === 'amount' && (
+                <AmountStage
+                    amount={amount}
+                    setAmount={setAmount}
+                    onContinue={handleNext}
+                    balance={balance}
+                />
+            )}
 
-            <NumericKeypad
-                value={amount}
-                onValueChange={setAmount}
-                onConfirm={handleContinue}
-                confirmLabel="Continue"
-                maxAmount={balance}
-                isLoading={isLoading}
-                showBalance={true}
-            />
+            {step === 'result' && (
+                <ResultStage
+                    status={status}
+                    amount={amount}
+                    onClose={() => router.back()}
+                />
+            )}
         </YStack>
     )
 }
+
+
