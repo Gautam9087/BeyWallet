@@ -2,6 +2,23 @@ import * as Crypto from 'expo-crypto';
 import 'text-encoding';
 import { Buffer } from 'buffer';
 
+// Filter out verbose coco-cashu library logs
+const originalConsoleLog = console.log;
+console.log = (...args: any[]) => {
+    const firstArg = args[0];
+    if (typeof firstArg === 'string') {
+        // Suppress keep/blinded message logs
+        if (/^(amount\.keep|keep \[)/.test(firstArg) || /blindedMessage|blindingFactor/.test(firstArg)) {
+            return;
+        }
+    }
+    // Suppress arrays with blindedMessage objects
+    if (Array.isArray(firstArg) && firstArg[0]?.blindedMessage) {
+        return;
+    }
+    originalConsoleLog.apply(console, args);
+};
+
 console.log('[Polyfills] Starting polyfill installation using expo-crypto');
 
 // 1. Patch Buffer
