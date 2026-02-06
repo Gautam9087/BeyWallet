@@ -91,7 +91,8 @@ const RollingDigit = ({
 };
 
 export interface RollingNumberProps {
-    value: number;
+    value?: number | string;
+    children?: number | string;
     fontSize?: number;
     color?: any;
     fontWeight?: any;
@@ -104,10 +105,12 @@ export interface RollingNumberProps {
     suffix?: string;
     decimalOpacity?: number;
     precision?: number;
+    showDecimals?: boolean;
 }
 
 export const RollingNumber = ({
     value,
+    children,
     fontSize = 40,
     color = "black",
     fontWeight = "400",
@@ -120,12 +123,23 @@ export const RollingNumber = ({
     suffix = "",
     decimalOpacity = 0.5,
     precision = 2,
+    showDecimals = true,
 }: RollingNumberProps) => {
-    // Format the number with commas and set precision
-    const formattedValue = value.toLocaleString(undefined, {
-        minimumFractionDigits: precision,
-        maximumFractionDigits: precision,
-    });
+    // Current display value
+    const displayValue = children !== undefined ? children : value;
+
+    // Build the string to display
+    let formattedValue = "";
+
+    if (typeof displayValue === "number") {
+        const finalPrecision = showDecimals ? precision : 0;
+        formattedValue = displayValue.toLocaleString(undefined, {
+            minimumFractionDigits: finalPrecision,
+            maximumFractionDigits: finalPrecision,
+        });
+    } else {
+        formattedValue = displayValue?.toString() || "";
+    }
 
     const valueStr = prefix + formattedValue + suffix;
     const itemHeight = lineHeight || fontSize * 1.1;

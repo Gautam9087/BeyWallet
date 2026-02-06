@@ -11,6 +11,7 @@ import { MintDiscovery } from './components/MintDiscovery'
 import { useWalletStore } from '../../store/walletStore'
 import React from 'react'
 import ManageBalances from './components/ManageBalances'
+import BitcoinPriceCard from './components/BitcoinPriceCard'
 
 export function HomeTabScreen() {
     const { refreshBalance } = useWalletStore()
@@ -36,6 +37,7 @@ export function HomeTabScreen() {
             <YStack flex={1} items="center" gap="$4" px="$4" pt="$2" pb="$20">
                 <WalletCard />
                 <ActionButtons />
+                <BitcoinPriceCard />
                 <ManageBalances />
                 {/* <MintDiscovery /> */}
                 {/* 

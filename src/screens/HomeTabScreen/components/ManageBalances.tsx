@@ -79,7 +79,7 @@ const ManageBalances = () => {
     ]
 
     return (
-        <YStack width="100%" gap="$2" >
+        <YStack width="100%" gap="$4" px="$1" >
             <XStack>
                 <H6 color="$gray10" borderBottomWidth={1} borderBottomColor="$gray10" borderStyle='dashed'>Manage Balances</H6>
             </XStack>

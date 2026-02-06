@@ -1,22 +1,30 @@
 import { create } from 'zustand';
 import { cocoService } from '../services/cocoService';
-import { mintService } from '../services/mintService';
+
+interface MintInfo {
+    mintUrl: string;
+    name?: string;
+    trusted: boolean;
+}
 
 interface WalletState {
     activeMintUrl: string | null;
     balance: number;
     isInitializing: boolean;
     error: string | null;
-    mints: string[]; // List of registered mint URLs
-
+    mints: MintInfo[]; // List of registered mints with trust status
     refreshCounter: number;
 
     // Actions
     initialize: () => Promise<void>;
     setActiveMint: (url: string) => void;
-    addMint: (url: string) => Promise<void>;
+    addMint: (url: string, options?: { trusted?: boolean }) => Promise<void>;
+    trustMint: (url: string) => Promise<void>;
     refreshBalance: () => Promise<void>;
+    restoreFromSeed: (mintUrl: string) => Promise<void>;
 }
+
+const DEFAULT_MINT = "https://testnut.cashu.space";
 
 export const useWalletStore = create<WalletState>((set, get) => ({
     activeMintUrl: null,
@@ -42,35 +50,50 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const manager = await cocoService.init();
             console.log('[WalletStore] cocoService initialized');
 
-            const defaultMint = "https://testnut.cashu.space";
-
             // Check if we already have mints
             const existingMints = await manager.mint.getAllMints();
             console.log(`[WalletStore] Existing mints: ${existingMints.length}`);
-            const hasDefault = existingMints.some(m => m.mintUrl === defaultMint);
+
+            const hasDefault = existingMints.some(m => m.mintUrl === DEFAULT_MINT);
 
             if (!hasDefault) {
-                console.log(`[WalletStore] Adding default mint: ${defaultMint}`);
-                // Add the default mint if it doesn't exist
-                await manager.mint.addMint(defaultMint);
-                console.log('[WalletStore] Default mint added');
+                console.log(`[WalletStore] Adding default mint: ${DEFAULT_MINT}`);
+                // Add and trust the default mint
+                await cocoService.addMint(DEFAULT_MINT, { trusted: true });
+                console.log('[WalletStore] Default mint added and trusted');
+            } else {
+                // Ensure it's trusted if it exists
+                const isTrusted = await manager.mint.isTrustedMint(DEFAULT_MINT);
+                if (!isTrusted) {
+                    await cocoService.trustMint(DEFAULT_MINT);
+                    console.log('[WalletStore] Default mint trusted');
+                }
             }
 
-            // Always ensure the default test mint is active for the user's request
+            // Set active mint if not set
             if (!get().activeMintUrl) {
                 console.log('[WalletStore] Setting active mint URL');
-                set({ activeMintUrl: defaultMint });
+                set({ activeMintUrl: DEFAULT_MINT });
             }
 
-            // Sync balance (initially)
+            // Sync balance
             console.log('[WalletStore] Refreshing balance');
             await get().refreshBalance();
 
-            // Store list of mint URLs
+            // Store list of mints with trust status
             const finalMints = await manager.mint.getAllMints();
+            const trustedMints = await manager.mint.getAllTrustedMints();
+            const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
+
+            const mintInfos: MintInfo[] = finalMints.map(m => ({
+                mintUrl: m.mintUrl,
+                name: m.name,
+                trusted: trustedUrls.has(m.mintUrl),
+            }));
+
             set({
                 isInitializing: false,
-                mints: finalMints.map(m => m.mintUrl)
+                mints: mintInfos,
             });
             console.log('[WalletStore] Initialization complete');
         } catch (err: any) {
@@ -84,17 +107,51 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         get().refreshBalance();
     },
 
-    addMint: async (url: string) => {
+    addMint: async (url: string, options?: { trusted?: boolean }) => {
         try {
-            await mintService.addMint(url);
+            await cocoService.addMint(url, options);
+
             const manager = cocoService.getManager();
             const allMints = await manager.mint.getAllMints();
+            const trustedMints = await manager.mint.getAllTrustedMints();
+            const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
+
+            const mintInfos: MintInfo[] = allMints.map(m => ({
+                mintUrl: m.mintUrl,
+                name: m.name,
+                trusted: trustedUrls.has(m.mintUrl),
+            }));
+
             set({
                 activeMintUrl: url,
-                mints: allMints.map(m => m.mintUrl)
+                mints: mintInfos,
             });
             get().refreshBalance();
         } catch (err: any) {
+            console.error('[WalletStore] Failed to add mint:', err);
+            set({ error: err.message });
+        }
+    },
+
+    trustMint: async (url: string) => {
+        try {
+            await cocoService.trustMint(url);
+
+            // Update mint list with new trust status
+            const manager = cocoService.getManager();
+            const allMints = await manager.mint.getAllMints();
+            const trustedMints = await manager.mint.getAllTrustedMints();
+            const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
+
+            const mintInfos: MintInfo[] = allMints.map(m => ({
+                mintUrl: m.mintUrl,
+                name: m.name,
+                trusted: trustedUrls.has(m.mintUrl),
+            }));
+
+            set({ mints: mintInfos });
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to trust mint:', err);
             set({ error: err.message });
         }
     },
@@ -106,19 +163,30 @@ export const useWalletStore = create<WalletState>((set, get) => ({
                 return;
             }
 
-            const manager = cocoService.getManager();
             const activeUrl = get().activeMintUrl;
             if (!activeUrl) {
                 set({ balance: 0 });
                 return;
             }
 
-            // Calculate balance for the active mint
-            const balances = await manager.wallet.getBalances();
+            // Get balances from coco
+            const balances = await cocoService.getBalances();
             const balance = balances[activeUrl] || 0;
             set({ balance, refreshCounter: get().refreshCounter + 1 });
         } catch (err) {
-            console.error('Error refreshing balance:', err);
+            console.error('[WalletStore] Error refreshing balance:', err);
         }
-    }
+    },
+
+    restoreFromSeed: async (mintUrl: string) => {
+        try {
+            console.log(`[WalletStore] Restoring from seed for mint: ${mintUrl}`);
+            await cocoService.restoreFromSeed(mintUrl);
+            await get().refreshBalance();
+            console.log('[WalletStore] Restore complete');
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to restore from seed:', err);
+            set({ error: err.message });
+        }
+    },
 }));

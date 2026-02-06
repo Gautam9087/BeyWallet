@@ -54,8 +54,8 @@ export default function ActionButtons() {
                     icon={<ArrowDownIcon size={36} />}
                 />
                 <Button
-                    bg="$color3"
                     themeInverse
+                    theme="gray"
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         router.push("/send");
