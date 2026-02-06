@@ -1,16 +1,19 @@
 import React from 'react';
-import { YStack, XStack, Text, Input, Button, View, TextArea } from 'tamagui';
-import { Scan, Nfc, Clipboard, X } from '@tamagui/lucide-icons';
+import { YStack, XStack, Text, Button, View, TextArea } from 'tamagui';
+import { Scan, Nfc, AlertCircle } from '@tamagui/lucide-icons';
+import { Spinner } from '../../components/UI/Spinner';
 import * as Haptics from 'expo-haptics';
 import * as ClipboardAPI from 'expo-clipboard';
 
 interface InputStageProps {
     token: string;
     setToken: (val: string) => void;
+    isLoading?: boolean;
+    error?: string | null;
     onContinue: () => void;
 }
 
-export function InputStage({ token, setToken, onContinue }: InputStageProps) {
+export function InputStage({ token, setToken, isLoading, error, onContinue }: InputStageProps) {
     const handlePaste = async () => {
         const text = await ClipboardAPI.getStringAsync();
         if (text) {
@@ -18,6 +21,11 @@ export function InputStage({ token, setToken, onContinue }: InputStageProps) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
     };
+
+    const isValidToken = token.trim().length > 20 && (
+        token.trim().startsWith('cashu') ||
+        token.trim().startsWith('creqA')
+    );
 
     return (
         <YStack flex={1} bg="$background" gap="$6" pt="$4">
@@ -48,6 +56,14 @@ export function InputStage({ token, setToken, onContinue }: InputStageProps) {
                 />
             </YStack>
 
+            {/* Error Display */}
+            {error && (
+                <XStack bg="$red3" p="$3" rounded="$3" gap="$2" items="center">
+                    <AlertCircle size={18} color="$red10" />
+                    <Text color="$red10" fontSize="$3" flex={1}>{error}</Text>
+                </XStack>
+            )}
+
             {/* Scanning Options */}
             <YStack gap="$3">
                 <Button
@@ -64,7 +80,7 @@ export function InputStage({ token, setToken, onContinue }: InputStageProps) {
                         </View>
                         <YStack>
                             <Text fontSize="$5" fontWeight="700">Scan QR Code</Text>
-                            <Text color="$gray10" fontSize="$3">Tap to scan an address</Text>
+                            <Text color="$gray10" fontSize="$3">Tap to scan a cashu token</Text>
                         </YStack>
                     </XStack>
                 </Button>
@@ -82,16 +98,18 @@ export function InputStage({ token, setToken, onContinue }: InputStageProps) {
                 </Button>
             </YStack>
 
-            {/* Hidden button to trigger next stage if token is detected */}
-            {token.length > 20 && (
+            {/* Continue Button */}
+            {isValidToken && (
                 <Button
                     mt="auto"
                     theme="accent"
                     size="$5"
                     fontWeight="800"
+                    disabled={isLoading}
+                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
                     onPress={onContinue}
                 >
-                    Preview Token
+                    {isLoading ? 'Decoding...' : 'Preview Token'}
                 </Button>
             )}
         </YStack>

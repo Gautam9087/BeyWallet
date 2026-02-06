@@ -1,26 +1,89 @@
 import { YStack } from "tamagui";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AmountStage } from "./AmountStage";
 import { ConfirmStage } from "./ConfirmStage";
 import { PaymentStage } from "./PaymentStage";
 import { ResultStage } from "./ResultStage";
+import { useWalletStore } from "../../store/walletStore";
+import { cocoService } from "../../services/cocoService";
 
 type MintStep = 'amount' | 'confirm' | 'payment' | 'result';
 type MintResultStatus = 'success' | 'error' | 'cancelled';
 
+interface MintQuoteData {
+    quoteId: string;
+    invoice: string;
+    expiry?: number;
+}
+
 export default function MintScreen() {
     const router = useRouter();
+    const { activeMintUrl, refreshBalance } = useWalletStore();
+
     const [step, setStep] = useState<MintStep>('amount');
     const [amount, setAmount] = useState("0");
     const [status, setStatus] = useState<MintResultStatus>('success');
+    const [quoteData, setQuoteData] = useState<MintQuoteData | null>(null);
+    const [isCreatingQuote, setIsCreatingQuote] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Listen for mint quote redeemed event
+    useEffect(() => {
+        if (!quoteData) return;
+
+        const handleRedeemed = (payload: any) => {
+            console.log('[MintScreen] Mint quote redeemed event:', payload);
+            if (payload.quoteId === quoteData.quoteId) {
+                setStatus('success');
+                setStep('result');
+                refreshBalance();
+            }
+        };
+
+        cocoService.on('mint-quote:redeemed', handleRedeemed);
+        return () => {
+            cocoService.off('mint-quote:redeemed', handleRedeemed);
+        };
+    }, [quoteData, refreshBalance]);
+
+    const handleCreateQuote = useCallback(async () => {
+        if (!activeMintUrl) {
+            setError('No active mint selected');
+            return;
+        }
+
+        setIsCreatingQuote(true);
+        setError(null);
+
+        try {
+            const amountSats = parseInt(amount, 10);
+            if (isNaN(amountSats) || amountSats <= 0) {
+                throw new Error('Invalid amount');
+            }
+
+            const quote = await cocoService.createMintQuote(activeMintUrl, amountSats);
+
+            setQuoteData({
+                quoteId: quote.quote,
+                invoice: quote.request,
+                expiry: quote.expiry,
+            });
+            setStep('payment');
+        } catch (err: any) {
+            console.error('[MintScreen] Failed to create mint quote:', err);
+            setError(err.message || 'Failed to create invoice');
+            setStatus('error');
+            setStep('result');
+        } finally {
+            setIsCreatingQuote(false);
+        }
+    }, [activeMintUrl, amount]);
 
     const handleNext = () => {
         if (step === 'amount') setStep('confirm');
-        else if (step === 'confirm') setStep('payment');
-        else if (step === 'payment') {
-            setStatus('success');
-            setStep('result');
+        else if (step === 'confirm') {
+            handleCreateQuote();
         }
     };
 
@@ -34,9 +97,30 @@ export default function MintScreen() {
         setStep('result');
     };
 
-    const handlePaid = () => {
+    const handlePaid = async () => {
+        // Manual "I have paid" - try to redeem immediately
+        // But don't block on errors - watchers will handle it if payment went through
+        if (quoteData && activeMintUrl) {
+            try {
+                await cocoService.redeemMintQuote(activeMintUrl, quoteData.quoteId);
+                setStatus('success');
+                refreshBalance();
+                setStep('result');
+                return;
+            } catch (err: any) {
+                console.log('[MintScreen] Manual redeem attempt failed, watchers will handle:', err.message);
+                // Don't show error - watchers will handle it if payment went through
+                // Show success anyway - the event listener will update when redeemed
+            }
+        }
+        // Assume success - watchers will verify and update balance
         setStatus('success');
         setStep('result');
+    };
+
+    const handleClose = () => {
+        refreshBalance();
+        router.back();
     };
 
     return (
@@ -52,14 +136,19 @@ export default function MintScreen() {
             {step === 'confirm' && (
                 <ConfirmStage
                     amount={amount}
+                    mintUrl={activeMintUrl || ''}
+                    isLoading={isCreatingQuote}
                     onConfirm={handleNext}
                     onBack={handleBack}
                 />
             )}
 
-            {step === 'payment' && (
+            {step === 'payment' && quoteData && (
                 <PaymentStage
                     amount={amount}
+                    invoice={quoteData.invoice}
+                    quoteId={quoteData.quoteId}
+                    expiry={quoteData.expiry}
                     onPaid={handlePaid}
                     onCancel={handleCancel}
                 />
@@ -69,7 +158,8 @@ export default function MintScreen() {
                 <ResultStage
                     status={status}
                     amount={amount}
-                    onClose={() => router.back()}
+                    error={error}
+                    onClose={handleClose}
                 />
             )}
         </YStack>

@@ -76,6 +76,25 @@ export const useWalletStore = create<WalletState>((set, get) => ({
                 }
             }
 
+            // Repair corrupted keysets (fix empty unit values) for ALL mints
+            console.log('[WalletStore] Checking for corrupted keysets...');
+            const allMints = await manager.mint.getAllMints();
+            let anyRepaired = false;
+            for (const mint of allMints) {
+                const repaired = await cocoService.repairMintKeysets(mint.mintUrl, 'sat');
+                if (repaired) anyRepaired = true;
+            }
+
+            // If keysets were repaired, we need to reinit to clear cached wallets
+            let currentManager = manager;
+            if (anyRepaired) {
+                console.log('[WalletStore] Reinitializing after keyset repair...');
+                await manager.dispose?.();
+                cocoService.reset();
+                currentManager = await cocoService.init();
+                console.log('[WalletStore] Manager reinitialized with fixed keysets');
+            }
+
             // Set active mint if not set
             if (!get().activeMintUrl) {
                 console.log('[WalletStore] Setting active mint URL');
@@ -87,8 +106,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             await get().refreshBalance();
 
             // Store list of mints with trust status
-            const finalMints = await manager.mint.getAllMints();
-            const trustedMints = await manager.mint.getAllTrustedMints();
+            const finalMints = await currentManager.mint.getAllMints();
+            const trustedMints = await currentManager.mint.getAllTrustedMints();
             const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
 
             const mintInfos: MintInfo[] = finalMints.map(m => ({
@@ -180,7 +199,23 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
             // Get balances from coco
             const balances = await cocoService.getBalances();
-            const balance = balances[activeUrl] || 0;
+            console.log('[WalletStore] Balances from coco:', balances);
+            console.log('[WalletStore] Active URL:', activeUrl);
+
+            // Normalize URL for matching (remove trailing slash)
+            const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+            const normalizedActiveUrl = normalizeUrl(activeUrl);
+
+            // Find balance with normalized URL matching
+            let balance = 0;
+            for (const [url, bal] of Object.entries(balances)) {
+                if (normalizeUrl(url) === normalizedActiveUrl) {
+                    balance = bal as number;
+                    break;
+                }
+            }
+
+            console.log('[WalletStore] Setting balance:', balance);
             set({ balance, refreshCounter: get().refreshCounter + 1 });
         } catch (err) {
             console.error('[WalletStore] Error refreshing balance:', err);

@@ -1,20 +1,42 @@
-import React, { useEffect } from 'react';
-import { YStack, XStack, Text, Button, H2, Separator, View, H4, H1, Popover, ListItem, Adapt, Sheet } from "tamagui";
-import { Copy, Share, Zap, Maximize, ExternalLink, ArrowUpDown, Coins, Building2, DollarSign, X, Layout, MoreHorizontal, Link, Contact2, Trash2, Scan, Share2 } from "@tamagui/lucide-icons";
+import React, { useEffect, useState } from 'react';
+import { YStack, XStack, Text, Button, H2, Separator, View, Popover, ListItem, Adapt, Sheet } from "tamagui";
+import { Copy, Share, Zap, ArrowUpDown, Building2, DollarSign, Layout, MoreHorizontal, Link, Contact2, Trash2, Scan, Share2, Check, RotateCcw, XCircle } from "@tamagui/lucide-icons";
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
+import { useToastController } from '@tamagui/toast';
+import { Spinner } from '../../components/UI/Spinner';
 
 interface ResultStageProps {
     status: 'success' | 'error';
     amount: string;
+    token?: string | null;
+    mintUrl?: string;
+    fee?: number;
+    operationId?: string;
+    error?: string | null;
     onClose: () => void;
+    onReclaim?: () => void;
     title?: string;
 }
 
-export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }: ResultStageProps) {
+export function ResultStage({
+    status,
+    amount,
+    token,
+    mintUrl,
+    fee = 0,
+    operationId,
+    error,
+    onClose,
+    onReclaim,
+    title = 'Pending Ecash'
+}: ResultStageProps) {
     const isSuccess = status === 'success';
+    const toast = useToastController();
+    const [copied, setCopied] = useState(false);
+    const [isReclaiming, setIsReclaiming] = useState(false);
 
     useEffect(() => {
         if (isSuccess) {
@@ -25,15 +47,45 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
     }, [status]);
 
     const handleCopy = async () => {
-        await Clipboard.setStringAsync(`cashu:Token...${amount}`);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (token) {
+            await Clipboard.setStringAsync(token);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setCopied(true);
+            toast.show('Copied!', { message: 'Token copied to clipboard' });
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleReclaim = async () => {
+        if (onReclaim) {
+            setIsReclaiming(true);
+            await onReclaim();
+            setIsReclaiming(false);
+        }
+    };
+
+    // Get mint display name
+    const getMintDisplayName = (url: string) => {
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return url;
+        }
     };
 
     if (!isSuccess) {
         return (
-            <YStack flex={1} justify="center" items="center" gap="$4">
-                <Text color="$red10" fontSize="$6" fontWeight="700">Payment Failed</Text>
-                <Button onPress={onClose}>Go Back</Button>
+            <YStack flex={1} justify="center" items="center" gap="$4" p="$4">
+                <XCircle size={80} color="$red10" />
+                <Text color="$red10" fontSize="$6" fontWeight="700" text="center">
+                    Send Failed
+                </Text>
+                <Text color="$gray10" fontSize="$4" text="center" px="$4">
+                    {error || 'An error occurred while creating the token.'}
+                </Text>
+                <Button theme="accent" size="$5" width="100%" onPress={onClose}>
+                    Go Back
+                </Button>
             </YStack>
         );
     }
@@ -98,6 +150,14 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
                                         pressStyle={{ bg: '$backgroundHover' }}
                                     />
                                     <Separator />
+                                    {onReclaim && (
+                                        <ListItem
+                                            icon={RotateCcw}
+                                            title="Reclaim Token"
+                                            onPress={handleReclaim}
+                                            pressStyle={{ bg: '$backgroundHover' }}
+                                        />
+                                    )}
                                     <ListItem
                                         icon={Trash2}
                                         title="Delete"
@@ -120,7 +180,7 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
                     rounded="$2"
                 >
                     <QRCode
-                        value={`cashu:token_placeholder_for_${amount}_sats`}
+                        value={token || `cashu:placeholder_${amount}`}
                         size={320}
                         backgroundColor="white"
                         color="black"
@@ -142,7 +202,7 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
                         <Text color="$gray10" fontSize="$4" fontWeight="500">Fee</Text>
                     </XStack>
                     <XStack items="center" gap="$1">
-                        <Text fontWeight="700" fontSize="$4">₿1</Text>
+                        <Text fontWeight="700" fontSize="$4">₿{fee}</Text>
                     </XStack>
                 </XStack>
 
@@ -171,23 +231,28 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
                         <Building2 size={18} opacity={0.7} />
                         <Text color="$gray10" fontSize="$4" fontWeight="500">Mint</Text>
                     </XStack>
-                    <Text fontWeight="700" fontSize="$4" opacity={0.9} text="right">testnut.cashu.space</Text>
+                    <Text fontWeight="700" fontSize="$4" opacity={0.9} text="right" numberOfLines={1} maxWidth={200}>
+                        {mintUrl ? getMintDisplayName(mintUrl) : 'Unknown'}
+                    </Text>
                 </XStack>
             </YStack>
 
             {/* Action Buttons */}
             <XStack mt="auto" pb="$8" gap="$2" width="100%">
-                <Button
-                    flex={1.5}
-                    onPress={() => { }}
-                    theme="gray"
-                    size="$4"
-                    fontWeight="800"
-                    pressStyle={{ opacity: 0.8, scale: 0.98 }}
-                    icon={<Zap size={18} />}
-                >
-                    Nostr
-                </Button>
+                {onReclaim && (
+                    <Button
+                        flex={1}
+                        onPress={handleReclaim}
+                        theme="gray"
+                        size="$4"
+                        fontWeight="800"
+                        pressStyle={{ opacity: 0.8, scale: 0.98 }}
+                        icon={isReclaiming ? <Spinner size="small" /> : <RotateCcw size={18} />}
+                        disabled={isReclaiming}
+                    >
+                        {isReclaiming ? '' : 'Reclaim'}
+                    </Button>
+                )}
                 <Button
                     flex={1}
                     onPress={() => { }}
@@ -199,17 +264,16 @@ export function ResultStage({ status, amount, onClose, title = 'Pending Ecash' }
                 />
 
                 <Button
-                    flex={1}
+                    flex={1.5}
                     onPress={handleCopy}
-
                     size="$4"
                     theme="accent"
                     fontWeight="800"
                     pressStyle={{ opacity: 0.8, scale: 0.98 }}
-                    icon={<Copy size={18} />}
-                />
-
-
+                    icon={copied ? <Check size={18} /> : <Copy size={18} />}
+                >
+                    {copied ? 'Copied!' : 'Copy'}
+                </Button>
             </XStack>
         </YStack>
     );

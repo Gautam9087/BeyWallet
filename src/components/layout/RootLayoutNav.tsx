@@ -9,6 +9,7 @@ import { LockOverlay } from '../LockOverlay'
 
 import { useAuthStore } from '../../store/authStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
+import { useCocoEvents } from '../../hooks/useCocoEvents'
 
 export function RootLayoutNav() {
     const { resolvedTheme } = useAppTheme()
@@ -16,6 +17,9 @@ export function RootLayoutNav() {
     const { isAuthenticated, setAuthenticated, lock, markBackgrounded } = useAuthStore()
     const { isOnboarded } = useOnboardingStore()
     const appState = useRef(AppState.currentState)
+
+    // Subscribe to coco events for automatic balance/history updates
+    useCocoEvents();
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {

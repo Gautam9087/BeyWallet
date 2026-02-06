@@ -1,4 +1,4 @@
-import { initializeCoco, Manager } from 'coco-cashu-core';
+import { initializeCoco, Manager, getDecodedToken, getEncodedToken } from 'coco-cashu-core';
 import { ExpoSqliteRepositories } from '../store/test';
 import * as SQLite from 'expo-sqlite';
 import { seedService } from './seedService';
@@ -148,6 +148,57 @@ export const cocoService = {
     },
 
     /**
+     * Debug method to check keysets in database.
+     */
+    debugKeysets: async (mintUrl: string) => {
+        if (!repo) {
+            throw new Error('Repositories not initialized');
+        }
+        const keysets = await repo.keysetRepository.getKeysetsByMintUrl(mintUrl);
+        console.log('[CocoService Debug] Keysets for', mintUrl);
+        keysets.forEach((k: any) => {
+            console.log(`  - ${k.id}: unit=${k.unit}, active=${k.active}, feePpk=${k.feePpk}`);
+        });
+        return keysets;
+    },
+
+    /**
+     * Repair keysets for a mint by setting proper unit values.
+     * This fixes corrupted keysets that were stored without units.
+     * Returns true if any repairs were made (caller should reinit manager).
+     */
+    repairMintKeysets: async (mintUrl: string, unit = 'sat'): Promise<boolean> => {
+        if (!repo) {
+            throw new Error('Repositories not initialized');
+        }
+        console.log(`[CocoService] Checking keysets for ${mintUrl}...`);
+
+        const keysets = await repo.keysetRepository.getKeysetsByMintUrl(mintUrl);
+
+        let repaired = false;
+        for (const keyset of keysets) {
+            const k = keyset as any;
+            if (!k.unit || k.unit === '') {
+                console.log(`  Fixing keyset ${k.id} (empty unit -> ${unit})...`);
+                // Update the keyset with proper unit
+                await repo.db.run(
+                    'UPDATE coco_cashu_keysets SET unit = ? WHERE mintUrl = ? AND id = ?',
+                    [unit, mintUrl, k.id]
+                );
+                repaired = true;
+            }
+        }
+
+        if (repaired) {
+            console.log('[CocoService] Keysets repaired!');
+        } else {
+            console.log('[CocoService] All keysets already have correct units.');
+        }
+
+        return repaired;
+    },
+
+    /**
      * Returns the CocoManager instance.
      * Throws if not initialized.
      */
@@ -218,7 +269,9 @@ export const cocoService = {
         if (!cocoManager) {
             throw new Error('CocoManager not initialized');
         }
-        return cocoManager.wallet.getBalances();
+        const balances = await cocoManager.wallet.getBalances();
+        console.log('[CocoService] getBalances result:', JSON.stringify(balances));
+        return balances;
     },
 
     /**
@@ -268,5 +321,136 @@ export const cocoService = {
             throw new Error('CocoManager not initialized');
         }
         return cocoManager.mint.isTrustedMint(mintUrl);
+    },
+
+    // ==========================================
+    // MINTING (Sats → Ecash via Lightning)
+    // ==========================================
+
+    /**
+     * Create a mint quote (Lightning invoice to pay).
+     * @param mintUrl - The mint to create quote from
+     * @param amount - Amount in sats
+     * @returns Quote with invoice to pay
+     */
+    createMintQuote: async (mintUrl: string, amount: number) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        console.log(`[CocoService] Creating mint quote: ${amount} sats from ${mintUrl}`);
+        const quote = await cocoManager.quotes.createMintQuote(mintUrl, amount);
+        console.log(`[CocoService] Mint quote created: ${quote.quote}`);
+        return quote;
+    },
+
+    /**
+     * Manually redeem a paid mint quote.
+     * Note: With watchers enabled, this happens automatically.
+     */
+    redeemMintQuote: async (mintUrl: string, quoteId: string) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        console.log(`[CocoService] Redeeming mint quote: ${quoteId}`);
+        await cocoManager.quotes.redeemMintQuote(mintUrl, quoteId);
+        console.log('[CocoService] Mint quote redeemed');
+    },
+
+    // ==========================================
+    // RECEIVING (Ecash Token → Balance)
+    // ==========================================
+
+    /**
+     * Receive an ecash token and add proofs to wallet.
+     * @param token - Encoded cashu token string or Token object
+     */
+    receive: async (token: string) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        console.log('[CocoService] Receiving token:', token.substring(0, 50) + '...');
+        try {
+            await cocoManager.wallet.receive(token);
+            console.log('[CocoService] Token received successfully');
+        } catch (err: any) {
+            console.error('[CocoService] Receive failed:', err.message, err);
+            throw err;
+        }
+    },
+
+    /**
+     * Decode a token to preview its contents (mint, amount, etc.)
+     * @param tokenString - Encoded cashu token string
+     */
+    decodeToken: (tokenString: string) => {
+        return getDecodedToken(tokenString);
+    },
+
+    // ==========================================
+    // SENDING (Balance → Ecash Token)
+    // ==========================================
+
+    /**
+     * Send tokens from a mint directly (no prepare/execute saga).
+     * @param mintUrl - The mint to send from
+     * @param amount - Amount to send in sats
+     * @returns The token to share with recipient
+     */
+    send: async (mintUrl: string, amount: number) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        console.log(`[CocoService] Sending: ${amount} sats from ${mintUrl}`);
+        const token = await cocoManager.wallet.send(mintUrl, amount);
+        console.log('[CocoService] Send complete, token created');
+        return token;
+    },
+
+    /**
+     * Encode a token object to shareable string.
+     */
+    encodeToken: (token: any): string => {
+        return getEncodedToken(token);
+    },
+
+    // ==========================================
+    // HISTORY
+    // ==========================================
+
+    /**
+     * Get paginated transaction history.
+     * @param limit - Number of entries to fetch
+     * @param offset - Offset for pagination
+     */
+    getHistory: async (limit = 25, offset = 0) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        return cocoManager.history.getPaginatedHistory(offset, limit);
+    },
+
+    // ==========================================
+    // EVENT SUBSCRIPTIONS
+    // ==========================================
+
+    /**
+     * Subscribe to a coco event.
+     * Events: 'mint-quote:redeemed', 'receive:created', 'send:created', 'history:updated'
+     */
+    on: (event: any, callback: (...args: any[]) => void) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        return cocoManager.on(event, callback);
+    },
+
+    /**
+     * Unsubscribe from a coco event.
+     */
+    off: (event: any, callback: (...args: any[]) => void) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        cocoManager.off(event, callback);
     },
 };
