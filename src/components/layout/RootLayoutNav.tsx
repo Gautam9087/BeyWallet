@@ -8,19 +8,21 @@ import { useAppTheme } from '../../context/ThemeContext'
 import { LockOverlay } from '../LockOverlay'
 
 import { useAuthStore } from '../../store/authStore'
+import { useOnboardingStore } from '../../store/onboardingStore'
 
 export function RootLayoutNav() {
     const { resolvedTheme } = useAppTheme()
     const theme = useTheme()
     const { isAuthenticated, setAuthenticated, lock, markBackgrounded } = useAuthStore()
+    const { isOnboarded } = useOnboardingStore()
     const appState = useRef(AppState.currentState)
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-            // When moving from active to background/inactive
-            if (appState.current === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
-                markBackgrounded() // Mark that we've gone to background at least once
-                lock() // Lock the app
+            // Only lock if onboarded and moving from active to background
+            if (isOnboarded && appState.current === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
+                markBackgrounded()
+                lock()
             }
 
             appState.current = nextAppState
@@ -29,7 +31,7 @@ export function RootLayoutNav() {
         return () => {
             subscription.remove()
         }
-    }, [lock, markBackgrounded])
+    }, [lock, markBackgrounded, isOnboarded])
 
     const navigationTheme = {
         ...resolvedTheme === 'dark' ? DarkTheme : DefaultTheme,
@@ -38,6 +40,9 @@ export function RootLayoutNav() {
             background: theme.background.val,
         },
     }
+
+    // Only show lock overlay if onboarded and not authenticated
+    const showLockOverlay = isOnboarded && !isAuthenticated
 
     return (
         <NavThemeProvider value={navigationTheme}>
@@ -81,8 +86,8 @@ export function RootLayoutNav() {
                     />
                 </Stack>
 
-                {/* Lock overlay - renders on top of everything when locked */}
-                {!isAuthenticated && (
+                {/* Lock overlay - only shows when onboarded and locked */}
+                {showLockOverlay && (
                     <LockOverlay onUnlock={() => setAuthenticated(true)} />
                 )}
             </YStack>

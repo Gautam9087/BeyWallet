@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFonts } from 'expo-font'
 import { SplashScreen } from 'expo-router'
 import { Provider } from '../Provider'
 import { RootLayoutNav } from './RootLayoutNav'
 import { cocoService } from '../../services/cocoService'
 import { useWalletStore } from '../../store/walletStore'
+import { useOnboardingStore } from '../../store/onboardingStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { OnboardingScreen } from '../../screens/OnboardingScreen'
 
 const queryClient = new QueryClient()
 
@@ -15,25 +17,57 @@ SplashScreen.preventAutoHideAsync()
 export function RootLayout() {
     const initialize = useWalletStore(state => state.initialize)
     const isInitializing = useWalletStore(state => state.isInitializing)
+    const { isOnboarded, isCheckingOnboarding, checkOnboardingStatus } = useOnboardingStore()
+    const [walletExists, setWalletExists] = useState<boolean | null>(null)
 
     const [loaded, error] = useFonts({
         BaselGroteskBook: require('../../assets/fonts/Basel-Grotesk-Book.otf'),
         BaselGroteskMedium: require('../../assets/fonts/Basel-Grotesk-Medium.otf'),
     })
 
+    // Check onboarding status and wallet existence on mount
     useEffect(() => {
-        initialize()
-    }, [initialize])
+        const checkStatus = async () => {
+            await checkOnboardingStatus()
+            const exists = await cocoService.walletExists()
+            setWalletExists(exists)
+        }
+        checkStatus()
+    }, [isOnboarded]) // Re-check when onboarding status changes
 
+    // Initialize wallet only if onboarded and wallet exists
     useEffect(() => {
-        if ((loaded || error) && !isInitializing) {
-            // Hide the splash screen after the fonts have loaded (or an error was returned) and the UI is ready.
+        if (isOnboarded && walletExists) {
+            initialize()
+        }
+    }, [isOnboarded, walletExists, initialize])
+
+    // Hide splash when ready
+    useEffect(() => {
+        const isReady = (loaded || error) && !isCheckingOnboarding && walletExists !== null
+        const isAppReady = !isOnboarded || (!isInitializing && isOnboarded)
+
+        if (isReady && isAppReady) {
             SplashScreen.hideAsync()
         }
-    }, [loaded, error, isInitializing])
+    }, [loaded, error, isCheckingOnboarding, walletExists, isOnboarded, isInitializing])
 
+    // Still loading fonts or checking onboarding
     if (!loaded && !error) {
         return null
+    }
+
+    if (isCheckingOnboarding || walletExists === null) {
+        return null
+    }
+
+    // Show onboarding if not completed or no wallet exists
+    if (!isOnboarded || !walletExists) {
+        return (
+            <Providers cocoManager={null}>
+                <OnboardingScreen />
+            </Providers>
+        )
     }
 
     // Get the manager after initialization

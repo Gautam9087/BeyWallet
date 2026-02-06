@@ -8,7 +8,9 @@ let repo: ExpoSqliteRepositories | null = null;
 
 export const cocoService = {
     /**
-     * Initializes the CocoManager instance.
+     * Initializes the CocoManager with an EXISTING wallet.
+     * Does NOT create a new wallet if none exists.
+     * Use createWallet() for new wallet creation.
      */
     init: async (): Promise<Manager> => {
         if (cocoManager) {
@@ -16,17 +18,37 @@ export const cocoService = {
             return cocoManager;
         }
 
-        console.log('[CocoService] Checking for mnemonic...');
-        let mnemonic = await seedService.getMnemonic();
+        console.log('[CocoService] Checking for existing mnemonic...');
+        const mnemonic = await seedService.getMnemonic();
         if (!mnemonic) {
-            console.log('[CocoService] No mnemonic found, generating new one...');
-            mnemonic = seedService.generateMnemonic();
-            await seedService.saveMnemonic(mnemonic);
-            console.log('[CocoService] New mnemonic saved');
-        } else {
-            console.log('[CocoService] Mnemonic found');
+            throw new Error('No wallet exists. Use createWallet() first.');
         }
 
+        console.log('[CocoService] Mnemonic found, initializing...');
+        return cocoService._initializeWithMnemonic(mnemonic);
+    },
+
+    /**
+     * Creates a new wallet with the provided mnemonic.
+     * Used during onboarding flow.
+     */
+    createWallet: async (mnemonic: string): Promise<Manager> => {
+        if (cocoManager) {
+            console.log('[CocoService] Manager already exists, resetting...');
+            cocoService.reset();
+        }
+
+        console.log('[CocoService] Saving new mnemonic...');
+        await seedService.saveMnemonic(mnemonic);
+        console.log('[CocoService] Mnemonic saved, initializing wallet...');
+
+        return cocoService._initializeWithMnemonic(mnemonic);
+    },
+
+    /**
+     * Internal method to initialize with a mnemonic.
+     */
+    _initializeWithMnemonic: async (mnemonic: string): Promise<Manager> => {
         const seed = await seedService.deriveSeed(mnemonic);
         console.log('[CocoService] Seed derived');
 
@@ -40,7 +62,6 @@ export const cocoService = {
             get(target, prop, receiver) {
                 const value = Reflect.get(target, prop, receiver);
                 if (typeof prop === 'string') {
-                    // console.log(`[CocoService] Accessing repo property: ${prop} (exists: ${value !== undefined})`);
                     if (value === undefined) {
                         console.warn(`[CocoService] WARNING: Property "${prop}" accessed on repositories but is UNDEFINED`);
                     }
@@ -50,8 +71,6 @@ export const cocoService = {
         });
 
         console.log('[CocoService] Initializing repositories...');
-        // The init method should be called on the actual instance, not the proxy,
-        // as the proxy is primarily for property access debugging.
         await repositoriesInstance.init();
         console.log('[CocoService] Repositories initialized');
 
@@ -65,6 +84,13 @@ export const cocoService = {
         repo = repositoriesInstance;
 
         return cocoManager;
+    },
+
+    /**
+     * Checks if a wallet exists (without initializing).
+     */
+    walletExists: async (): Promise<boolean> => {
+        return seedService.walletExists();
     },
 
     /**
@@ -89,9 +115,17 @@ export const cocoService = {
     },
 
     /**
+     * Checks if manager is initialized.
+     */
+    isInitialized: (): boolean => {
+        return cocoManager !== null;
+    },
+
+    /**
      * Resets the manager (for logout or dev purposes).
      */
     reset: () => {
         cocoManager = null;
+        repo = null;
     }
 };

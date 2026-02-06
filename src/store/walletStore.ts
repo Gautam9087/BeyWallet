@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { cocoService } from '../services/cocoService';
 import { mintService } from '../services/mintService';
-import { seedService } from '../services/seedService';
 
 interface WalletState {
     activeMintUrl: string | null;
@@ -31,6 +30,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         set({ isInitializing: true, error: null });
         console.log('[WalletStore] Starting initialization...');
         try {
+            // Check if wallet exists first
+            const walletExists = await cocoService.walletExists();
+            if (!walletExists) {
+                console.log('[WalletStore] No wallet exists, skipping initialization');
+                set({ isInitializing: false });
+                return;
+            }
+
             console.log('[WalletStore] Calling cocoService.init()');
             const manager = await cocoService.init();
             console.log('[WalletStore] cocoService initialized');
@@ -94,6 +101,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
     refreshBalance: async () => {
         try {
+            if (!cocoService.isInitialized()) {
+                set({ balance: 0 });
+                return;
+            }
+
             const manager = cocoService.getManager();
             const activeUrl = get().activeMintUrl;
             if (!activeUrl) {
