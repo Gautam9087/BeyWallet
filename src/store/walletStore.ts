@@ -4,6 +4,8 @@ import { cocoService } from '../services/cocoService';
 interface MintInfo {
     mintUrl: string;
     name?: string;
+    nickname?: string;
+    description?: string;
     trusted: boolean;
 }
 
@@ -20,7 +22,11 @@ interface WalletState {
     setActiveMint: (url: string) => void;
     addMint: (url: string, options?: { trusted?: boolean }) => Promise<void>;
     trustMint: (url: string) => Promise<void>;
+    untrustMint: (url: string) => Promise<void>;
+    setMintNickname: (url: string, nickname: string) => Promise<void>;
+    fetchMintInfo: (url: string) => Promise<any>;
     refreshBalance: () => Promise<void>;
+    refreshMintList: () => Promise<void>;
     restoreFromSeed: (mintUrl: string) => Promise<void>;
 }
 
@@ -88,6 +94,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const mintInfos: MintInfo[] = finalMints.map(m => ({
                 mintUrl: m.mintUrl,
                 name: m.name,
+                nickname: (m as any).nickname,
                 trusted: trustedUrls.has(m.mintUrl),
             }));
 
@@ -119,6 +126,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const mintInfos: MintInfo[] = allMints.map(m => ({
                 mintUrl: m.mintUrl,
                 name: m.name,
+                nickname: (m as any).nickname,
                 trusted: trustedUrls.has(m.mintUrl),
             }));
 
@@ -146,6 +154,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const mintInfos: MintInfo[] = allMints.map(m => ({
                 mintUrl: m.mintUrl,
                 name: m.name,
+                nickname: (m as any).nickname,
                 trusted: trustedUrls.has(m.mintUrl),
             }));
 
@@ -186,6 +195,58 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             console.log('[WalletStore] Restore complete');
         } catch (err: any) {
             console.error('[WalletStore] Failed to restore from seed:', err);
+            set({ error: err.message });
+        }
+    },
+
+    untrustMint: async (url: string) => {
+        try {
+            await cocoService.untrustMint(url);
+            await get().refreshMintList();
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to untrust mint:', err);
+            set({ error: err.message });
+        }
+    },
+
+    fetchMintInfo: async (url: string) => {
+        try {
+            const info = await cocoService.getMintInfo(url);
+            return info;
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to fetch mint info:', err);
+            throw err;
+        }
+    },
+
+    refreshMintList: async () => {
+        try {
+            const manager = cocoService.getManager();
+            const allMints = await manager.mint.getAllMints();
+            const trustedMints = await manager.mint.getAllTrustedMints();
+            const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
+
+            const mintInfos: MintInfo[] = allMints.map(m => ({
+                mintUrl: m.mintUrl,
+                name: m.name,
+                nickname: (m as any).nickname,
+                description: (m as any).description,
+                trusted: trustedUrls.has(m.mintUrl),
+            }));
+
+            set({ mints: mintInfos });
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to refresh mint list:', err);
+        }
+    },
+
+    setMintNickname: async (url: string, nickname: string) => {
+        try {
+            const repo = cocoService.getRepo();
+            await (repo.mintRepository as any).setMintNickname(url, nickname);
+            await get().refreshMintList();
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to set mint nickname:', err);
             set({ error: err.message });
         }
     },

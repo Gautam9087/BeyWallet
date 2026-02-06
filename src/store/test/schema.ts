@@ -341,6 +341,12 @@ const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_mint_recommendations_rating ON coco_cashu_mint_recommendations(averageRating DESC);
     `,
   },
+  {
+    id: '014_mint_nickname',
+    sql: `
+      ALTER TABLE coco_cashu_mints ADD COLUMN nickname TEXT;
+    `,
+  },
 ];
 
 export async function seedMockData(db: ExpoSqliteDb): Promise<void> {

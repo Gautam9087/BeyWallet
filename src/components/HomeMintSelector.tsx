@@ -1,15 +1,65 @@
-import { ChevronDown, Sprout } from "@tamagui/lucide-icons";
-import { Button, Text, YStack, XStack, ListItem, Paragraph } from "tamagui";
+import { ChevronDown, Sprout, Plus, ShieldCheck, ShieldOff, Edit3 } from "@tamagui/lucide-icons";
+import { Button, Text, YStack, XStack, ListItem, Paragraph, View } from "tamagui";
+import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Haptics from 'expo-haptics';
-import { useRef } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useWalletStore } from "../store/walletStore";
 import AppBottomSheet, { AppBottomSheetRef } from "./UI/AppBottomSheet";
+import AddMintModal, { AddMintModalRef } from "./AddMintModal";
+import EditNicknameModal, { EditNicknameModalRef } from "./EditNicknameModal";
+import { cocoService } from "../services/cocoService";
 
 export default function HomeHeaderMintSelector() {
-    const { activeMintUrl, balance } = useWalletStore();
+    const { activeMintUrl, balance, mints, setActiveMint, refreshMintList } = useWalletStore();
     const sheetRef = useRef<AppBottomSheetRef>(null);
+    const addMintRef = useRef<AddMintModalRef>(null);
+    const editNicknameRef = useRef<EditNicknameModalRef>(null);
 
-    const displayUrl = activeMintUrl ? activeMintUrl.replace('https://', '') : "Select Mint";
+    // Normalize URLs for comparison
+    const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+
+    // Refresh mint list when sheet opens
+    useEffect(() => {
+        if (cocoService.isInitialized()) {
+            refreshMintList();
+        }
+    }, []);
+
+    console.log('[HomeMintSelector] Current Mints:', mints.length, 'Active URL:', activeMintUrl);
+
+    const activeMint = useMemo(() => {
+        if (!activeMintUrl) return null;
+        return mints.find(m => normalizeUrl(m.mintUrl) === normalizeUrl(activeMintUrl));
+    }, [mints, activeMintUrl]);
+
+    const displayUrl = activeMintUrl ? activeMintUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : "Select Mint";
+
+    const displayName = useMemo(() => {
+        if (activeMint?.nickname) return activeMint.nickname;
+        if (activeMint?.name) return activeMint.name;
+        if (!activeMintUrl) return "Select Mint";
+
+        return displayUrl;
+    }, [activeMint, activeMintUrl, displayUrl]);
+
+    const handleSelectMint = (mintUrl: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setActiveMint(mintUrl);
+        sheetRef.current?.dismiss();
+    };
+
+    const handleAddMint = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        sheetRef.current?.dismiss();
+        setTimeout(() => {
+            addMintRef.current?.present();
+        }, 300);
+    };
+
+    const handleEditNickname = (mint: any) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        editNicknameRef.current?.present(mint.mintUrl, mint.nickname);
+    };
 
     return (
         <>
@@ -33,83 +83,106 @@ export default function HomeHeaderMintSelector() {
                 }}
                 ellipse
             >
-                {displayUrl}
+                {displayName}
             </Button>
 
-            <AppBottomSheet ref={sheetRef}>
-                <YStack p="$4" gap="$3">
-                    <XStack justify="center">
-                        <Paragraph fontSize="$6" color="$accent5" fontWeight="bold" mb="$2" px="$2">Select Mint</Paragraph>
+            <AppBottomSheet ref={sheetRef} snapPoints={["50%", "85%"]}>
+                <YStack p="$4" gap="$3" flex={1}>
+                    <XStack justify="space-between" items="center" mb="$2">
+                        <Paragraph fontSize="$6" color="$accent5" fontWeight="bold">Your Mints</Paragraph>
+                        <Button
+                            size="$3"
+                            circular
+                            icon={<Plus size={18} />}
+                            onPress={handleAddMint}
+                            pressStyle={{ scale: 0.95 }}
+                        />
                     </XStack>
 
-                    <ListItem
-                        size="$4"
-                        px="$0"
-                        hoverTheme
-                        pressTheme
-                        rounded="$5"
-                        borderWidth={0}
-                        borderColor="$borderColor"
+                    <BottomSheetScrollView showsVerticalScrollIndicator={false}>
+                        <YStack gap="$2" pb="$4">
+                            {mints.length === 0 ? (
+                                <YStack items="center" py="$6" gap="$2">
+                                    <Sprout size={40} color="$gray8" />
+                                    <Text color="$gray10">No mints added yet</Text>
+                                </YStack>
+                            ) : (
+                                mints.map((mint) => (
+                                    <ListItem
+                                        key={mint.mintUrl}
+                                        size="$4"
+                                        px="$2"
+                                        hoverTheme
+                                        pressTheme
+                                        theme="gray"
+                                        rounded="$4"
+                                        borderWidth={mint.mintUrl === activeMintUrl ? 1 : 0}
+                                        borderColor={mint.mintUrl === activeMintUrl ? "$borderColor" : "$borderColor"}
+                                        bg={mint.mintUrl === activeMintUrl ? "$color2" : "transparent"}
+                                        onPress={() => handleSelectMint(mint.mintUrl)}
+                                        icon={
+                                            <View
+                                                bg={mint.trusted ? "$green4" : "$gray4"}
+                                                p="$2"
+                                                rounded="$10"
+                                            >
+                                                {mint.trusted ? (
+                                                    <ShieldCheck size={20} color="$green10" />
+                                                ) : (
+                                                    <ShieldOff size={20} color="$gray10" />
+                                                )}
+                                            </View>
+                                        }
+                                        title={
+                                            <XStack items="center" gap="$2">
+                                                <Text fontWeight="600" fontSize="$4" numberOfLines={1}>
+                                                    {mint.nickname || mint.name || mint.mintUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                                                </Text>
+                                                <Button
+                                                    size="$2"
+                                                    circular
+                                                    chromeless
+                                                    icon={<Edit3 size={14} color="$gray10" />}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEditNickname(mint);
+                                                    }}
+                                                />
+                                            </XStack>
+                                        }
+                                        subTitle={
+                                            <Text fontSize="$2" color="$gray10" numberOfLines={1}>
+                                                {mint.mintUrl.replace('https://', '')}
+                                            </Text>
+                                        }
+                                        iconAfter={
+                                            mint.mintUrl === activeMintUrl ? (
+                                                <YStack items="flex-end" gap="$0">
+                                                    <Text fontWeight="bold" fontSize="$6">{balance}</Text>
+                                                    <Text fontSize="$2" opacity={0.6}>SATS</Text>
+                                                </YStack>
+                                            ) : undefined
+                                        }
+                                    />
+                                ))
+                            )}
+                        </YStack>
+                    </BottomSheetScrollView>
 
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            sheetRef.current?.dismiss();
-                        }}
-                        title="Cashu Testnut"
-                        subTitle="https://testnut.cashu.space"
-                        iconAfter={
-                            <YStack items="flex-end" gap="$0">
-                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
-                                <Text fontSize="$2" opacity={0.6}>SATS</Text>
-                            </YStack>
-                        }
-                    />
-                    <ListItem
+                    <Button
                         size="$4"
-                        px="$0"
-                        hoverTheme
-                        pressTheme
-                        rounded="$5"
-                        borderWidth={0}
-                        borderColor="$borderColor"
-
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            sheetRef.current?.dismiss();
-                        }}
-                        title="Cashu Testnut"
-                        subTitle="https://testnut.cashu.space"
-                        iconAfter={
-                            <YStack items="flex-end" gap="$0">
-                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
-                                <Text fontSize="$2" opacity={0.6}>SATS</Text>
-                            </YStack>
-                        }
-                    />
-                    <ListItem
-                        size="$4"
-                        px="$0"
-                        hoverTheme
-                        pressTheme
-                        rounded="$5"
-                        borderWidth={0}
-                        borderColor="$borderColor"
-
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            sheetRef.current?.dismiss();
-                        }}
-                        title="Cashu Testnut"
-                        subTitle="https://testnut.cashu.space"
-                        iconAfter={
-                            <YStack items="flex-end" gap="$0">
-                                <Text fontWeight="bold" fontSize="$6">{balance}</Text>
-                                <Text fontSize="$2" opacity={0.6}>SATS</Text>
-                            </YStack>
-                        }
-                    />
+                        theme="gray"
+                        onPress={handleAddMint}
+                        icon={<Plus size={18} />}
+                        mt="auto"
+                    >
+                        Add New Mint
+                    </Button>
                 </YStack>
             </AppBottomSheet>
+
+            <AddMintModal ref={addMintRef} />
+            <EditNicknameModal ref={editNicknameRef} />
         </>
     );
 }

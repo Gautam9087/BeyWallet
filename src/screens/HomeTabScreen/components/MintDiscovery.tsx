@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { YStack, XStack, Text, Button, Card, H3, H4, Image, View } from 'tamagui';
 import { Spinner } from '../../../components/UI/Spinner';
-import { Search, Star, MessageSquare, Plus, RefreshCw, Check, Sprout, Info, ExternalLink } from '@tamagui/lucide-icons';
+import { Search, Star, MessageSquare, Plus, RefreshCw, Check, Sprout, Info, ExternalLink, ShieldCheck, ShieldOff } from '@tamagui/lucide-icons';
 import { useQuery } from '@tanstack/react-query';
 import { mintRecommendationService } from '../../../services/mintRecommendationService';
 import { useWalletStore } from '../../../store/walletStore';
@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useToastController } from '@tamagui/toast';
 import { useRouter } from 'expo-router';
 import { AppBottomSheetRef } from '../../../components/UI/AppBottomSheet';
-import { TrustingMint } from './TrustingMint';
+import AddMintModal, { AddMintModalRef } from '../../../components/AddMintModal';
 
 interface MintDiscoveryProps {
     refreshTrigger?: number;
@@ -26,11 +26,8 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
             const repo = cocoService.getRepo();
 
             setLoadingMessage('Fetching from local database...');
-            // 1. Try to get from Cache (DB)
             const cached = await repo.mintRecommendationRepository.getAll();
 
-            // 2. If it's the first time (empty), or we explicitly want to refresh (handled by refetch)
-            // Note: querySync in discoverMints is slow, so we only do it if necessary or triggered
             if (cached.length === 0) {
                 setLoadingMessage('Searching the Nostr network...');
                 const discovered = await mintRecommendationService.discoverMints();
@@ -42,7 +39,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
 
             return cached;
         },
-        staleTime: Infinity, // Rely on manual refresh to update DB
+        staleTime: Infinity,
     });
 
     const handleRefresh = async () => {
@@ -50,7 +47,6 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setLoadingMessage('Syncing with the Nostr network...');
 
-        // Forced discovery and cache update
         try {
             const discovered = await mintRecommendationService.discoverMints();
             if (discovered.length > 0) {
@@ -66,41 +62,31 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
         }
     };
 
-    // Watch for external refresh trigger
     React.useEffect(() => {
         if (refreshTrigger && refreshTrigger > 0) {
             handleRefresh();
         }
     }, [refreshTrigger]);
-    const { addMint, mints } = useWalletStore();
-    const toast = useToastController();
+
+    const { mints, trustMint } = useWalletStore();
     const router = useRouter();
+    const addMintRef = React.useRef<AddMintModalRef>(null);
 
-    const trustSheetRef = React.useRef<AppBottomSheetRef>(null!);
-    const [pendingMintUrl, setPendingMintUrl] = React.useState<string>('');
+    const normalizeUrl = (url: string) => url.replace(/\/$/, '');
 
-    const handleAddMint = async (url: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setPendingMintUrl(url);
-        trustSheetRef.current?.present();
-    };
-
-    const confirmAddMint = async (url: string) => {
+    const handleAction = async (url: string, status: 'none' | 'untrusted' | 'trusted') => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        try {
-            await addMint(url);
-            toast.show('Mint Added', {
-                message: `Successfully connected to ${url}`,
-                type: 'success'
-            });
-        } catch (err: any) {
-            toast.show('Error', {
-                message: err.message || 'Failed to add mint',
-                theme: 'red'
-            });
+        if (status === 'none') {
+            addMintRef.current?.present(url);
+        } else if (status === 'untrusted') {
+            // Quick trust
+            try {
+                await trustMint(url);
+            } catch (e) {
+                console.error('[MintDiscovery] Quick trust failed:', e);
+            }
         }
     };
-
 
     const handleViewProfile = (url: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -112,10 +98,12 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
 
     return (
         <YStack gap="$4" width="100%">
-            <XStack items="center" justify="space-between">
-                <H3>Discover Mints</H3>
+            <XStack items="center" justify="space-between" px="$1">
+                <H3 fontSize="$6" fontWeight="bold">Discover Mints</H3>
                 <Button
                     size="$2"
+                    circular
+                    chromeless
                     icon={(isLoading || isRefetching) ? <Spinner size="small" /> : <RefreshCw size={14} />}
                     onPress={handleRefresh}
                     disabled={isLoading || isRefetching}
@@ -123,9 +111,9 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
             </XStack>
 
             {(isLoading || isRefetching) && recommendations.length === 0 && (
-                <YStack height={200} items="center" justify="center">
-                    <Spinner size="large" color="$accentColor" />
-                    <Text mt="$2" color="$gray10">{loadingMessage}</Text>
+                <YStack height={200} items="center" justify="center" gap="$3">
+                    <Spinner size="large" color="$accent9" />
+                    <Text color="$gray10">{loadingMessage}</Text>
                 </YStack>
             )}
 
@@ -137,15 +125,24 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
             )}
 
             {!isLoading && recommendations.length === 0 && !error && (
-                <YStack height={100} items="center" justify="center">
+                <Card p="$4" items="center" justify="center" bg="$gray2">
                     <Text color="$gray10">No mints found in your relays.</Text>
-                </YStack>
+                </Card>
             )}
 
             <YStack gap="$3">
                 {recommendations.map((mint, index) => {
-                    const isAlreadyAdded = mints.includes(mint.url) || mints.includes(mint.url + '/');
+                    const normalizedMintUrl = normalizeUrl(mint.url);
+                    const walletMint = mints.find(m => normalizeUrl(m.mintUrl) === normalizedMintUrl);
+
+                    const isAlreadyAdded = !!walletMint;
+                    const isTrusted = walletMint?.trusted ?? false;
                     const isMostRecommended = index < 2;
+
+                    let status: 'none' | 'untrusted' | 'trusted' = 'none';
+                    if (isAlreadyAdded) {
+                        status = isTrusted ? 'trusted' : 'untrusted';
+                    }
 
                     return (
                         <Card
@@ -154,43 +151,49 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
                             p="$3"
                             bg="$gray3"
                             minH={150}
-
                             pressStyle={{ scale: 0.98 }}
+                            borderWidth={isTrusted ? 1 : 0}
+                            borderColor={isTrusted ? "$green8" : "transparent"}
                         >
                             <YStack justify="space-between" flex={1}>
-                                <XStack gap="$2" flex={1}>
+                                <XStack gap="$3">
                                     <View
-                                        width={40}
-                                        height={40}
-                                        rounded="$3"
+                                        width={48}
+                                        height={48}
+                                        rounded="$4"
                                         bg="$gray4"
                                         items="center"
                                         justify="center"
                                         overflow="hidden"
                                     >
                                         {mint.icon ? (
-                                            <Image source={{ uri: mint.icon, width: 40, height: 40 }} />
+                                            <Image source={{ uri: mint.icon, width: 48, height: 48 }} />
                                         ) : (
-                                            <Sprout size={24} color="$gray10" />
+                                            <Sprout size={28} color="$gray10" />
                                         )}
                                     </View>
 
                                     <YStack flex={1} gap="$1">
                                         <XStack items="center" justify="space-between" width="100%">
-                                            <H4 fontSize="$5" fontWeight="700" numberOfLines={1} flex={1}>
-                                                {mint.name || (() => {
-                                                    try { return new URL(mint.url).hostname }
-                                                    catch (e) { return mint.url }
-                                                })()}
-                                            </H4>
+                                            <XStack items="center" gap="$2" flex={1}>
+                                                <H4 fontSize="$5" fontWeight="700" numberOfLines={1}>
+                                                    {mint.name || (() => {
+                                                        try { return new URL(mint.url).hostname }
+                                                        catch (e) { return mint.url }
+                                                    })()}
+                                                </H4>
+                                                {isTrusted ? (
+                                                    <ShieldCheck size={16} color="$green10" />
+                                                ) : isAlreadyAdded ? (
+                                                    <ShieldOff size={16} color="$orange10" />
+                                                ) : null}
+                                            </XStack>
                                             <Button
                                                 size="$2"
                                                 circular
-                                                icon={<ExternalLink size={18} color="$gray10" />}
+                                                icon={<ExternalLink size={16} color="$gray10" />}
                                                 onPress={() => handleViewProfile(mint.url)}
                                                 chromeless
-                                                mt="$-1"
-                                                mr="$-1"
                                             />
                                         </XStack>
 
@@ -202,12 +205,12 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
 
                                 <XStack mt="$2" items="center" justify="space-between">
                                     <XStack gap="$3" items="center">
-                                        <XStack items="center" gap="$1">
-                                            <MessageSquare size={12} color="$gray9" />
-                                            <Text fontSize="$2" color="$gray9">{mint.reviewsCount} reviews</Text>
+                                        <XStack items="center" gap="$1.5">
+                                            <MessageSquare size={14} color="$gray9" />
+                                            <Text fontSize="$2" color="$gray9">{mint.reviewsCount}</Text>
                                         </XStack>
 
-                                        <XStack items="center" gap="$1">
+                                        <XStack items="center" gap="$1.5">
                                             <Star size={14} color="#FFD700" fill="#FFD700" />
                                             <Text fontSize="$3" fontWeight="bold">
                                                 {mint.averageRating ? mint.averageRating.toFixed(1) : 'N/A'}
@@ -218,13 +221,12 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
                                     <Button
                                         size="$3"
                                         fontWeight="bold"
-                                        fontSize="$4"
-                                        theme={isAlreadyAdded ? 'gray' : 'accent'}
-                                        disabled={isAlreadyAdded}
-                                        icon={isAlreadyAdded ? <Check strokeWidth={3} size={14} /> : <Plus strokeWidth={3} size={14} />}
-                                        onPress={() => handleAddMint(mint.url)}
+                                        theme={status === 'trusted' ? 'green' : status === 'untrusted' ? 'orange' : 'accent'}
+                                        disabled={status === 'trusted'}
+                                        icon={status === 'trusted' ? <ShieldCheck size={14} /> : <Plus size={14} />}
+                                        onPress={() => handleAction(mint.url, status)}
                                     >
-                                        {isAlreadyAdded ? 'Added' : 'Connect'}
+                                        {status === 'trusted' ? 'Trusted' : status === 'untrusted' ? 'Trust Now' : 'Connect'}
                                     </Button>
                                 </XStack>
                             </YStack>
@@ -233,7 +235,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
                                 <XStack
                                     position="absolute"
                                     t={-10}
-                                    r={15}
+                                    r={12}
                                     bg="gold"
                                     px="$2"
                                     py="$1"
@@ -247,7 +249,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
                                 >
                                     <Star size={10} color="black" fill="black" />
                                     <Text fontSize="$1" fontWeight="800" color="black" letterSpacing={0.5}>
-                                        Top Best
+                                        TOP BEST
                                     </Text>
                                 </XStack>
                             )}
@@ -256,11 +258,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
                 })}
             </YStack>
 
-            <TrustingMint
-                bottomSheetRef={trustSheetRef}
-                mintUrl={pendingMintUrl}
-                onConfirm={confirmAddMint}
-            />
+            <AddMintModal ref={addMintRef} />
         </YStack>
     );
 }

@@ -51,9 +51,9 @@ export default function BitcoinPriceCard() {
             height={140}
             justify="space-between"
             borderColor="$borderColor"
-            borderWidth={1}
+            borderWidth={0}
             rounded="$5"
-
+            bg="$gray2"
             p="$4"
             pressStyle={{ opacity: 0.9, scale: 0.99 }}
             onPress={handleRefresh}

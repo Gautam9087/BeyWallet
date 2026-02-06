@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { YStack, XStack, Text, Button, H2, H3, H4, Separator, ScrollView, View, Image, Card } from 'tamagui';
 import { Spinner } from '../../components/UI/Spinner';
-import { Link, Mail, Globe, Info, Copy, Check, ChevronLeft, Sprout, Share2, MessageSquare, ShieldCheck, Cpu, Plus } from '@tamagui/lucide-icons';
+import { Link, Mail, Globe, Info, Copy, Check, ChevronLeft, Sprout, Share2, MessageSquare, ShieldCheck, Cpu, Plus, ShieldOff } from '@tamagui/lucide-icons';
 import { useRouter, Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -11,7 +11,7 @@ import { useToastController } from '@tamagui/toast';
 import { useQuery } from '@tanstack/react-query';
 import { useWalletStore } from '../../store/walletStore';
 import { AppBottomSheetRef } from '../../components/UI/AppBottomSheet';
-import { TrustingMint } from '../HomeTabScreen/components/TrustingMint';
+import AddMintModal, { AddMintModalRef } from '../../components/AddMintModal';
 
 interface MintProfileScreenProps {
     url: string;
@@ -23,8 +23,22 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
     const toast = useToastController();
     const { addMint, mints } = useWalletStore();
 
-    const trustSheetRef = React.useRef<AppBottomSheetRef>(null!);
-    const isAlreadyAdded = mints.includes(url) || mints.includes(url + '/');
+    const addMintRef = React.useRef<AddMintModalRef>(null);
+
+    const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+    const walletMint = mints.find(m => normalizeUrl(m.mintUrl) === normalizeUrl(url));
+    const isAlreadyAdded = !!walletMint;
+    const isTrusted = walletMint?.trusted ?? false;
+
+    const handleAction = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (!isAlreadyAdded) {
+            addMintRef.current?.present(url);
+        } else if (!isTrusted) {
+            // Quick trust flow or open modal
+            addMintRef.current?.present(url);
+        }
+    };
 
     const { data: info, isLoading, error: fetchError } = useQuery({
         queryKey: ['mint-metadata', url],
@@ -111,7 +125,14 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
                                 <Sprout size={60} color="$accentColor" />
                             )}
                         </View>
-                        <H2 text="center">{name}</H2>
+                        <XStack items="center" gap="$2">
+                            <H2 text="center">{name}</H2>
+                            {isTrusted ? (
+                                <ShieldCheck size={24} color="$green10" />
+                            ) : isAlreadyAdded ? (
+                                <ShieldOff size={24} color="$orange10" />
+                            ) : null}
+                        </XStack>
                         <XStack
                             bg="$gray3"
                             px="$3"
@@ -248,34 +269,16 @@ export function MintProfileScreen({ url }: MintProfileScreenProps) {
                 <Button
                     size="$4"
                     fontWeight="bold"
-                    theme={isAlreadyAdded ? 'gray' : 'accent'}
-                    disabled={isAlreadyAdded}
-                    icon={isAlreadyAdded ? <Check size={18} /> : <Plus size={18} />}
-                    onPress={() => trustSheetRef.current?.present()}
+                    theme={isTrusted ? 'green' : isAlreadyAdded ? 'orange' : 'accent'}
+                    disabled={isTrusted}
+                    icon={isTrusted ? <ShieldCheck size={18} /> : isAlreadyAdded ? <ShieldOff size={18} /> : <Plus size={18} />}
+                    onPress={handleAction}
                 >
-                    {isAlreadyAdded ? 'Already Connected' : 'Connect to this Mint'}
+                    {isTrusted ? 'Mint Trusted' : isAlreadyAdded ? 'Trust this Mint' : 'Connect to this Mint'}
                 </Button>
             </YStack>
 
-            <TrustingMint
-                bottomSheetRef={trustSheetRef}
-                mintUrl={url}
-                onConfirm={async (url) => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    try {
-                        await addMint(url);
-                        toast.show('Mint Added', {
-                            message: `Successfully connected to ${url}`,
-                            type: 'success'
-                        });
-                    } catch (err: any) {
-                        toast.show('Error', {
-                            message: err.message || 'Failed to add mint',
-                            theme: 'red'
-                        });
-                    }
-                }}
-            />
+            <AddMintModal ref={addMintRef} />
         </YStack>
     );
 }

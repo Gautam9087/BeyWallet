@@ -233,4 +233,40 @@ export const cocoService = {
         await cocoManager.wallet.restore(mintUrl);
         console.log('[CocoService] Wallet restored');
     },
+
+    /**
+     * Get mint info (name, description, etc.) for preview.
+     * This fetches and caches mint info without trusting.
+     */
+    getMintInfo: async (mintUrl: string): Promise<any> => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        // Add the mint to fetch and cache its info
+        await cocoManager.mint.addMint(mintUrl);
+        // Now retrieve the cached info
+        const info = await cocoManager.mint.getMintInfo(mintUrl);
+        return info;
+    },
+
+    /**
+     * Untrust a mint (cached info remains).
+     */
+    untrustMint: async (mintUrl: string): Promise<void> => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        await cocoManager.mint.untrustMint(mintUrl);
+        console.log(`[CocoService] Mint untrusted: ${mintUrl}`);
+    },
+
+    /**
+     * Check if a mint is trusted.
+     */
+    isMintTrusted: async (mintUrl: string): Promise<boolean> => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+        return cocoManager.mint.isTrustedMint(mintUrl);
+    },
 };

@@ -11,6 +11,7 @@ import * as Haptics from "expo-haptics";
 
 interface AppBottomSheetProps {
     children: React.ReactNode;
+    snapPoints?: (string | number)[];
     onClose?: () => void;
 }
 
@@ -20,7 +21,7 @@ export interface AppBottomSheetRef {
 }
 
 const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
-    ({ children, onClose }, ref) => {
+    ({ children, snapPoints, onClose }, ref) => {
         const bottomSheetRef = useRef<BottomSheetModal>(null);
         const theme = useTheme();
         const [isOpen, setIsOpen] = useState(false);
@@ -69,11 +70,14 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
             return () => backHandler.remove();
         }, [isOpen]);
 
+        const enableDynamicSizing = !snapPoints;
+
         return (
             <BottomSheetModal
                 ref={bottomSheetRef}
                 enablePanDownToClose={true}
-                enableDynamicSizing={true}
+                enableDynamicSizing={enableDynamicSizing}
+                snapPoints={snapPoints}
                 backdropComponent={renderBackdrop}
                 stackBehavior="push"
                 handleIndicatorStyle={{
@@ -92,9 +96,13 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
                 // Ensure high priority
                 containerStyle={{ zIndex: 1000 }}
             >
-                <BottomSheetView style={styles.contentContainer}>
-                    {children}
-                </BottomSheetView>
+                {enableDynamicSizing ? (
+                    <BottomSheetView style={styles.contentContainer}>
+                        {children}
+                    </BottomSheetView>
+                ) : (
+                    children
+                )}
             </BottomSheetModal>
         );
     }

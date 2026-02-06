@@ -20,12 +20,13 @@ export class ExpoMintRepository implements MintRepository {
         const row = await this.db.get<{
             mintUrl: string;
             name: string;
+            nickname: string | null;
             mintInfo: string;
             trusted: number;
             createdAt: number;
             updatedAt: number;
         }>(
-            'SELECT mintUrl, name, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints WHERE mintUrl = ? LIMIT 1',
+            'SELECT mintUrl, name, nickname, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints WHERE mintUrl = ? LIMIT 1',
             [mintUrl],
         );
         if (!row) {
@@ -34,32 +35,35 @@ export class ExpoMintRepository implements MintRepository {
         return {
             mintUrl: row.mintUrl,
             name: row.name,
+            nickname: row.nickname,
             mintInfo: JSON.parse(row.mintInfo),
             trusted: row.trusted === 1,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
-        } satisfies Mint;
+        } as any;
     }
 
     async getAllMints(): Promise<Mint[]> {
         const rows = await this.db.all<{
             mintUrl: string;
             name: string;
+            nickname: string | null;
             mintInfo: string;
             trusted: number;
             createdAt: number;
             updatedAt: number;
-        }>('SELECT mintUrl, name, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints');
+        }>('SELECT mintUrl, name, nickname, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints');
         return rows.map(
             (r) =>
             ({
                 mintUrl: r.mintUrl,
                 name: r.name,
+                nickname: r.nickname,
                 mintInfo: JSON.parse(r.mintInfo),
                 trusted: r.trusted === 1,
                 createdAt: r.createdAt,
                 updatedAt: r.updatedAt,
-            } satisfies Mint),
+            } as any),
         );
     }
 
@@ -67,23 +71,25 @@ export class ExpoMintRepository implements MintRepository {
         const rows = await this.db.all<{
             mintUrl: string;
             name: string;
+            nickname: string | null;
             mintInfo: string;
             trusted: number;
             createdAt: number;
             updatedAt: number;
         }>(
-            'SELECT mintUrl, name, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints WHERE trusted = 1',
+            'SELECT mintUrl, name, nickname, mintInfo, trusted, createdAt, updatedAt FROM coco_cashu_mints WHERE trusted = 1',
         );
         return rows.map(
             (r) =>
             ({
                 mintUrl: r.mintUrl,
                 name: r.name,
+                nickname: r.nickname,
                 mintInfo: JSON.parse(r.mintInfo),
                 trusted: r.trusted === 1,
                 createdAt: r.createdAt,
                 updatedAt: r.updatedAt,
-            } satisfies Mint),
+            } as any),
         );
     }
 
@@ -135,6 +141,13 @@ export class ExpoMintRepository implements MintRepository {
     async setMintTrusted(mintUrl: string, trusted: boolean): Promise<void> {
         await this.db.run('UPDATE coco_cashu_mints SET trusted = ? WHERE mintUrl = ?', [
             trusted ? 1 : 0,
+            mintUrl,
+        ]);
+    }
+
+    async setMintNickname(mintUrl: string, nickname: string | null): Promise<void> {
+        await this.db.run('UPDATE coco_cashu_mints SET nickname = ? WHERE mintUrl = ?', [
+            nickname,
             mintUrl,
         ]);
     }
