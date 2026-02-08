@@ -5,6 +5,7 @@ import { InputStage } from './InputStage'
 import { ConfirmStage } from './ConfirmStage'
 import { ResultStage } from '../SendModalScreen/ResultStage'
 import { cocoService } from '../../services/cocoService'
+import { customReceiveService } from '../../services/fixes/CustomReceiveService';
 import { useWalletStore } from '../../store/walletStore'
 
 type ReceiveStep = 'input' | 'confirm' | 'result';
@@ -13,6 +14,10 @@ interface TokenInfo {
     mint: string;
     amount: number;
     proofCount: number;
+    preview?: {
+        name?: string;
+        description?: string;
+    };
 }
 
 export function ReceiveModalScreen() {
@@ -24,9 +29,9 @@ export function ReceiveModalScreen() {
     const [status, setStatus] = useState<'success' | 'error'>('success')
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
-    const { refreshBalance } = useWalletStore()
+    const { refreshBalance, addMint, fetchMintInfo, mints } = useWalletStore()
 
-    const handleDecodeToken = useCallback(() => {
+    const handleDecodeToken = useCallback(async () => {
         if (!token.trim()) return;
 
         setIsDecoding(true);
@@ -34,14 +39,35 @@ export function ReceiveModalScreen() {
 
         try {
             const decoded = cocoService.decodeToken(token.trim());
+            const mintUrl = decoded.mint;
 
             // Calculate total amount from proofs
             const amount = decoded.proofs?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
 
+            let previewInfo;
+
+            // Check if mint is already trusted
+            const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
+            const isTrusted = mints.some(m => normalizeUrl(m.mintUrl) === normalizeUrl(mintUrl) && m.trusted);
+
+            if (!isTrusted) {
+                try {
+                    console.log('[ReceiveModal] Fetching mint preview for:', mintUrl);
+                    const info = await fetchMintInfo(mintUrl);
+                    previewInfo = {
+                        name: info?.name,
+                        description: info?.description
+                    };
+                } catch (e) {
+                    console.warn('[ReceiveModal] Failed to fetch mint preview:', e);
+                }
+            }
+
             setTokenInfo({
-                mint: decoded.mint || 'Unknown mint',
+                mint: mintUrl || 'Unknown mint',
                 amount: amount,
                 proofCount: decoded.proofs?.length || 0,
+                preview: previewInfo
             });
             setStep('confirm');
         } catch (err: any) {
@@ -50,14 +76,26 @@ export function ReceiveModalScreen() {
         } finally {
             setIsDecoding(false);
         }
-    }, [token]);
+    }, [token, mints, fetchMintInfo]);
 
     const handleReceive = useCallback(async () => {
+        if (!tokenInfo) return;
+
         setIsReceiving(true);
         setError(null);
 
         try {
-            await cocoService.receive(token.trim());
+            // Ensure mint is trusted before receiving
+            const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
+            const isTrusted = mints.some(m => normalizeUrl(m.mintUrl) === normalizeUrl(tokenInfo.mint) && m.trusted);
+
+            if (!isTrusted) {
+                console.log('[ReceiveModal] Trusting mint before receive:', tokenInfo.mint);
+                await addMint(tokenInfo.mint, { trusted: true });
+            }
+
+            // Use custom service to fix unit mismatch issues
+            await customReceiveService.receive(token.trim());
             setStatus('success');
             refreshBalance();
             setStep('result');
@@ -69,7 +107,7 @@ export function ReceiveModalScreen() {
         } finally {
             setIsReceiving(false);
         }
-    }, [token, refreshBalance]);
+    }, [token, tokenInfo, mints, addMint, refreshBalance]);
 
     const handleNext = () => {
         if (step === 'input') handleDecodeToken();
