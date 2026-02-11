@@ -137,6 +137,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         try {
             await cocoService.addMint(url, options);
 
+            // Repair any corrupted keysets for this new mint immediately
+            await cocoService.repairMintKeysets(url, 'sat');
+
             const manager = cocoService.getManager();
             const allMints = await manager.mint.getAllMints();
             const trustedMints = await manager.mint.getAllTrustedMints();

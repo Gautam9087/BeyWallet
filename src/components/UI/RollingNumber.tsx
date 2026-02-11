@@ -191,6 +191,7 @@ export const RollingNumber = ({
                                 fontWeight={fontWeight}
                                 fontSize={fontSize}
                                 lineHeight={itemHeight}
+
                                 fontVariant={['tabular-nums']}
                             >
                                 {char}

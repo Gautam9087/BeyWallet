@@ -98,7 +98,7 @@ export default function TabLayout() {
                 icon={<LockIcon size={24} color={theme.color9.val} />}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-                  lock()
+                  lock(true)
                 }}
               />
             </XStack>

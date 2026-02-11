@@ -6,8 +6,8 @@ import { customProofService } from './CustomProofService';
 const getInternals = () => {
     const manager = cocoService.getManager();
     return {
-        // We reuse mintService for basics
-        mintService: (manager as any).mintService,
+        // Handle both possible property names for backward/forward compatibility
+        mintService: (manager as any).mintService || (manager as any).mint,
         proofService: (manager as any).proofService, // The original one for utils
         eventBus: (manager as any).eventBus,
         logger: (manager as any).logger,
@@ -41,9 +41,18 @@ export class CustomReceiveService {
         const { mintService, eventBus, logger } = getInternals();
 
         // 2. Ensure Mint is trusted
-        const trusted = await mintService.isTrustedMint(mint);
-        if (!trusted) {
-            throw new Error(`Mint ${mint} is not trusted`);
+        if (mintService) {
+            const trusted = await mintService.isTrustedMint(mint);
+            if (!trusted) {
+                console.log(`[CustomReceiveService] Mint ${mint} is not trusted. Trusting now to allow receive.`);
+                try {
+                    await mintService.addMint(mint, { trusted: true });
+                } catch (addErr) {
+                    console.error('[CustomReceiveService] Failed to auto-trust mint:', addErr);
+                    // We don't throw here, we'll try to proceed anyway if possible, 
+                    // or let ensureUpdatedMint fail if it's a hard requirement.
+                }
+            }
         }
 
         // 3. Ensure updated mint (keysets)
@@ -64,15 +73,19 @@ export class CustomReceiveService {
                 });
 
                 if (matchingKeyset) {
-                    if (unit !== matchingKeyset.unit) {
-                        console.warn(`[CustomReceiveService] Token metadata says '${unit}' but keyset says '${matchingKeyset.unit}'. Using keyset unit.`);
+                    const keysetUnit = matchingKeyset.unit || 'sat';
+                    if (unit && unit !== keysetUnit) {
+                        console.warn(`[CustomReceiveService] Token metadata says '${unit}' but keyset says '${keysetUnit}'. Using keyset unit.`);
                     }
-                    unit = matchingKeyset.unit;
+                    unit = keysetUnit;
                 }
             }
         } catch (e) {
             console.warn('[CustomReceiveService] Failed to infer unit from token proofs', e);
         }
+
+        // Final fallback to 'sat' if still undefined or empty
+        unit = unit || 'sat';
 
         console.log(`[CustomReceiveService] Using mint: ${mint}, unit: ${unit || 'default(sat)'}`);
 

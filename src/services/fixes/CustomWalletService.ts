@@ -7,7 +7,7 @@ const getInternals = () => {
     const manager = cocoService.getManager();
     return {
         manager,
-        mintService: (manager as any).mintService,
+        mintService: (manager as any).mintService || (manager as any).mint,
         seedService: (manager as any).seedService,
         // requestProvider: (manager as any).mintRequestProvider, // Removing for now
     };
@@ -73,15 +73,16 @@ export class CustomWalletService {
         // This calls the existing MintService to get cached/fresh keysets
         const { mint, keysets } = await mintService.ensureUpdatedMint(mintUrl);
 
-        // Default to 'sat' ONLY if unit is undefined. If unit is "" (empty string), respect it.
-        const targetUnit = unit !== undefined ? unit : DEFAULT_UNIT;
+        // Normalize targetUnit to 'sat' if it's empty or undefined
+        const targetUnit = (unit && unit !== '') ? unit : DEFAULT_UNIT;
+        console.log(`[CustomWalletService] Building wallet for ${mintUrl}, targetUnit normalized to: ${targetUnit}`);
 
         // Filter keysets matching the requested unit
         const validKeysets = keysets.filter(
             (keyset: any) =>
                 keyset.keypairs &&
                 Object.keys(keyset.keypairs).length > 0 &&
-                (keyset.unit === targetUnit || (!keyset.unit && targetUnit === DEFAULT_UNIT))
+                (keyset.unit === targetUnit || ((!keyset.unit || keyset.unit === '') && targetUnit === DEFAULT_UNIT))
         );
 
         if (validKeysets.length === 0) {

@@ -5,9 +5,10 @@ export interface BitcoinPriceData {
 }
 
 export const bitcoinService = {
-    async fetchPrice(): Promise<BitcoinPriceData> {
+    async fetchPrice(currency: string = 'usd'): Promise<BitcoinPriceData> {
+        const vsCurrency = currency.toLowerCase();
         const priceRes = await fetch(
-            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true'
+            `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${vsCurrency}&include_24hr_change=true`
         );
 
         if (!priceRes.ok) {
@@ -16,14 +17,19 @@ export const bitcoinService = {
 
         const priceData = await priceRes.json();
 
-        if (!priceData?.bitcoin?.usd) {
-            throw new Error('Invalid price format from CoinGecko');
+        if (!priceData?.bitcoin?.[vsCurrency]) {
+            throw new Error(`Invalid price format from CoinGecko for ${vsCurrency}`);
         }
 
         return {
-            price: priceData.bitcoin.usd,
-            change24h: priceData.bitcoin.usd_24h_change || 0,
+            price: priceData.bitcoin[vsCurrency],
+            change24h: priceData.bitcoin[`${vsCurrency}_24h_change`] || 0,
             updatedAt: Math.floor(Date.now() / 1000),
         };
+    },
+
+    async getFromDb(): Promise<BitcoinPriceData | null> {
+        // Placeholder for matching the store's loadFromCache call if needed
+        return null;
     }
 };

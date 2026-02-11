@@ -5,12 +5,16 @@ import { useQuery } from '@tanstack/react-query'
 import { bitcoinService } from '../../../services/bitcoinService'
 import * as Haptics from 'expo-haptics'
 import { RollingNumber } from '~/components/UI/RollingNumber'
+import { useSettingsStore } from '~/store/settingsStore'
+import { currencyService, CurrencyCode } from '~/services/currencyService'
 
 export default function BitcoinPriceCard() {
+    const { secondaryCurrency } = useSettingsStore()
+
     const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
-        queryKey: ['bitcoinPrice'],
-        queryFn: () => bitcoinService.fetchPrice(),
-        refetchInterval: 300000, // Auto refresh every 5 minutes
+        queryKey: ['bitcoinPrice', secondaryCurrency],
+        queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
+        refetchInterval: 300000,
         staleTime: 30000,
     })
 
@@ -20,11 +24,7 @@ export default function BitcoinPriceCard() {
     }
 
     const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 0
-        }).format(val)
+        return currencyService.formatValue(val, secondaryCurrency as CurrencyCode)
     }
 
     const [now, setNow] = React.useState(Date.now());
@@ -51,9 +51,9 @@ export default function BitcoinPriceCard() {
             height={140}
             justify="space-between"
             borderColor="$borderColor"
-            borderWidth={0}
+            borderWidth={0.5}
             rounded="$5"
-            bg="$gray2"
+            bg="$color2"
             p="$3"
             pressStyle={{ opacity: 0.9, scale: 0.99 }}
             onPress={handleRefresh}
@@ -83,11 +83,11 @@ export default function BitcoinPriceCard() {
             <XStack justify="space-between" items="flex-end" flex={1} pt="$3">
                 <YStack gap="$1.5" flex={1} justify="flex-end">
                     {data ? (
-                        <>
+                        <XStack justify="space-between">
                             <RollingNumber
                                 showDecimals={false}
 
-                                fontSize={30} fontWeight={800} letterSpacing={-1.5} color="$accent4" lineHeight={36}>
+                                fontSize={24} fontWeight={800} letterSpacing={-1.5} color="$accent4" lineHeight={36}>
                                 {formatCurrency(data.price)}
                             </RollingNumber>
 
@@ -108,7 +108,7 @@ export default function BitcoinPriceCard() {
                                 </View>
                                 <Text color="$gray9" fontSize="$2" fontWeight="600">24h</Text>
                             </XStack>
-                        </>
+                        </XStack>
                     ) : (
                         <YStack gap="$2">
                             <View height={30} width={120} bg="$gray5" rounded="$2" opacity={0.5} />

@@ -1,6 +1,7 @@
 import React from 'react'
-import { View, Text, YStack, XStack, H4, H6, Image, styled } from 'tamagui'
+import { View, Text, YStack, XStack, H4, H6, Image, styled, H5 } from 'tamagui'
 import { ChevronRight } from '@tamagui/lucide-icons'
+import { RollingNumber } from '~/components/UI/RollingNumber'
 
 interface BalanceItem {
     id: string
@@ -39,16 +40,27 @@ const BalanceRow = ({ item }: BalanceRowProps) => {
                     width={45}
                     height={45}
                 />
-                <H4 color="$accent4">{title}</H4>
+                <H6 color="$accent4" textTransform="uppercase">{title}</H6>
                 {!isComingSoon && (
                     <ChevronRight size={20} strokeWidth={3} color="$accent9" />
                 )}
             </XStack>
 
             <YStack>
-                <H4>
+                <RollingNumber
+
+                    letterSpacing={-1}
+                    fontSize={16}
+                    fontWeight="900"
+                    color="$accent8"
+                    decimalOpacity={0.4}
+                    showDecimals={false}
+                >
+
+
                     {isComingSoon ? 'Coming soon...' : value}
-                </H4>
+
+                </RollingNumber>
             </YStack>
         </RowContainer>
     )

@@ -5,18 +5,18 @@ import Blockies from 'components/UI/Blockies';
 
 export default function WalletCard() {
     return (
-        <YStack width={"100%"} gap="$2">
+        <YStack width={"100%"} gap="$2" >
             <XStack gap="$2" items="center" justify="space-between">
                 <XStack gap="$2" items="center">
                     <Blockies
                         style={{ borderRadius: 3 }}
-                        seed={"hussein@zaps.lol"}
-                        size={8}
-                        scale={7}
+                        seed={"2dss4zahuvtcyggsrrdestd6ps.lol"}
+                        size={10}
+                        scale={4}
                     />
                     <YStack>
-                        <H4 color="$accent4">hussein@zaps.lol</H4>
-                        <H5 fontWeight={'300'} color="$accent9">124K21...diuy</H5>
+                        <Text fontSize="$5" fontWeight="700" color="$accent5">hussein@zaps.lol</Text>
+                        <Text fontSize="$3" fontWeight="700" color="$accent10">npub78d...5gdcf</Text>
                     </YStack>
                 </XStack>
             </XStack>

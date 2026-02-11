@@ -2,12 +2,17 @@ import React, { useState } from 'react'
 import { YStack, ScrollView, Text, YGroup, ListItem, Separator, View } from 'tamagui'
 import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight } from '@tamagui/lucide-icons'
 import { ThemeModal } from './components/ThemeModal'
+import { CurrencyModal } from './components/CurrencyModal'
 import { BackupMnemonicModal } from './components/BackupMnemonicModal'
 import * as Haptics from 'expo-haptics'
+import { useSettingsStore } from '~/store/settingsStore'
 
 export function SettingsScreen() {
     const [isMnemonicOpen, setIsMnemonicOpen] = useState(false)
     const [isThemeOpen, setIsThemeOpen] = useState(false)
+    const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
+
+    const { secondaryCurrency } = useSettingsStore()
 
     const handleSettingPress = (id: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -15,6 +20,8 @@ export function SettingsScreen() {
             setIsMnemonicOpen(true)
         } else if (id === 'theme') {
             setIsThemeOpen(true)
+        } else if (id === 'currency') {
+            setIsCurrencyOpen(true)
         }
     }
 
@@ -58,6 +65,17 @@ export function SettingsScreen() {
                                 icon={Palette}
                                 iconAfter={ChevronRight}
                                 onPress={() => handleSettingPress('theme')}
+                            />
+                        </YGroup.Item>
+                        <YGroup.Item>
+                            <ListItem
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
+                                title="Currency"
+                                subTitle={`Secondary: ${secondaryCurrency}`}
+                                icon={Globe}
+                                iconAfter={ChevronRight}
+                                onPress={() => handleSettingPress('currency')}
                             />
                         </YGroup.Item>
                     </YGroup>
@@ -106,6 +124,10 @@ export function SettingsScreen() {
                 <ThemeModal
                     open={isThemeOpen}
                     onOpenChange={setIsThemeOpen}
+                />
+                <CurrencyModal
+                    open={isCurrencyOpen}
+                    onOpenChange={setIsCurrencyOpen}
                 />
                 <BackupMnemonicModal
                     open={isMnemonicOpen}

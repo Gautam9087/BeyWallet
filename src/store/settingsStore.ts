@@ -5,13 +5,16 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 interface SettingsState {
     theme: ThemePreference;
+    secondaryCurrency: string;
     initialized: boolean;
     initialize: () => Promise<void>;
     setTheme: (theme: ThemePreference) => Promise<void>;
+    setSecondaryCurrency: (currency: string) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     theme: 'system',
+    secondaryCurrency: 'USD',
     initialized: false,
 
     initialize: async () => {
@@ -33,10 +36,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 const repo = cocoService.getRepo();
                 const storedTheme = await repo.settingsRepository.getSetting('theme');
                 if (storedTheme) {
-                    set({ theme: storedTheme as ThemePreference, initialized: true });
-                } else {
-                    set({ initialized: true });
+                    set({ theme: storedTheme as ThemePreference });
                 }
+                const storedCurrency = await repo.settingsRepository.getSetting('secondaryCurrency');
+                if (storedCurrency) {
+                    set({ secondaryCurrency: storedCurrency });
+                }
+                set({ initialized: true });
                 return;
             } catch (error) {
                 // If it's a "Repositories not initialized" error, we just wait.
@@ -62,6 +68,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             console.error('[SettingsStore] Failed to set theme:', error);
             // Still set state so UI reflects choice even if save fails
             set({ theme });
+        }
+    },
+
+    setSecondaryCurrency: async (currency: string) => {
+        try {
+            const exists = await cocoService.walletExists();
+            if (exists) {
+                const repo = cocoService.getRepo();
+                await repo.settingsRepository.setSetting('secondaryCurrency', currency);
+            }
+            set({ secondaryCurrency: currency });
+        } catch (error) {
+            console.error('[SettingsStore] Failed to set secondary currency:', error);
+            set({ secondaryCurrency: currency });
         }
     },
 }));

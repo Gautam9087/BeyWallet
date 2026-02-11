@@ -14,6 +14,8 @@ interface NumericKeypadProps {
     showBalance?: boolean
     showAmountDisplay?: boolean
     showConfirmButton?: boolean
+    confirmDisabled?: boolean
+    confirmIcon?: any
 }
 
 export function NumericKeypad({
@@ -26,7 +28,9 @@ export function NumericKeypad({
     currency = 'SATS',
     showBalance = false,
     showAmountDisplay = true,
-    showConfirmButton = true
+    showConfirmButton = true,
+    confirmDisabled = false,
+    confirmIcon = null
 }: NumericKeypadProps) {
 
     const amountNum = Number(value) || 0
@@ -130,14 +134,14 @@ export function NumericKeypad({
                     <Button
                         size="$5"
                         fontSize="$6"
-                        theme={canContinue ? "accent" : "gray"}
+                        theme={canContinue && !confirmDisabled ? "accent" : "gray"}
                         onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
                             onConfirm()
                         }}
-                        disabled={!canContinue}
-                        opacity={!canContinue ? 0.5 : 1}
-                        icon={isLoading ? <Spinner color="$color" /> : null}
+                        disabled={!canContinue || confirmDisabled}
+                        opacity={(!canContinue || confirmDisabled) ? 0.5 : 1}
+                        icon={isLoading ? <Spinner color="$color" /> : (confirmIcon || null)}
                     >
                         {isLoading ? 'Processing...' : confirmLabel}
                     </Button>
