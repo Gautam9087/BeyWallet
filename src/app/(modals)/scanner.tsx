@@ -1,0 +1,203 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Dimensions } from 'react-native';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { YStack, XStack, Text, Button, View, ZStack, Spinner, Theme } from 'tamagui';
+import { X, Zap, ZapOff, RefreshCcw } from '@tamagui/lucide-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width, height } = Dimensions.get('window');
+const SCAN_AREA_SIZE = width * 0.7;
+
+export default function ScannerScreen() {
+    const router = useRouter();
+    const params = useLocalSearchParams();
+    const [permission, requestPermission] = useCameraPermissions();
+    const [scanned, setScanned] = useState(false);
+    const [flash, setFlash] = useState<'off' | 'on'>('off');
+    const [progress, setProgress] = useState(0);
+    const [isUR, setIsUR] = useState(false);
+    const decoderRef = useRef<URDecoder>(new URDecoder());
+
+    useEffect(() => {
+        if (!permission) {
+            requestPermission();
+        }
+    }, [permission]);
+
+    if (!permission) {
+        return (
+            <YStack flex={1} bg="black" items="center" justify="center">
+                <Spinner size="large" color="white" />
+            </YStack>
+        );
+    }
+
+    if (!permission.granted) {
+        return (
+            <YStack flex={1} bg="black" items="center" justify="center" p="$4" gap="$4">
+                <Text color="white" fontSize="$6" fontWeight="700" ta="center">
+                    Camera Permission Required
+                </Text>
+                <Text color="$gray10" ta="center">
+                    We need your permission to show the camera to scan QR codes.
+                </Text>
+                <Button theme="accent" onPress={requestPermission}>
+                    Grant Permission
+                </Button>
+                <Button chromeless color="white" onPress={() => router.back()}>
+                    Cancel
+                </Button>
+            </YStack>
+        );
+    }
+
+    const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+        if (scanned) return;
+
+        const data = result.data.trim();
+
+        // Handle UR (Multipart QR)
+        if (data.toLowerCase().startsWith('ur:')) {
+            setIsUR(true);
+            try {
+                decoderRef.current.receivePart(data);
+                const p = decoderRef.current.estimatedPercentComplete();
+                setProgress(p);
+
+                if (decoderRef.current.isComplete()) {
+                    if (decoderRef.current.isSuccess()) {
+                        const ur = decoderRef.current.resultUR();
+                        const decoded = ur.decodeCBOR();
+
+                        // Robust string conversion for decoded UR payload
+                        let decodedStr = '';
+                        if (typeof decoded === 'string') {
+                            decodedStr = decoded;
+                        } else if (Buffer.isBuffer(decoded)) {
+                            decodedStr = decoded.toString('utf8');
+                        } else if (decoded instanceof Uint8Array || Array.isArray(decoded)) {
+                            decodedStr = Buffer.from(decoded).toString('utf8');
+                        } else {
+                            decodedStr = String(decoded);
+                        }
+
+                        onSuccess(decodedStr);
+                    } else {
+                        // Reset if failed
+                        decoderRef.current = new URDecoder();
+                        setProgress(0);
+                    }
+                }
+            } catch (e) {
+                console.error('UR Decoding error:', e);
+                decoderRef.current = new URDecoder();
+                setProgress(0);
+            }
+        } else {
+            // Static QR
+            onSuccess(data);
+        }
+    };
+
+    const onSuccess = (data: string) => {
+        setScanned(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        // Navigate back with the scanned data
+        // We use the 'receive' screen or whatever triggered us
+        const returnTo = (params.returnTo as any) || '/receive';
+
+        // We can't easily pass big strings via router.back() params in some expo-router versions
+        // but since ReceiveModalScreen might be listening to a store or we can use setParams
+        router.replace({
+            pathname: returnTo,
+            params: { scannedToken: data }
+        });
+    };
+
+    return (
+        <Theme name="dark">
+            <ZStack flex={1} bg="black">
+                <CameraView
+                    style={StyleSheet.absoluteFill}
+                    facing="back"
+                    enableTorch={flash === 'on'}
+                    onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+                    barcodeScannerSettings={{
+                        barcodeTypes: ['qr'],
+                    }}
+                />
+
+                {/* Overlay UI */}
+                <SafeAreaView style={{ flex: 1 }}>
+                    <YStack flex={1} justify="space-between" p="$4">
+                        {/* Header */}
+                        <XStack justify="space-between" items="center">
+                            <Button
+                                circular
+                                size="$4"
+                                bg="rgba(0,0,0,0.5)"
+                                icon={<X size={24} color="white" />}
+                                onPress={() => router.back()}
+                            />
+                            <Button
+                                circular
+                                size="$4"
+                                bg="rgba(0,0,0,0.5)"
+                                icon={flash === 'on' ? <Zap size={24} color="#FFD700" /> : <ZapOff size={24} color="white" />}
+                                onPress={() => setFlash(f => f === 'on' ? 'off' : 'on')}
+                            />
+                        </XStack>
+
+                        {/* Middle - Scan Frame */}
+                        <YStack items="center">
+                            <View
+                                width={SCAN_AREA_SIZE}
+                                height={SCAN_AREA_SIZE}
+                                borderWidth={2}
+                                borderColor="white"
+                                rounded="$6"
+                                style={{
+                                    borderStyle: 'dashed',
+                                    backgroundColor: 'rgba(255,255,255,0.05)',
+                                }}
+                            />
+                            <Text color="white" mt="$4" fontWeight="600" ta="center" style={{ textShadowColor: 'black', textShadowRadius: 2 }}>
+                                {isUR ? 'Scanning animated QR...' : 'Align QR code within the frame'}
+                            </Text>
+                        </YStack>
+
+                        {/* Footer - Progress */}
+                        <YStack gap="$4" items="center" pb="$8">
+                            {progress > 0 && (
+                                <YStack width="80%" gap="$2">
+                                    <XStack justify="space-between">
+                                        <Text color="white" fontWeight="700">Reading Fragments...</Text>
+                                        <Text color="white" fontWeight="700">{Math.round(progress * 100)}%</Text>
+                                    </XStack>
+                                    <View height={10} bg="rgba(255,255,255,0.2)" rounded="$5" overflow="hidden">
+                                        <View
+                                            height="100%"
+                                            bg="$accentColor"
+                                            width={`${progress * 100}%`}
+                                            rounded="$5"
+                                        />
+                                    </View>
+                                </YStack>
+                            )}
+
+                            {scanned && (
+                                <Button theme="accent" size="$5" onPress={() => setScanned(false)}>
+                                    Scan Again
+                                </Button>
+                            )}
+                        </YStack>
+                    </YStack>
+                </SafeAreaView>
+            </ZStack>
+        </Theme>
+    );
+}

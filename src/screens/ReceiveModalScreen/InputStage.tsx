@@ -11,9 +11,10 @@ interface InputStageProps {
     isLoading?: boolean;
     error?: string | null;
     onContinue: () => void;
+    onScanPress?: () => void;
 }
 
-export function InputStage({ token, setToken, isLoading, error, onContinue }: InputStageProps) {
+export function InputStage({ token, setToken, isLoading, error, onContinue, onScanPress }: InputStageProps) {
     const handlePaste = async () => {
         const text = await ClipboardAPI.getStringAsync();
         if (text) {
@@ -22,10 +23,19 @@ export function InputStage({ token, setToken, isLoading, error, onContinue }: In
         }
     };
 
-    const isValidToken = token.trim().length > 20 && (
-        token.trim().startsWith('cashu') ||
-        token.trim().startsWith('creqA')
+    const isValidToken = token.trim().length > 5 && (
+        token.trim().toLowerCase().includes('cashu') ||
+        token.trim().toLowerCase().includes('creq') ||
+        token.trim().toLowerCase().startsWith('lnbc') ||
+        token.trim().toLowerCase().startsWith('lnurl') ||
+        // Check for variation selectors (Peanut format)
+        /[\uFE00-\uFE0F\u{E0100}-\u{E01EF}]/u.test(token)
     );
+
+    const handleScanPress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onScanPress?.();
+    };
 
     return (
         <YStack flex={1} bg="$background" gap="$6" pt="$4">
@@ -70,7 +80,7 @@ export function InputStage({ token, setToken, isLoading, error, onContinue }: In
                     height={80}
                     bg="$color3"
                     rounded="$4"
-                    onPress={() => { }}
+                    onPress={handleScanPress}
                     pressStyle={{ bg: '$color4' }}
                     p="$4"
                 >

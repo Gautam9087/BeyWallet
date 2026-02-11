@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import { YStack } from 'tamagui'
-import { useRouter, Stack } from 'expo-router'
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 import { InputStage } from './InputStage'
 import { ConfirmStage } from './ConfirmStage'
 import { ResultStage } from '../SendModalScreen/ResultStage'
@@ -29,16 +29,25 @@ export function ReceiveModalScreen() {
     const [status, setStatus] = useState<'success' | 'error'>('success')
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
+    const params = useLocalSearchParams<{ scannedToken?: string }>()
     const { refreshBalance, addMint, fetchMintInfo, mints } = useWalletStore()
 
-    const handleDecodeToken = useCallback(async () => {
-        if (!token.trim()) return;
+    React.useEffect(() => {
+        if (params.scannedToken) {
+            setToken(params.scannedToken);
+            handleDecodeToken(params.scannedToken);
+        }
+    }, [params.scannedToken]);
+
+    const handleDecodeToken = useCallback(async (tokenToDecode?: string) => {
+        const targetToken = tokenToDecode || token;
+        if (!targetToken.trim()) return;
 
         setIsDecoding(true);
         setError(null);
 
         try {
-            const decoded = cocoService.decodeToken(token.trim());
+            const decoded = cocoService.decodeToken(targetToken.trim());
             const mintUrl = decoded.mint;
 
             // Calculate total amount from proofs
@@ -143,6 +152,12 @@ export function ReceiveModalScreen() {
                     isLoading={isDecoding}
                     error={error}
                     onContinue={handleNext}
+                    onScanPress={() => {
+                        router.push({
+                            pathname: '/(modals)/scanner',
+                            params: { returnTo: '/receive' }
+                        });
+                    }}
                 />
             )}
 

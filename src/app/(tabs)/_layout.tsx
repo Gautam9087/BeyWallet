@@ -88,7 +88,10 @@ export default function TabLayout() {
                 icon={<Scan strokeWidth={3} size={24} color="$color9" />}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                  console.log('Scan')
+                  router.push({
+                    pathname: '/(modals)/scanner',
+                    params: { returnTo: '/receive' }
+                  })
                 }}
               />
               <Button

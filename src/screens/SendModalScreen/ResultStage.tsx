@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useToastController } from '@tamagui/toast';
 import { Spinner } from '../../components/UI/Spinner';
 import { Buffer } from 'buffer';
@@ -14,6 +15,8 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useQuery } from '@tanstack/react-query';
 import { bitcoinService } from '../../services/bitcoinService';
 import { currencyService, CurrencyCode } from '../../services/currencyService';
+import { cocoService } from '../../services/cocoService';
+import { Hexagon } from "@tamagui/lucide-icons";
 
 // Ensure Buffer is available globally
 if (typeof global.Buffer === 'undefined') {
@@ -53,11 +56,13 @@ export function ResultStage({
     const [isReclaiming, setIsReclaiming] = useState(false);
 
     // Animated QR states
+    const [currentToken, setCurrentToken] = useState<string>(token || '');
     const [qrCodeFragment, setQrCodeFragment] = useState<string>(token || '');
     const [showAnimatedQR, setShowAnimatedQR] = useState(false);
     const [fragmentLength, setFragmentLength] = useState(150); // L=150, M=100, S=50
     const [intervalMs, setIntervalMs] = useState(140); // F=140, M=250, S=500
     const encoderRef = React.useRef<UREncoder | null>(null);
+    const [tokenVersion, setTokenVersion] = useState<'V3' | 'V4'>(token?.startsWith('cashuB') ? 'V4' : 'V3');
 
     const { data: btcData } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
@@ -66,12 +71,12 @@ export function ResultStage({
     });
 
     useEffect(() => {
-        if (!isSuccess || !token) return;
+        if (!isSuccess || !currentToken) return;
 
         try {
-            // Normalize token (strip prefix for decoding if needed, though cashu-ts handles it)
-            const cleanToken = token.startsWith('cashu:') ? token.replace('cashu:', '') : token;
-            const decoded = getDecodedToken(cleanToken) as any;
+            // Normalize token (strip prefix for decoding)
+            const cleanToken = cocoService._cleanToken(currentToken);
+            const decoded = cocoService.decodeToken(cleanToken) as any;
             const proofs = decoded.token?.[0]?.proofs || [];
 
             // Animate if the token is large (>400 chars) or has more than 2 proofs
@@ -85,14 +90,14 @@ export function ResultStage({
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
                 setShowAnimatedQR(false);
-                setQrCodeFragment(token);
+                setQrCodeFragment(currentToken);
             }
         } catch (e) {
             console.error('Failed to decode token for QR:', e);
             setShowAnimatedQR(false);
-            setQrCodeFragment(token);
+            setQrCodeFragment(currentToken);
         }
-    }, [token, isSuccess, fragmentLength]);
+    }, [currentToken, isSuccess, fragmentLength]);
 
     useEffect(() => {
         if (!showAnimatedQR || !encoderRef.current) return;
@@ -130,12 +135,44 @@ export function ResultStage({
     }, [status]);
 
     const handleCopy = async () => {
-        if (token) {
-            await Clipboard.setStringAsync(token);
+        if (currentToken) {
+            await Clipboard.setStringAsync(currentToken);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setCopied(true);
             toast.show('Copied!', { message: 'Token copied to clipboard' });
             setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleCopyEmoji = async () => {
+        if (currentToken) {
+            const peanut = cocoService.encodeTokenPeanut(cocoService._cleanToken(currentToken));
+            await Clipboard.setStringAsync(peanut);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            toast.show('Copied as Emoji!', { message: 'Peanut token copied to clipboard' });
+        }
+    };
+
+    const handleToggleVersion = () => {
+        if (!currentToken) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        try {
+            const decoded = cocoService.decodeToken(currentToken);
+            if (tokenVersion === 'V3') {
+                const encodedV4 = cocoService.encodeTokenV4(decoded);
+                setCurrentToken(encodedV4);
+                setTokenVersion('V4');
+                toast.show('Switched to V4', { message: 'Using compact CBOR encoding' });
+            } else {
+                const encodedV3 = cocoService.encodeTokenV3(decoded);
+                setCurrentToken(encodedV3);
+                setTokenVersion('V3');
+                toast.show('Switched to V3', { message: 'Using standard JSON encoding' });
+            }
+        } catch (e) {
+            console.error('Failed to toggle token version:', e);
+            toast.show('Error', { message: 'Failed to switch token version' });
         }
     };
 
@@ -144,6 +181,31 @@ export function ResultStage({
             setIsReclaiming(true);
             await onReclaim();
             setIsReclaiming(false);
+        }
+    };
+
+    const handleShare = async () => {
+        if (!currentToken) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        const shareText = `cashu:${currentToken}`;
+
+        try {
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (isAvailable) {
+                // expo-sharing works best with files, but for text we might use Share from react-native
+                // or just Clipboard if Sharing.shareAsync isn't what we want for text.
+                // However, since we are in a mobile app, let's use Share from react-native for better text sharing.
+                const { Share: RNShare } = require('react-native');
+                await RNShare.share({
+                    message: shareText,
+                });
+            } else {
+                handleCopy();
+            }
+        } catch (error) {
+            console.error('Error sharing:', error);
+            handleCopy();
         }
     };
 
@@ -216,6 +278,12 @@ export function ResultStage({
                                 <YStack>
                                     <ListItem
                                         icon={Link}
+                                        title="Copy as Emoji"
+                                        onPress={handleCopyEmoji}
+                                        pressStyle={{ bg: '$backgroundHover' }}
+                                    />
+                                    <ListItem
+                                        icon={Link}
                                         title="Link Share"
                                         onPress={() => { }}
                                         pressStyle={{ bg: '$backgroundHover' }}
@@ -270,7 +338,7 @@ export function ResultStage({
                     }}
                 >
                     <QRCode
-                        value={qrCodeFragment || `cashu:${token}`}
+                        value={showAnimatedQR ? qrCodeFragment : (currentToken.startsWith('cashu:') ? currentToken : `cashu:${currentToken}`)}
                         size={300}
                         backgroundColor="white"
                         color="black"
@@ -278,31 +346,44 @@ export function ResultStage({
                     />
                 </View>
 
-                {showAnimatedQR && (
-                    <XStack gap="$3" bg="$color3" px="$4" py="$2" borderRadius={1000}>
-                        <Button
-                            size="$2.5"
-                            chromeless
-                            icon={<Gauge size={16} />}
-                            onPress={changeSpeed}
-                            color="$color"
-                            fontWeight="700"
-                        >
-                            INTERVAL: {speedLabel}
-                        </Button>
-                        <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                        <Button
-                            size="$2.5"
-                            chromeless
-                            icon={<ZoomIn size={16} />}
-                            onPress={changeSize}
-                            color="$color"
-                            fontWeight="700"
-                        >
-                            SIZE: {sizeLabel}
-                        </Button>
-                    </XStack>
-                )}
+                <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
+                    {showAnimatedQR && (
+                        <>
+                            <Button
+                                size="$2.5"
+                                chromeless
+                                icon={<Gauge size={16} />}
+                                onPress={changeSpeed}
+                                color="$color"
+                                fontWeight="700"
+                            >
+                                {speedLabel}
+                            </Button>
+                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                            <Button
+                                size="$2.5"
+                                chromeless
+                                icon={<ZoomIn size={16} />}
+                                onPress={changeSize}
+                                color="$color"
+                                fontWeight="700"
+                            >
+                                {sizeLabel}
+                            </Button>
+                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                        </>
+                    )}
+                    <Button
+                        size="$2.5"
+                        chromeless
+                        icon={<Hexagon size={16} />}
+                        onPress={handleToggleVersion}
+                        color="$color"
+                        fontWeight="700"
+                    >
+                        {tokenVersion}
+                    </Button>
+                </XStack>
             </YStack>
 
             {/* Amount Section */}
@@ -351,7 +432,7 @@ export function ResultStage({
                         <Building2 size={18} opacity={0.7} />
                         <Text color="$gray10" fontSize="$4" fontWeight="500">Mint</Text>
                     </XStack>
-                    <Text fontWeight="700" fontSize="$4" opacity={0.9} textAlign="right" numberOfLines={1} style={{ maxWidth: 200 }}>
+                    <Text fontWeight="700" fontSize="$4" opacity={0.9} numberOfLines={1} style={{ maxWidth: 200, textAlign: 'right' }}>
                         {mintUrl ? getMintDisplayName(mintUrl) : 'Unknown'}
                     </Text>
                 </XStack>
@@ -375,7 +456,7 @@ export function ResultStage({
                 )}
                 <Button
                     flex={1}
-                    onPress={() => { }}
+                    onPress={handleShare}
                     theme="gray"
                     size="$4"
                     fontWeight="800"

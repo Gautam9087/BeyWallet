@@ -73,6 +73,13 @@ export default function ModalLayout() {
                     title: 'Send Cash',
                 }}
             />
+            <Stack.Screen
+                name="scanner"
+                options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                }}
+            />
         </Stack>
     )
 }

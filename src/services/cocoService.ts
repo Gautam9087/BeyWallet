@@ -1,4 +1,5 @@
 import { initializeCoco, Manager, getDecodedToken, getEncodedToken } from 'coco-cashu-core';
+import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { ExpoSqliteRepositories } from '../store/test';
 import * as SQLite from 'expo-sqlite';
 import { seedService } from './seedService';
@@ -9,6 +10,104 @@ let repo: ExpoSqliteRepositories | null = null;
 let appStateSubscription: any = null;
 
 export const cocoService = {
+    /**
+     * Internal helper to clean token strings (remove prefixes, whitespace, etc.)
+     * Also handles "Peanut" tokens (hidden in variation selectors)
+     */
+    _cleanToken: (tokenString: any): string => {
+        if (!tokenString) return '';
+
+        let clean = '';
+
+        // Handle potential array of numbers or Buffer
+        if (Array.isArray(tokenString)) {
+            // Convert character codes to string
+            clean = String.fromCharCode(...tokenString).trim();
+        } else if (typeof tokenString !== 'string') {
+            try {
+                // Try toString fallback (handles Buffer, etc.)
+                clean = tokenString.toString().trim();
+
+                // If it still looks like [object ...], it failed to be useful
+                if (clean.startsWith('[object')) {
+                    return '';
+                }
+            } catch (e) {
+                return '';
+            }
+        } else {
+            clean = tokenString.trim();
+        }
+
+        // 1. Try to extract Peanut data (variation selectors)
+        const peanut = cocoService._extractPeanut(clean);
+        if (peanut) {
+            console.log('[CocoService] Extracted Peanut data from token');
+            clean = peanut;
+        }
+
+        // 2. Remove common prefixes
+        if (clean.toLowerCase().startsWith('cashu:')) {
+            clean = clean.substring(6);
+        } else if (clean.toLowerCase().startsWith('lightning:')) {
+            clean = clean.substring(10);
+        } else if (clean.toLowerCase().startsWith('creq:')) {
+            clean = clean.substring(5);
+        }
+
+        // 3. Match standard cashu/creq token patterns (A=V3, B=V4)
+        // cashuA..., cashuB..., creqA..., creqB...
+        const cashuMatch = clean.match(/(cashu|creq)[A-Za-z0-9+/=_-]+/);
+        if (cashuMatch) {
+            return cashuMatch[0];
+        }
+
+        return clean;
+    },
+
+    /**
+     * Extracts hidden Cashu tokens from "Peanut" format (Variation Selectors)
+     */
+    _extractPeanut: (text: string): string | null => {
+        try {
+            let decoded: string[] = [];
+            const chars = Array.from(text);
+            if (!chars.length) return null;
+
+            const fromVariationSelector = (char: string): string | null => {
+                const codePoint = char.codePointAt(0);
+                if (!codePoint) return null;
+
+                // Handle Variation Selectors (VS1-VS16): U+FE00 to U+FE0F
+                if (codePoint >= 0xfe00 && codePoint <= 0xfe0f) {
+                    return String.fromCharCode(codePoint - 0xfe00);
+                }
+
+                // Handle Variation Selectors Supplement (VS17-VS256): U+E0100 to U+E01EF
+                if (codePoint >= 0xe0100 && codePoint <= 0xe01ef) {
+                    return String.fromCharCode(codePoint - 0xe0100 + 16);
+                }
+
+                return null;
+            };
+
+            for (const char of chars) {
+                const byteValue = fromVariationSelector(char);
+                if (byteValue === null && decoded.length > 0) {
+                    break;
+                } else if (byteValue === null) {
+                    continue;
+                }
+                decoded.push(byteValue);
+            }
+
+            const result = decoded.join('');
+            return result.length > 0 ? result : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
     /**
      * Initializes the CocoManager with an EXISTING wallet.
      * Does NOT create a new wallet if none exists.
@@ -368,9 +467,10 @@ export const cocoService = {
         if (!cocoManager) {
             throw new Error('CocoManager not initialized');
         }
-        console.log('[CocoService] Receiving token:', token.substring(0, 50) + '...');
+        const cleanToken = cocoService._cleanToken(token);
+        console.log('[CocoService] Receiving token:', cleanToken.substring(0, 50) + '...');
         try {
-            await cocoManager.wallet.receive(token);
+            await cocoManager.wallet.receive(cleanToken);
             console.log('[CocoService] Token received successfully');
         } catch (err: any) {
             console.error('[CocoService] Receive failed:', err.message, err);
@@ -383,7 +483,70 @@ export const cocoService = {
      * @param tokenString - Encoded cashu token string
      */
     decodeToken: (tokenString: string) => {
-        return getDecodedToken(tokenString);
+        const cleanToken = cocoService._cleanToken(tokenString);
+
+        try {
+            return getDecodedToken(cleanToken);
+        } catch (err: any) {
+            console.warn('[CocoService] Standard getDecodedToken failed, trying manual fallback...', err.message);
+
+            // Manual fallback for V3/V4 (cashuA, cashuB, creqA, creqB)
+            try {
+                let base64Part = '';
+                if (cleanToken.startsWith('cashuA') || cleanToken.startsWith('cashuB')) {
+                    base64Part = cleanToken.substring(6);
+                } else if (cleanToken.startsWith('creqA') || cleanToken.startsWith('creqB')) {
+                    base64Part = cleanToken.substring(5);
+                }
+
+                if (base64Part) {
+                    // Normalize base64 (handle url-safe base64 used in V4)
+                    const normalizedB64 = base64Part.replace(/-/g, '+').replace(/_/g, '/');
+
+                    // V4 tokens (B) use CBOR, V3 (A) use JSON
+                    if (cleanToken.includes('B')) {
+                        // For V4, we really should use the library, but if it fails...
+                        // We might just be getting a "version not supported" because of its prefix
+                        // Let's try to just re-decode it with 'cashuA' prefix to see if it's actually V3 but labeled wrong?
+                        // (Unlikely, but worth a shot if we have a weird token)
+                    }
+
+                    const decodedStr = Buffer.from(normalizedB64, 'base64').toString('utf8');
+                    const json = JSON.parse(decodedStr);
+
+                    if (json.token && Array.isArray(json.token)) {
+                        const first = json.token[0];
+                        return {
+                            token: json.token,
+                            mint: first.mint,
+                            proofs: first.proofs,
+                            unit: first.unit || 'sat'
+                        };
+                    }
+                }
+            } catch (fallbackErr) {
+                console.error('[CocoService] Manual fallback also failed:', fallbackErr);
+            }
+
+            // Check for creq specific error
+            if (cleanToken.startsWith('creq')) {
+                throw new Error('This is a Cashu Request (creq). Receiving creq tokens is not yet supported in this tab.');
+            }
+
+            // Check for common non-cashu formats to provide better errors
+            const lower = cleanToken.toLowerCase();
+            if (lower.startsWith('lnbc') || lower.startsWith('lightning:lnbc')) {
+                throw new Error('This looks like a Lightning Invoice. Please use the "Send" tab to pay invoices.');
+            }
+            if (lower.startsWith('lnurl')) {
+                throw new Error('This looks like an LNURL. LNURL deposits are not yet supported in this flow.');
+            }
+
+            if (err.message?.includes('version')) {
+                throw new Error(`The scanned token version is not supported by this wallet. Please use a V3 or V4 token.`);
+            }
+            throw new Error('Invalid or unsupported cashu token format.');
+        }
     },
 
     // ==========================================
@@ -408,9 +571,50 @@ export const cocoService = {
 
     /**
      * Encode a token object to shareable string.
+     * Uses V4 by default (compact CBOR), falls back to V3.
      */
     encodeToken: (token: any): string => {
+        return cocoService.encodeTokenV4(token);
+    },
+
+    /**
+     * Encode as V4 (CBOR)
+     */
+    encodeTokenV4: (token: any): string => {
+        try {
+            return getEncodedTokenV4(token);
+        } catch (e) {
+            console.warn('[CocoService] Failed to encode as V4, falling back to V3', e);
+            return getEncodedToken(token);
+        }
+    },
+
+    /**
+     * Encode as V3 (JSON)
+     */
+    encodeTokenV3: (token: any): string => {
         return getEncodedToken(token);
+    },
+
+    /**
+     * Encodes a token string into the "Peanut" format (Variation Selectors)
+     */
+    encodeTokenPeanut: (tokenStr: string): string => {
+        return (
+            "🥜" +
+            Array.from(tokenStr)
+                .map((char) => {
+                    const byteValue = char.charCodeAt(0);
+                    if (byteValue >= 0 && byteValue <= 15) {
+                        return String.fromCodePoint(0xfe00 + byteValue);
+                    }
+                    if (byteValue >= 16 && byteValue <= 255) {
+                        return String.fromCodePoint(0xe0100 + (byteValue - 16));
+                    }
+                    return "";
+                })
+                .join("")
+        );
     },
 
     // ==========================================

@@ -22,14 +22,17 @@ export class CustomReceiveService {
         let proofs: Proof[];
         let keysetIds: string[];
 
+        // Use cocoService utility to clean token (remove prefixes, etc.)
+        const cleanToken = cocoService._cleanToken(token);
+
         // 1. Decode token
         try {
-            const metadata = getTokenMetadata(token);
+            const metadata = getTokenMetadata(cleanToken);
             mint = metadata.mint;
             unit = metadata.unit;
             // Decode proofs using keyset IDs if needed, or just token structure
             // cashu-ts handles this mostly
-            const decoded = getDecodedToken(token);
+            const decoded = getDecodedToken(cleanToken);
             proofs = decoded.proofs;
             // We might need keysets to fully decode if minimal token?
             // Assume full token for now or let wallet handle decoding
@@ -60,7 +63,7 @@ export class CustomReceiveService {
 
         // 3.5 Determine Unit from Keyset (Prioritize Keyset derived unit)
         try {
-            const decoded = getDecodedToken(token);
+            const decoded = getDecodedToken(cleanToken);
             proofs = decoded.proofs;
             if (proofs && proofs.length > 0) {
                 const firstProofId = proofs[0].id;
