@@ -15,6 +15,11 @@ import { useQuery } from '@tanstack/react-query';
 import { bitcoinService } from '../../services/bitcoinService';
 import { currencyService, CurrencyCode } from '../../services/currencyService';
 
+// Ensure Buffer is available globally
+if (typeof global.Buffer === 'undefined') {
+    global.Buffer = Buffer;
+}
+
 interface ResultStageProps {
     status: 'success' | 'error';
     amount: string;
@@ -64,16 +69,18 @@ export function ResultStage({
         if (!isSuccess || !token) return;
 
         try {
-            const decoded = getDecodedToken(token) as any;
+            // Normalize token (strip prefix for decoding if needed, though cashu-ts handles it)
+            const cleanToken = token.startsWith('cashu:') ? token.replace('cashu:', '') : token;
+            const decoded = getDecodedToken(cleanToken) as any;
             const proofs = decoded.token?.[0]?.proofs || [];
 
-            // Skip animation for V4 tokens (compact) unless they are very large
-            const isV4 = token.startsWith('cashuB');
-            const shouldAnimate = proofs.length > 2 && (!isV4 || token.length > 1200);
+            // Animate if the token is large (>400 chars) or has more than 2 proofs
+            // This ensures readability as static QR modules become too small for some cameras
+            const shouldAnimate = proofs.length > 2 || cleanToken.length > 400;
 
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
-                const messageBuffer = Buffer.from(token);
+                const messageBuffer = Buffer.from(cleanToken);
                 const ur = UR.fromBuffer(messageBuffer);
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
@@ -276,7 +283,7 @@ export function ResultStage({
                         <Button
                             size="$2.5"
                             chromeless
-                            icon={Gauge}
+                            icon={<Gauge size={16} />}
                             onPress={changeSpeed}
                             color="$color"
                             fontWeight="700"
@@ -287,7 +294,7 @@ export function ResultStage({
                         <Button
                             size="$2.5"
                             chromeless
-                            icon={ZoomIn}
+                            icon={<ZoomIn size={16} />}
                             onPress={changeSize}
                             color="$color"
                             fontWeight="700"
