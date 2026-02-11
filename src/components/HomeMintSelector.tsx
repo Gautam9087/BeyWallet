@@ -1,5 +1,5 @@
-import { ChevronDown, Sprout, Plus, ShieldCheck, ShieldOff, Edit3 } from "@tamagui/lucide-icons";
-import { Button, Text, YStack, XStack, ListItem, Paragraph, View } from "tamagui";
+import { ChevronDown, Sprout, Plus, ShieldCheck, ShieldOff, Edit3, Building2 } from "@tamagui/lucide-icons";
+import { Button, Text, YStack, XStack, ListItem, Paragraph, View, Image, Avatar, Square } from "tamagui";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Haptics from 'expo-haptics';
 import { useRef, useEffect, useMemo } from 'react';
@@ -35,9 +35,9 @@ export default function HomeHeaderMintSelector() {
     const displayUrl = activeMintUrl ? activeMintUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : "Select Mint";
 
     const displayName = useMemo(() => {
+        if (!activeMintUrl) return "Select Mint";
         if (activeMint?.nickname) return activeMint.nickname;
         if (activeMint?.name) return activeMint.name;
-        if (!activeMintUrl) return "Select Mint";
 
         return displayUrl;
     }, [activeMint, activeMintUrl, displayUrl]);
@@ -66,6 +66,7 @@ export default function HomeHeaderMintSelector() {
             <Button
                 size="$2.5"
                 theme="gray"
+                px="$1.5"
                 borderWidth={1}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
@@ -73,8 +74,19 @@ export default function HomeHeaderMintSelector() {
                 }}
                 maxW={170}
                 pressStyle={{ scale: 0.97, opacity: 0.9 }}
-                icon={<Sprout size={16} strokeWidth={2.5} color="$color" />}
-                iconAfter={<ChevronDown size={14} strokeWidth={2.5} color="$color" />}
+                icon={
+                    <Avatar rounded="$3" size="$1.5">
+                        <Avatar.Image src={activeMint?.icon} />
+                        <Avatar.Fallback backgroundColor="$gray5" alignItems="center" justifyContent="center">
+                            <Building2 size={12} color="$gray10" />
+                        </Avatar.Fallback>
+                    </Avatar>
+                }
+                iconAfter={
+                    <Square size="$1.5" borderWidth={0.5} borderColor="$borderColor" bg="$gray2" rounded="$3">
+                        <ChevronDown size={12} strokeWidth={2.5} color="$color" />
+                    </Square>
+                }
                 textProps={{
                     fontSize: "$3",
                     fontWeight: "700",
@@ -123,10 +135,22 @@ export default function HomeHeaderMintSelector() {
                                         icon={
                                             <View
                                                 bg={mint.trusted ? "$green4" : "$gray4"}
-                                                p="$2"
+                                                p={mint.icon ? "$0" : "$2"}
                                                 rounded="$10"
+                                                overflow="hidden"
+                                                width={40}
+                                                height={40}
+                                                items="center"
+                                                justify="center"
                                             >
-                                                {mint.trusted ? (
+                                                {mint.icon ? (
+                                                    <Image
+                                                        source={{ uri: mint.icon }}
+                                                        width={40}
+                                                        height={40}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : mint.trusted ? (
                                                     <ShieldCheck size={20} color="$green10" />
                                                 ) : (
                                                     <ShieldOff size={20} color="$gray10" />

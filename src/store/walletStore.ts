@@ -6,6 +6,7 @@ interface MintInfo {
     name?: string;
     nickname?: string;
     description?: string;
+    icon?: string;
     trusted: boolean;
 }
 
@@ -110,12 +111,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const trustedMints = await currentManager.mint.getAllTrustedMints();
             const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
 
-            const mintInfos: MintInfo[] = finalMints.map(m => ({
-                mintUrl: m.mintUrl,
-                name: m.name,
-                nickname: (m as any).nickname,
-                trusted: trustedUrls.has(m.mintUrl),
-            }));
+            const mintInfos: MintInfo[] = finalMints.map(m => {
+                const info = (m as any).mintInfo || {};
+                return {
+                    mintUrl: m.mintUrl,
+                    name: info.name || info.nickname || info.shortname || m.name,
+                    nickname: (m as any).nickname,
+                    description: info.description,
+                    icon: info.icon_url || info.picture,
+                    trusted: trustedUrls.has(m.mintUrl),
+                };
+            });
 
             set({
                 isInitializing: false,
@@ -145,12 +151,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const trustedMints = await manager.mint.getAllTrustedMints();
             const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
 
-            const mintInfos: MintInfo[] = allMints.map(m => ({
-                mintUrl: m.mintUrl,
-                name: m.name,
-                nickname: (m as any).nickname,
-                trusted: trustedUrls.has(m.mintUrl),
-            }));
+            const mintInfos: MintInfo[] = allMints.map(m => {
+                const info = (m as any).mintInfo || {};
+                return {
+                    mintUrl: m.mintUrl,
+                    name: info.name || info.nickname || info.shortname || m.name,
+                    nickname: (m as any).nickname,
+                    description: info.description,
+                    icon: info.icon_url || info.picture,
+                    trusted: trustedUrls.has(m.mintUrl),
+                };
+            });
 
             set({
                 activeMintUrl: url,
@@ -173,12 +184,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const trustedMints = await manager.mint.getAllTrustedMints();
             const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
 
-            const mintInfos: MintInfo[] = allMints.map(m => ({
-                mintUrl: m.mintUrl,
-                name: m.name,
-                nickname: (m as any).nickname,
-                trusted: trustedUrls.has(m.mintUrl),
-            }));
+            const mintInfos: MintInfo[] = allMints.map(m => {
+                const info = (m as any).mintInfo || {};
+                return {
+                    mintUrl: m.mintUrl,
+                    name: info.name || info.nickname || info.shortname || m.name,
+                    nickname: (m as any).nickname,
+                    description: info.description,
+                    icon: info.icon_url || info.picture,
+                    trusted: trustedUrls.has(m.mintUrl),
+                };
+            });
 
             set({ mints: mintInfos });
         } catch (err: any) {
@@ -264,13 +280,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const trustedMints = await manager.mint.getAllTrustedMints();
             const trustedUrls = new Set(trustedMints.map(m => m.mintUrl));
 
-            const mintInfos: MintInfo[] = allMints.map(m => ({
-                mintUrl: m.mintUrl,
-                name: m.name,
-                nickname: (m as any).nickname,
-                description: (m as any).description,
-                trusted: trustedUrls.has(m.mintUrl),
-            }));
+            const mintInfos: MintInfo[] = allMints.map(m => {
+                const info = (m as any).mintInfo || {};
+                return {
+                    mintUrl: m.mintUrl,
+                    name: info.name || info.nickname || info.shortname || m.name,
+                    nickname: (m as any).nickname,
+                    description: (m as any).description || info.description,
+                    icon: info.icon_url || info.picture,
+                    trusted: trustedUrls.has(m.mintUrl),
+                };
+            });
 
             set({ mints: mintInfos });
         } catch (err: any) {

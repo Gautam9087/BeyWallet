@@ -17,8 +17,11 @@ export default function Balance() {
         staleTime: 30000,
     })
 
-    const activeMint = mints.find(m => m.mintUrl === activeMintUrl);
-    const mintName = activeMint?.nickname || activeMintUrl || "No Mint Selected";
+    // Normalize URLs for comparison
+    const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+
+    const activeMint = mints.find(m => activeMintUrl && normalizeUrl(m.mintUrl) === normalizeUrl(activeMintUrl));
+    const mintName = activeMint?.nickname || activeMint?.name || activeMintUrl?.replace(/^https?:\/\//, '').replace(/\/$/, '') || "No Mint Selected";
 
     const secondaryBalance = React.useMemo(() => {
         if (!btcData?.price) return 0;

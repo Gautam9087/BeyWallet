@@ -1,39 +1,22 @@
-import React from 'react'
-import { YStack, Text, XStack, ListItem, YGroup, Separator } from 'tamagui'
-import { Check } from '@tamagui/lucide-icons'
-import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet'
-import { SUPPORTED_CURRENCIES, CurrencyCode } from '~/services/currencyService'
-import { useSettingsStore } from '~/store/settingsStore'
-import * as Haptics from 'expo-haptics'
+import React, { forwardRef } from 'react';
+import { YStack, Text, ListItem, YGroup, Separator } from 'tamagui';
+import { Check } from '@tamagui/lucide-icons';
+import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
+import { SUPPORTED_CURRENCIES, CurrencyCode } from '~/services/currencyService';
+import { useSettingsStore } from '~/store/settingsStore';
+import * as Haptics from 'expo-haptics';
 
-interface CurrencyModalProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-}
-
-export function CurrencyModal({ open, onOpenChange }: CurrencyModalProps) {
-    const bottomSheetRef = React.useRef<AppBottomSheetRef>(null)
-    const { secondaryCurrency, setSecondaryCurrency } = useSettingsStore()
-
-    React.useEffect(() => {
-        if (open) {
-            bottomSheetRef.current?.present()
-        } else {
-            bottomSheetRef.current?.dismiss()
-        }
-    }, [open])
+export const CurrencyModal = forwardRef<AppBottomSheetRef>((_, ref) => {
+    const { secondaryCurrency, setSecondaryCurrency } = useSettingsStore();
 
     const handleSelect = (code: CurrencyCode) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-        setSecondaryCurrency(code)
-        bottomSheetRef.current?.dismiss()
-    }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setSecondaryCurrency(code);
+        (ref as React.RefObject<AppBottomSheetRef>).current?.dismiss();
+    };
 
     return (
-        <AppBottomSheet
-            ref={bottomSheetRef}
-            onClose={() => onOpenChange(false)}
-        >
+        <AppBottomSheet ref={ref}>
             <YStack p="$4" gap="$4">
                 <YStack gap="$1">
                     <Text fontSize="$6" fontWeight="700">Select Currency</Text>
@@ -56,5 +39,7 @@ export function CurrencyModal({ open, onOpenChange }: CurrencyModalProps) {
                 </YGroup>
             </YStack>
         </AppBottomSheet>
-    )
-}
+    );
+});
+
+CurrencyModal.displayName = 'CurrencyModal';

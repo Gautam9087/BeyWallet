@@ -1,10 +1,13 @@
-import React from 'react';
-import { YStack, XStack, Text, Button, ScrollView, Card, Separator, View } from 'tamagui';
-import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, Zap, Coins } from '@tamagui/lucide-icons';
+import React, { useEffect } from 'react';
+import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme } from 'tamagui';
+import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck } from '@tamagui/lucide-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cocoService } from '../../services/cocoService';
 import { Spinner } from '../../components/UI/Spinner';
 import { RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { formatLocalTime } from '~/utils/time';
 
 interface HistoryEntry {
     id: string;
@@ -18,6 +21,7 @@ interface HistoryEntry {
 }
 
 export function HistoryScreen() {
+    const router = useRouter();
     const queryClient = useQueryClient();
 
     const { data: history = [], isLoading, refetch, isRefetching } = useQuery({
@@ -26,12 +30,34 @@ export function HistoryScreen() {
             if (!cocoService.isInitialized()) {
                 return [];
             }
-            return cocoService.getHistory(50, 0) as Promise<HistoryEntry[]>;
+            return cocoService.getHistory(100, 0) as Promise<HistoryEntry[]>;
         },
         enabled: cocoService.isInitialized(),
     });
 
-    // Get icon and colors based on transaction type
+    // Real-time updates via coco events
+    useEffect(() => {
+        if (!cocoService.isInitialized()) return;
+
+        const handleUpdate = () => {
+            queryClient.invalidateQueries({ queryKey: ['history'] });
+        };
+
+        cocoService.on('history:updated', handleUpdate);
+        cocoService.on('receive:created', handleUpdate);
+        cocoService.on('send:created', handleUpdate);
+
+        return () => {
+            try {
+                cocoService.off('history:updated', handleUpdate);
+                cocoService.off('receive:created', handleUpdate);
+                cocoService.off('send:created', handleUpdate);
+            } catch (e) {
+                // Ignore cleanup errors if manager is gone
+            }
+        };
+    }, [queryClient]);
+
     const getTransactionStyle = (type: string) => {
         const isOutgoing = type === 'send' || type === 'melt';
         return {
@@ -42,7 +68,6 @@ export function HistoryScreen() {
         };
     };
 
-    // Get display label for transaction type
     const getTypeLabel = (type: string) => {
         switch (type) {
             case 'send': return 'Sent';
@@ -53,13 +78,12 @@ export function HistoryScreen() {
         }
     };
 
-    // Get mint display name
-    const getMintDisplayName = (url: string) => {
-        try {
-            return new URL(url).hostname;
-        } catch {
-            return url;
-        }
+    const handleTransactionPress = (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push({
+            pathname: '/transaction-details',
+            params: { id }
+        });
     };
 
     if (isLoading && !isRefetching) {
@@ -75,22 +99,23 @@ export function HistoryScreen() {
         <YStack flex={1} bg="$background">
             <XStack p="$4" justify="space-between" items="center">
                 <YStack>
-                    <Text fontSize="$6" fontWeight="bold">Transaction History</Text>
-                    <Text fontSize="$3" color="$gray10">Your Recent Activity</Text>
+                    <Text fontSize="$6" fontWeight="800">History</Text>
+                    <Text fontSize="$2" color="$gray10">Your recent activity</Text>
                 </YStack>
                 <Button
                     size="$3"
                     circular
                     icon={<RefreshCw size={18} />}
-                    onPress={() => refetch()}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        refetch();
+                    }}
                     chromeless
                 />
             </XStack>
 
             <ScrollView
                 flex={1}
-                px="$4"
-                pb="$4"
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefetching}
@@ -98,68 +123,73 @@ export function HistoryScreen() {
                         tintColor="#FFD700"
                     />
                 }
+                showsVerticalScrollIndicator={false}
             >
-                <YStack gap="$3">
+                <YStack px="$4" pb="$10">
                     {history.length === 0 ? (
-                        <YStack py="$10" items="center" justify="center" gap="$2">
-                            <Clock size={40} color="$gray8" />
-                            <Text color="$gray10">No transactions yet</Text>
-                            <Text fontSize="$2" color="$gray8" text="center" px="$4">
-                                Mint some tokens or receive ecash to see your transaction history
-                            </Text>
+                        <YStack py="$10" items="center" justify="center" gap="$3">
+                            <View p="$4" bg="$gray2" rounded="$10">
+                                <Clock size={32} color="$gray9" />
+                            </View>
+                            <YStack items="center">
+                                <Text fontWeight="700">No transactions yet</Text>
+                                <Text fontSize="$3" color="$gray9" textAlign="center" mt="$1">
+                                    When you send or receive tokens, they will appear here.
+                                </Text>
+                            </YStack>
                         </YStack>
                     ) : (
-                        history.map((entry: HistoryEntry) => {
-                            const style = getTransactionStyle(entry.type);
-                            const Icon = style.icon;
+                        <YStack gap="$2">
+                            {history.map((entry: HistoryEntry) => {
+                                const style = getTransactionStyle(entry.type);
+                                const status = entry.state || 'completed';
 
-                            return (
-                                <Card key={entry.id} p="$3" bg="$gray2" bordered>
-                                    <XStack justify="space-between" items="center">
-                                        <XStack gap="$3" items="center">
-                                            <View
-                                                p="$2"
-                                                rounded={100}
-                                                bg={style.bgColor as any}
-                                            >
-                                                <Icon size={20} color={style.iconColor as any} />
-                                            </View>
-                                            <YStack>
-                                                <Text fontWeight="bold" fontSize="$4">
-                                                    {getTypeLabel(entry.type)}
+                                return (
+                                    <YStack
+                                        key={entry.id}
+                                        onPress={() => handleTransactionPress(entry.id)}
+                                        pressStyle={{ opacity: 0.7, scale: 0.98 }}
+                                    >
+                                        <XStack justify="space-between" items="center" p="$3" bg="$gray2" rounded="$4" borderWidth={1} borderColor="$borderColor">
+                                            <XStack gap="$3" items="center">
+                                                <View
+                                                    p="$2.5"
+                                                    rounded="$10"
+                                                    bg={style.bgColor as any}
+                                                >
+                                                    <style.icon size={20} color={style.iconColor as any} />
+                                                </View>
+                                                <YStack>
+                                                    <Text fontWeight="700" fontSize="$4">
+                                                        {getTypeLabel(entry.type)}
+                                                    </Text>
+                                                    <Text fontSize="$2" color="$gray10">
+                                                        {formatLocalTime(entry.createdAt)}
+                                                    </Text>
+                                                </YStack>
+                                            </XStack>
+
+                                            <YStack items="flex-end" gap="$1">
+                                                <Text
+                                                    fontWeight="800"
+                                                    fontSize="$4"
+                                                    color={style.iconColor as any}
+                                                >
+                                                    {style.sign}{entry.amount} {entry.unit?.toUpperCase() || 'SATS'}
                                                 </Text>
-                                                <Text fontSize="$2" color="$gray10">
-                                                    {new Date(entry.createdAt * 1000).toLocaleString()}
-                                                </Text>
+                                                {status !== 'completed' && (
+                                                    <XStack px="$1.5" py="$0.5" bg="$gray3" rounded="$2">
+                                                        <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
+                                                            {status}
+                                                        </Text>
+                                                    </XStack>
+                                                )}
                                             </YStack>
                                         </XStack>
-                                        <YStack items="flex-end">
-                                            <Text
-                                                fontWeight="bold"
-                                                fontSize="$5"
-                                                color={style.iconColor as any}
-                                            >
-                                                {style.sign}{entry.amount} {entry.unit || 'SAT'}
-                                            </Text>
-                                            <XStack items="center" gap="$1">
-                                                <Text fontSize="$1" color="$gray8" textTransform="capitalize">
-                                                    {entry.state || 'completed'}
-                                                </Text>
-                                            </XStack>
-                                        </YStack>
-                                    </XStack>
-
-                                    <Separator my="$2" opacity={0.5} />
-
-                                    <XStack items="center" gap="$1">
-                                        <Info size={12} color="$gray9" />
-                                        <Text fontSize="$1" color="$gray9" numberOfLines={1} flex={1}>
-                                            {getMintDisplayName(entry.mintUrl)}
-                                        </Text>
-                                    </XStack>
-                                </Card>
-                            );
-                        })
+                                    </YStack>
+                                );
+                            })}
+                        </YStack>
                     )}
                 </YStack>
             </ScrollView>

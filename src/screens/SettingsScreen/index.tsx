@@ -1,51 +1,62 @@
-import React, { useState } from 'react'
-import { YStack, ScrollView, Text, YGroup, ListItem, Separator, View } from 'tamagui'
-import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight } from '@tamagui/lucide-icons'
-import { ThemeModal } from './components/ThemeModal'
-import { CurrencyModal } from './components/CurrencyModal'
-import { BackupMnemonicModal } from './components/BackupMnemonicModal'
-import * as Haptics from 'expo-haptics'
-import { useSettingsStore } from '~/store/settingsStore'
+import React, { useRef } from 'react';
+import { YStack, ScrollView, Text, YGroup, ListItem, H6 } from 'tamagui';
+import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight } from '@tamagui/lucide-icons';
+import { ThemeModal } from './components/ThemeModal';
+import { CurrencyModal } from './components/CurrencyModal';
+import * as Haptics from 'expo-haptics';
+import { useSettingsStore } from '~/store/settingsStore';
+import { useRouter } from 'expo-router';
+import { biometricService } from '~/services/biometricService';
+import { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 
 export function SettingsScreen() {
-    const [isMnemonicOpen, setIsMnemonicOpen] = useState(false)
-    const [isThemeOpen, setIsThemeOpen] = useState(false)
-    const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
+    const router = useRouter();
+    const themeSheetRef = useRef<AppBottomSheetRef>(null);
+    const currencySheetRef = useRef<AppBottomSheetRef>(null);
 
-    const { secondaryCurrency } = useSettingsStore()
+    const { secondaryCurrency } = useSettingsStore();
 
-    const handleSettingPress = (id: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-        if (id === 'backup') {
-            setIsMnemonicOpen(true)
-        } else if (id === 'theme') {
-            setIsThemeOpen(true)
-        } else if (id === 'currency') {
-            setIsCurrencyOpen(true)
+    const handleSettingPress = async (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        switch (id) {
+            case 'backup':
+                const success = await biometricService.authenticateAsync('Authorize to view your secret backup phrase');
+                if (success) {
+                    router.push('/backup-seed');
+                } else {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                }
+                break;
+            case 'theme':
+                themeSheetRef.current?.present();
+                break;
+            case 'currency':
+                currencySheetRef.current?.present();
+                break;
+            default:
+                break;
         }
-    }
+    };
 
     return (
         <ScrollView bg="$background" showsVerticalScrollIndicator={false}>
             <YStack flex={1} p="$4" gap="$6" pb="$20">
-                {/* Visual Header / Title */}
-                <YStack gap="$1">
-                    <Text fontSize="$8" fontWeight="700" color="$color">Settings</Text>
-                    <Text fontSize="$3" color="$gray11">Manage your wallet preferences</Text>
-                </YStack>
 
                 {/* Security Section */}
                 <YStack gap="$3">
-                    <Text fontSize="$4" fontWeight="600" color="$gray11" px="$2">Security</Text>
-                    <YGroup bordered separator={<Separator />}>
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Security</Text>
+                    <YGroup>
                         <YGroup.Item>
                             <ListItem
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
-                                title="Backup Recovery Phrase"
+                                bg="$gray5"
+                                fontWeight="600"
+                                title={<H6>Backup Recovery Phrase</H6>}
                                 subTitle="View your secret 12 words"
-                                icon={ShieldCheck}
-                                iconAfter={ChevronRight}
+                                icon={<ShieldCheck size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
                                 onPress={() => handleSettingPress('backup')}
                             />
                         </YGroup.Item>
@@ -54,53 +65,61 @@ export function SettingsScreen() {
 
                 {/* Appearance Section */}
                 <YStack gap="$3">
-                    <Text fontSize="$4" fontWeight="600" color="$gray11" px="$2">Appearance</Text>
-                    <YGroup bordered separator={<Separator />}>
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Appearance</Text>
+                    <YGroup>
                         <YGroup.Item>
                             <ListItem
+                                bg="$gray5"
+                                fontWeight="600"
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
-                                title="Theme"
+                                title={<H6>Theme</H6>}
                                 subTitle="Light, Dark or System"
-                                icon={Palette}
-                                iconAfter={ChevronRight}
+                                icon={<Palette size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
                                 onPress={() => handleSettingPress('theme')}
                             />
                         </YGroup.Item>
                         <YGroup.Item>
                             <ListItem
+                                bg="$gray5"
+                                fontWeight="600"
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
-                                title="Currency"
+                                title={<H6>Currency</H6>}
                                 subTitle={`Secondary: ${secondaryCurrency}`}
-                                icon={Globe}
-                                iconAfter={ChevronRight}
+                                icon={<Globe size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
                                 onPress={() => handleSettingPress('currency')}
                             />
                         </YGroup.Item>
                     </YGroup>
                 </YStack>
 
-                {/* Other Settings (Placeholders) */}
+                {/* General Section */}
                 <YStack gap="$3">
-                    <Text fontSize="$4" fontWeight="600" color="$gray11" px="$2">General</Text>
-                    <YGroup bordered separator={<Separator />}>
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">General</Text>
+                    <YGroup>
                         <YGroup.Item>
                             <ListItem
+                                bg="$gray5"
+                                fontWeight="600"
                                 opacity={0.5}
-                                title="Notifications"
+                                title={<H6>Notifications</H6>}
                                 subTitle="Manage alerts and updates"
-                                icon={Bell}
-                                iconAfter={ChevronRight}
+                                icon={<Bell size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
                             />
                         </YGroup.Item>
                         <YGroup.Item>
                             <ListItem
+                                bg="$gray5"
+                                fontWeight="600"
                                 opacity={0.5}
-                                title="Language"
+                                title={<H6>Language</H6>}
                                 subTitle="English (US)"
-                                icon={Globe}
-                                iconAfter={ChevronRight}
+                                icon={<Globe size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
                             />
                         </YGroup.Item>
                     </YGroup>
@@ -108,32 +127,24 @@ export function SettingsScreen() {
 
                 {/* About Section */}
                 <YStack gap="$3">
-                    <Text fontSize="$4" fontWeight="600" color="$gray11" px="$2">About</Text>
-                    <YGroup bordered separator={<Separator />}>
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">About</Text>
+                    <YGroup>
                         <YGroup.Item>
                             <ListItem
+                                bg="$gray5"
+                                fontWeight="600"
                                 title="Version"
                                 subTitle="1.0.0 (Alpha)"
-                                icon={Info}
+                                icon={<Info size={24} />}
                             />
                         </YGroup.Item>
                     </YGroup>
                 </YStack>
 
-                {/* Modals */}
-                <ThemeModal
-                    open={isThemeOpen}
-                    onOpenChange={setIsThemeOpen}
-                />
-                <CurrencyModal
-                    open={isCurrencyOpen}
-                    onOpenChange={setIsCurrencyOpen}
-                />
-                <BackupMnemonicModal
-                    open={isMnemonicOpen}
-                    onOpenChange={setIsMnemonicOpen}
-                />
+                {/* Bottom Sheets */}
+                <ThemeModal ref={themeSheetRef} />
+                <CurrencyModal ref={currencySheetRef} />
             </YStack>
         </ScrollView>
-    )
+    );
 }

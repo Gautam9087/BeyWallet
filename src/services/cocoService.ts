@@ -659,4 +659,27 @@ export const cocoService = {
         }
         cocoManager.off(event, callback);
     },
+
+    /**
+     * Check the status of proofs from a token.
+     * Returns the states (e.g. 'UNSPENT', 'SPENT')
+     */
+    checkProofStates: async (tokenString: string) => {
+        if (!cocoManager) {
+            throw new Error('CocoManager not initialized');
+        }
+
+        const decoded = cocoService.decodeToken(tokenString);
+        if (!decoded || !decoded.token || decoded.token.length === 0) {
+            throw new Error('Could not decode token for status check');
+        }
+
+        const states = [];
+        for (const t of decoded.token) {
+            const s = await (cocoManager.wallet as any).checkProofStates(t.mint, t.proofs);
+            states.push(...s);
+        }
+
+        return states;
+    },
 };

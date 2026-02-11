@@ -80,6 +80,13 @@ export default function ModalLayout() {
                     presentation: 'fullScreenModal',
                 }}
             />
+            <Stack.Screen
+                name="transaction-details"
+                options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                }}
+            />
         </Stack>
     )
 }

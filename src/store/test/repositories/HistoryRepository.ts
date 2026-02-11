@@ -291,6 +291,13 @@ export class ExpoHistoryRepository {
         );
     }
 
+    async updateHistoryEntryState(id: string, state: string): Promise<void> {
+        await this.db.run(
+            'UPDATE coco_cashu_history SET state = ? WHERE id = ?',
+            [state, id],
+        );
+    }
+
     async deleteHistoryEntry(mintUrl: string, quoteId: string): Promise<void> {
         await this.db.run('DELETE FROM coco_cashu_history WHERE mintUrl = ? AND quoteId = ?', [
             mintUrl,
