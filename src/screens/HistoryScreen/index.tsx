@@ -133,7 +133,7 @@ export function HistoryScreen() {
                             </View>
                             <YStack items="center">
                                 <Text fontWeight="700">No transactions yet</Text>
-                                <Text fontSize="$3" color="$gray9" textAlign="center" mt="$1">
+                                <Text fontSize="$3" color="$gray9" text="center" mt="$1">
                                     When you send or receive tokens, they will appear here.
                                 </Text>
                             </YStack>
@@ -150,12 +150,12 @@ export function HistoryScreen() {
                                         onPress={() => handleTransactionPress(entry.id)}
                                         pressStyle={{ opacity: 0.7, scale: 0.98 }}
                                     >
-                                        <XStack justify="space-between" items="center" p="$3" bg="$gray2" rounded="$4" borderWidth={1} borderColor="$borderColor">
+                                        <XStack justify="space-between" items="center" p="$3" bg="$gray3" rounded="$7" >
                                             <XStack gap="$3" items="center">
                                                 <View
                                                     p="$2.5"
                                                     rounded="$10"
-                                                    bg={style.bgColor as any}
+                                                    bg="$gray4"
                                                 >
                                                     <style.icon size={20} color={style.iconColor as any} />
                                                 </View>
@@ -178,7 +178,7 @@ export function HistoryScreen() {
                                                     {style.sign}{entry.amount} {entry.unit?.toUpperCase() || 'SATS'}
                                                 </Text>
                                                 {status !== 'completed' && (
-                                                    <XStack px="$1.5" py="$0.5" bg="$gray3" rounded="$2">
+                                                    <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
                                                         <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
                                                             {status}
                                                         </Text>

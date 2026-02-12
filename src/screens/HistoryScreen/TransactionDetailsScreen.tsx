@@ -1,16 +1,26 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { YStack, XStack, Text, Button, ScrollView, View, Separator, Circle, Theme } from 'tamagui';
-import { ChevronLeft, RefreshCw, Copy, Share2, ArrowUpRight, ArrowDownLeft, Calendar, Coins, Zap, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2 } from '@tamagui/lucide-icons';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { YStack, XStack, Text, Button, ScrollView, View, Separator, Circle, Popover, ListItem, Adapt, Sheet, Square } from 'tamagui';
+import { ChevronLeft, RefreshCw, Copy, Share2, ArrowUpRight, ArrowDownLeft, Calendar, Coins, Zap, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2, Check, RotateCcw, MoreHorizontal, Link, Contact2, Scan, Trash2, Gauge, ZoomIn, Hexagon, History, X, Ban, CheckCircle } from '@tamagui/lucide-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
+import { Share as RNShare } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { formatFullLocalTime } from '~/utils/time';
+import { UR, UREncoder } from "@gandlaf21/bc-ur";
+import { Buffer } from 'buffer';
+import { formatFullLocalTime, formatRelativeTime } from '~/utils/time';
 import { cocoService } from '~/services/cocoService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spinner } from '~/components/UI/Spinner';
+import { useToastController } from '@tamagui/toast';
+
+// Ensure Buffer is available globally
+if (typeof global.Buffer === 'undefined') {
+    global.Buffer = Buffer;
+}
 
 interface HistoryEntry {
     id: string;
@@ -21,11 +31,13 @@ interface HistoryEntry {
     state?: string;
     createdAt: number;
     metadata?: any;
+    token?: any;
 }
 
 export function TransactionDetailsScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
+    const toast = useToastController();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { secondaryCurrency } = useSettingsStore();
 
@@ -38,7 +50,86 @@ export function TransactionDetailsScreen() {
         enabled: !!id,
     });
 
+    const [token, setToken] = useState<string>('');
+
+    useEffect(() => {
+        if (!entry) return;
+
+        // Priority 1: Token in metadata (already encoded string)
+        if (entry.metadata?.token) {
+            if (typeof entry.metadata.token === 'string') {
+                setToken(entry.metadata.token);
+            } else {
+                try {
+                    const encoded = cocoService.encodeToken(entry.metadata.token);
+                    setToken(encoded);
+                } catch (e) {
+                    console.warn('[TransactionDetails] Failed to encode metadata token:', e);
+                }
+            }
+            return;
+        }
+
+        // Priority 2: Token object in entry (needs encoding)
+        if (entry.token) {
+            try {
+                // Ensure we have a valid token object or string
+                const encoded = typeof entry.token === 'string'
+                    ? entry.token
+                    : cocoService.encodeToken(entry.token);
+                setToken(encoded);
+            } catch (e) {
+                console.warn('[TransactionDetails] Failed to encode token from entry:', e);
+            }
+        }
+    }, [entry]);
+
     const status = entry?.state || 'completed';
+
+    // Animated QR states
+    const [qrCodeFragment, setQrCodeFragment] = useState<string>(token || '');
+    const [showAnimatedQR, setShowAnimatedQR] = useState(false);
+    const [fragmentLength, setFragmentLength] = useState(150); // L=150, M=100, S=50
+    const [intervalMs, setIntervalMs] = useState(140); // F=140, M=250, S=500
+    const encoderRef = useRef<UREncoder | null>(null);
+    const [tokenVersion, setTokenVersion] = useState<'V3' | 'V4'>(token?.startsWith('cashuB') ? 'V4' : 'V3');
+
+    useEffect(() => {
+        if (!token) return;
+
+        try {
+            const cleanToken = cocoService._cleanToken(token);
+            const decoded = cocoService.decodeToken(cleanToken) as any;
+            const proofs = decoded.token?.[0]?.proofs || [];
+
+            // Animate if the token is large (>400 chars) or has more than 2 proofs
+            const shouldAnimate = proofs.length > 2 || cleanToken.length > 400;
+
+            if (shouldAnimate) {
+                setShowAnimatedQR(true);
+                const messageBuffer = Buffer.from(cleanToken);
+                const ur = UR.fromBuffer(messageBuffer);
+                encoderRef.current = new UREncoder(ur, fragmentLength, 0);
+            } else {
+                setShowAnimatedQR(false);
+                setQrCodeFragment(token);
+            }
+        } catch (e) {
+            console.error('[TransactionDetails] Failed to setup QR:', e);
+            setShowAnimatedQR(false);
+            setQrCodeFragment(token);
+        }
+    }, [token, fragmentLength]);
+
+    useEffect(() => {
+        if (!showAnimatedQR || !encoderRef.current) return;
+
+        const interval = setInterval(() => {
+            setQrCodeFragment(encoderRef.current!.nextPart());
+        }, intervalMs);
+
+        return () => clearInterval(interval);
+    }, [showAnimatedQR, intervalMs]);
 
     const statusConfig = useMemo(() => {
         if (status === 'claimed' || status === 'completed' || entry?.type === 'receive' || entry?.type === 'mint') {
@@ -53,21 +144,67 @@ export function TransactionDetailsScreen() {
         return { color: '$gray10', bg: '$gray3', headerBg: '$gray9', icon: AlertCircle, label: status };
     }, [status, entry?.type]);
 
-    const style = useMemo(() => {
-        if (!entry) return null;
-        const isOutgoing = entry.type === 'send' || entry.type === 'melt';
-        return {
-            icon: isOutgoing ? ArrowUpRight : ArrowDownLeft,
-            iconColor: isOutgoing ? '$red10' : '$green10',
-            bgColor: isOutgoing ? '$red2' : '$green2',
-            title: entry.type.charAt(0).toUpperCase() + entry.type.slice(1),
-        };
+    const title = useMemo(() => {
+        if (!entry) return '';
+        switch (entry.type) {
+            case 'send': return 'Send Ecash';
+            case 'receive': return 'Receive Ecash';
+            case 'mint': return 'Mint Ecash';
+            case 'melt': return 'Melt Ecash';
+            default: return 'Transaction';
+        }
     }, [entry]);
 
+
     const handleCopyToken = async () => {
-        if (entry?.metadata?.token) {
-            await Clipboard.setStringAsync(entry.metadata.token);
+        if (token) {
+            await Clipboard.setStringAsync(token);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            toast.show('Copied!', { message: 'Token copied to clipboard' });
+        }
+    };
+
+    const handleCopyEmoji = async () => {
+        if (token) {
+            const peanut = cocoService.encodeTokenPeanut(cocoService._cleanToken(token));
+            await Clipboard.setStringAsync(peanut);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            toast.show('Copied as Emoji!', { message: 'Peanut token copied to clipboard' });
+        }
+    };
+
+    const handleShare = async () => {
+        if (!token) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const shareText = `cashu:${token}`;
+        try {
+            await RNShare.share({ message: shareText });
+        } catch (error) {
+            console.error('[TransactionDetails] Error sharing:', error);
+            handleCopyToken();
+        }
+    };
+
+    const handleToggleVersion = () => {
+        if (!token) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        try {
+            const decoded = cocoService.decodeToken(token);
+            if (tokenVersion === 'V3') {
+                const encodedV4 = cocoService.encodeTokenV4(decoded);
+                setToken(encodedV4);
+                setTokenVersion('V4');
+                toast.show('Switched to V4', { message: 'Using compact CBOR encoding' });
+            } else {
+                const encodedV3 = cocoService.encodeTokenV3(decoded);
+                setToken(encodedV3);
+                setTokenVersion('V3');
+                toast.show('Switched to V3', { message: 'Using standard JSON encoding' });
+            }
+        } catch (e) {
+            console.error('[TransactionDetails] Failed to toggle version:', e);
+            toast.show('Error', { message: 'Failed to switch token version' });
         }
     };
 
@@ -75,20 +212,18 @@ export function TransactionDetailsScreen() {
         if (isRefetching) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        if (entry?.metadata?.token) {
+        if (token) {
             try {
-                const states = await cocoService.checkProofStates(entry.metadata.token);
-                // If any proof is spent, it's claimed. If all are unspent, it's unclaimed.
+                const states = await cocoService.checkProofStates(token);
                 const isSpent = states.some((s: any) => s.state === 'SPENT');
                 const isPending = states.some((s: any) => s.state === 'PENDING');
 
-                let newState = entry.state;
+                let newState = entry?.state;
                 if (isSpent) newState = 'claimed';
                 else if (isPending) newState = 'pending';
                 else newState = 'unclaimed';
 
-                // Update the state in the database if it changed
-                if (newState !== entry.state) {
+                if (entry && newState !== entry.state) {
                     await (cocoService.getRepo().historyRepository as any).updateHistoryEntryState(entry.id, newState);
                 }
             } catch (err) {
@@ -100,14 +235,28 @@ export function TransactionDetailsScreen() {
         queryClient.invalidateQueries({ queryKey: ['history'] });
     };
 
+    const changeSpeed = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (intervalMs === 250) setIntervalMs(500);
+        else if (intervalMs === 500) setIntervalMs(140);
+        else setIntervalMs(250);
+    };
+
+    const changeSize = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (fragmentLength === 100) setFragmentLength(50);
+        else if (fragmentLength === 50) setFragmentLength(150);
+        else setFragmentLength(100);
+    };
+
     // Auto-refresh on mount if pending
     useEffect(() => {
-        if (entry && (status === 'pending' || status === 'unclaimed')) {
+        if (entry && (status === 'pending' || status === 'unclaimed') && entry.type === 'send') {
             handleRefresh();
         }
     }, [entry?.id]);
 
-    if (!entry || !style) {
+    if (!entry) {
         return (
             <YStack flex={1} bg="$background" items="center" justify="center" p="$4">
                 <Spinner size="large" />
@@ -116,111 +265,148 @@ export function TransactionDetailsScreen() {
         );
     }
 
-    const token = entry.metadata?.token;
+    const speedLabel = intervalMs === 140 ? "F" : intervalMs === 250 ? "M" : "S";
+    const sizeLabel = fragmentLength === 150 ? "L" : fragmentLength === 100 ? "M" : "S";
+
+    const isOutgoing = entry.type === 'send' || entry.type === 'melt';
+    const amountColor = isOutgoing ? '$red10' : '$green11';
+    const amountSign = isOutgoing ? '-' : '+';
+
+    // Status text formatting
+    const formattedStatus = status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     return (
-        <YStack flex={1} bg="$background">
-            {/* Colored Header Area */}
-            <YStack bg={statusConfig.headerBg as any} pb="$4">
-                <SafeAreaView edges={['top']}>
-                    <XStack p="$4" items="center" justify="space-between">
-                        <Button
-                            circular
-                            icon={<ChevronLeft size={24} color="white" />}
-                            onPress={() => router.back()}
-                            chromeless
-                        />
-                        <Text fontSize="$6" fontWeight="800" color="white">{statusConfig.label}</Text>
-                        <Button
-                            circular
-                            icon={<RefreshCw size={20} color="white" animation={isRefetching ? "rotate" : undefined} />}
-                            onPress={handleRefresh}
-                            chromeless
-                        />
-                    </XStack>
 
-                    <YStack items="center" gap="$2" pt="$2" pb="$4">
-                        <Circle size={70} bg="rgba(255,255,255,0.2)" borderWidth={2} borderColor="rgba(255,255,255,0.5)">
-                            <statusConfig.icon size={35} color="white" />
-                        </Circle>
-                        <YStack items="center">
-                            <Text fontSize="$9" fontWeight="800" color="white">₿{entry.amount.toLocaleString()}</Text>
-                            <Text color="rgba(255,255,255,0.8)" fontSize="$4" fontWeight="600">
-                                {style.title} • {entry.unit?.toUpperCase() || 'SATS'}
-                            </Text>
-                        </YStack>
-                    </YStack>
-                </SafeAreaView>
+        <ScrollView p="$4" pb="$2" bg="$background" showsVerticalScrollIndicator={false}>
+            {/* Header */}
+
+
+            {/* Amount Display */}
+            <YStack gap="$1" mb="$6" >
+                <XStack items="center">
+                    <Text fontSize="$9" fontWeight="800" color={amountColor}>
+                        {amountSign}₿{entry.amount.toLocaleString()}
+                    </Text>
+                </XStack>
+                <Text fontSize="$5" color="$gray10">
+                    $0.00
+                </Text>
             </YStack>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <YStack p="$4" gap="$6" pb="$10">
-                    <YStack gap="$4">
-                        <Text fontSize="$4" fontWeight="700" color="$gray11">Details</Text>
+            {/* Timeline / Status Card */}
+            <YStack bg="$gray2" rounded="$4" p="$4" mb="$6">
+                <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$2" textTransform='uppercase' letterSpacing={1}>
+                    {entry.type} • {formattedStatus}
+                </Text>
+                <Text fontSize="$5" fontWeight="800" color="$orange10" mb="$4">
+                    {formattedStatus.toUpperCase()}
+                </Text>
 
-                        <YStack bg="$gray2" rounded="$4" p="$4" gap="$4" borderWidth={1} borderColor="$borderColor">
-                            <DetailItem icon={Calendar} label="Date & Time" value={formatFullLocalTime(entry.createdAt)} />
-                            <Separator borderColor="$borderColor" opacity={0.5} />
-                            <DetailItem icon={Coins} label="Amount" value={`₿${entry.amount.toLocaleString()} ${entry.unit || 'sats'}`} />
-                            <Separator borderColor="$borderColor" opacity={0.5} />
-                            <DetailItem icon={Zap} label="Fee" value="0 sats" />
-                            <Separator borderColor="$borderColor" opacity={0.5} />
-                            <DetailItem icon={ShieldCheck} label="Mint" value={entry.mintUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')} />
-                            <Separator borderColor="$borderColor" opacity={0.5} />
-                            <DetailItem
-                                icon={statusConfig.icon}
-                                label="Status"
-                                value={status.charAt(0).toUpperCase() + status.slice(1)}
-                                valueColor={statusConfig.color}
-                            />
+                <YStack>
+                    {/* Step 1: Prepared */}
+                    <XStack gap="$3">
+                        <YStack items="center">
+                            <Circle size={24} bg="$green10">
+                                <Check size={14} color="black" />
+                            </Circle>
+                            <View width={2} flex={1} bg={status === 'completed' || status === 'claimed' ? "$green10" : "$gray8"} my="$1" />
                         </YStack>
-                    </YStack>
-
-                    {token && (
-                        <YStack gap="$4">
-                            <XStack justify="space-between" items="center">
-                                <Text fontSize="$4" fontWeight="700" color="$gray11">Token Address</Text>
-                                <Button size="$2" chromeless icon={ExternalLink} onPress={() => { }}>View Details</Button>
-                            </XStack>
-                            <YStack bg="$gray2" rounded="$4" p="$6" items="center" gap="$6" borderWidth={1} borderColor="$borderColor">
-                                <View p="$3" bg="white" rounded="$4" style={{ elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
-                                    <QRCode value={token} size={220} />
-                                </View>
-
-                                <YStack gap="$3" width="100%">
-                                    <View
-                                        bg="$background"
-                                        p="$4"
-                                        rounded="$4"
-                                        borderWidth={1}
-                                        borderColor="$borderColor"
-                                    >
-                                        <Text fontSize="$2" color="$gray10" numberOfLines={3} style={{ fontFamily: 'monospace' }}>
-                                            {token}
-                                        </Text>
-                                    </View>
-                                    <XStack gap="$3">
-                                        <Button flex={1} icon={Copy} onPress={handleCopyToken} bg="$gray4" fontWeight="700">Copy Token</Button>
-                                        <Button circular icon={<Share2 size={20} />} bg="$gray4" />
-                                    </XStack>
-                                </YStack>
-                            </YStack>
+                        <YStack pb="$4">
+                            <Text fontSize="$4" fontWeight="700" color="$color">Prepared</Text>
+                            <Text fontSize="$3" color="$gray10">{formatFullLocalTime(entry.createdAt)}</Text>
                         </YStack>
-                    )}
+                    </XStack>
+
+                    {/* Step 2: Current Status */}
+                    <XStack gap="$3">
+                        <Circle size={24} bg={statusConfig.color as any} items="center" justify="center">
+                            <statusConfig.icon size={14} color={status === 'completed' || status === 'claimed' ? "black" : "$color"} />
+                        </Circle>
+                        <YStack>
+                            <Text fontSize="$4" fontWeight="700" color="$color">{formattedStatus}</Text>
+                            <Text fontSize="$3" color="$gray10">
+                                {status === 'pending' ? 'Waiting for recipient...' :
+                                    status === 'claimed' ? 'Tokens claimed by recipient' :
+                                        status === 'completed' ? 'Transaction completed' :
+                                            'Token funds returned to your balance'}
+                            </Text>
+                        </YStack>
+                    </XStack>
                 </YStack>
-            </ScrollView>
-        </YStack>
+            </YStack>
+
+
+
+            {/* Details List */}
+            <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
+                <DetailItem label="Amount" value={`${entry.amount} ${entry.unit || 'sats'}`} />
+                <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
+                <DetailItem label="Type" value={`${title} • ${entry.type === 'send' ? 'Send' : 'Receive'}`} />
+                <DetailItem label="Status" value={formattedStatus} />
+                <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
+                <DetailItem label="Mint" value={entry.mintUrl.replace(/^https?:\/\//, '').split('/')[0]} />
+            </YStack>
+
+            {token && typeof token === 'string' && (
+                <YStack gap="$4" pb="$10">
+                    <Button
+                        bg="$gray3"
+                        color="$color"
+                        icon={<Copy size={18} />}
+                        onPress={handleCopyToken}
+                        fontWeight="600"
+                    >
+                        Copy Token
+                    </Button>
+                    <Button
+                        bg="$gray3"
+                        color="$color"
+                        icon={<Share2 size={18} />}
+                        onPress={handleShare}
+                        fontWeight="600"
+                    >
+                        Share Token
+                    </Button>
+
+                    <YStack bg="$gray2" rounded="$4" p="$4" items="center" gap="$4">
+                        {/* QRCode disabled due to crashes
+                                <QRCode
+                                    value={showAnimatedQR ? qrCodeFragment : (token.startsWith('cashu:') ? token : `cashu:${token}`)}
+                                    size={200}
+                                    backgroundColor="white"
+                                    color="black"
+                                />
+                                {showAnimatedQR && (
+                                    <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" justify="center">
+                                        <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
+                                        <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                        <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
+                                    </XStack>
+                                )}
+                                */}
+                        <Text color="$gray10">QR Code disabled</Text>
+                    </YStack>
+                </YStack>
+            )}
+
+
+        </ScrollView>
+
     );
 }
 
-function DetailItem({ icon: Icon, label, value, valueColor }: { icon: any, label: string, value: string, valueColor?: any }) {
+function DetailItem({ label, value, isCopyable, copyValue, onCopy }: { label: string, value: string, isCopyable?: boolean, copyValue?: string, onCopy?: () => void }) {
     return (
-        <XStack justify="space-between" items="center">
-            <XStack gap="$3" items="center">
-                <Icon size={18} color="$gray10" />
-                <Text color="$gray10" fontWeight="500">{label}</Text>
+        <XStack justify="space-between" items="center" py="$3" borderBottomWidth={1} borderColor="$gray3">
+            <Text fontSize="$4" color="$gray10" fontWeight="500">{label}</Text>
+            <XStack gap="$2" items="center">
+                <Text fontSize="$4" fontWeight="600" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                    {value}
+                </Text>
+                {isCopyable && (
+                    <Button size="$2" chromeless icon={<Copy size={14} color="$gray10" />} onPress={onCopy} />
+                )}
             </XStack>
-            <Text fontWeight="700" color={valueColor || '$color'} numberOfLines={1} style={{ maxWidth: '60%' }}>{value}</Text>
         </XStack>
     );
 }

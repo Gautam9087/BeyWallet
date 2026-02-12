@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router'
 import { Button, useTheme, XStack, Text } from 'tamagui'
-import { X, ChevronLeft } from '@tamagui/lucide-icons'
+import { X, ChevronLeft, RefreshCw } from '@tamagui/lucide-icons'
 
 export default function ModalLayout() {
     const theme = useTheme()
@@ -83,8 +83,17 @@ export default function ModalLayout() {
             <Stack.Screen
                 name="transaction-details"
                 options={{
-                    headerShown: false,
-                    presentation: 'modal',
+
+                    title: 'Transaction Details',
+                    headerRight: () => (
+                        <Button
+                            circular
+                            size="$3"
+                            icon={<RefreshCw size={24} color="$gray10" />} // Placeholder icon, or Refreh if needed
+                            chromeless
+
+                        />
+                    ),
                 }}
             />
         </Stack>
