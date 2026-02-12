@@ -1,8 +1,10 @@
 import React from 'react';
-import { YStack, XStack, Text, Button, H1, View } from 'tamagui';
-import { ArrowUpDown, DollarSign, Building2, AlertTriangle, Shield } from '@tamagui/lucide-icons';
+import { YStack, XStack, Text, Button, View, Separator, Circle, ScrollView } from 'tamagui';
+import { ArrowDownLeft, Check, ShieldCheck, AlertTriangle, Copy, Building2, DollarSign } from '@tamagui/lucide-icons';
 import { Spinner } from '../../components/UI/Spinner';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
+import { useToastController } from '@tamagui/toast';
 import { useWalletStore } from '../../store/walletStore';
 
 interface TokenInfo {
@@ -25,6 +27,7 @@ interface ConfirmStageProps {
 
 export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }: ConfirmStageProps) {
     const { mints } = useWalletStore();
+    const toast = useToastController();
 
     // Check if mint is trusted
     const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
@@ -42,113 +45,156 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
         }
     };
 
+    const handleCopy = async (text: string, label: string) => {
+        await Clipboard.setStringAsync(text);
+        toast.show('Copied!', { message: `${label} copied to clipboard` });
+        Haptics.selectionAsync();
+    };
+
+
     return (
-        <YStack flex={1} bg="$background" gap="$6" pt="$4">
-            {/* Token Preview Card */}
-            <YStack bg="$color3" rounded="$4" p="$4" style={{ minHeight: 150 }} gap="$2" position="relative">
-                <Text color="$gray10" fontSize="$3" numberOfLines={3} ellipsizeMode="middle">
-                    {token.substring(0, 80)}...
-                </Text>
+        <YStack flex={1} bg="$background">
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {/* Header Section */}
+                <YStack items="center" py="$6" gap="$4">
 
-                <YStack mt="auto">
-                    <XStack items="center" gap="$2">
-                        {isMintTrusted ? (
-                            <Shield size={14} color="$green10" />
-                        ) : (
-                            <AlertTriangle size={14} color="$orange10" />
+                    <YStack items="center">
+                        <XStack items="center" gap="$2">
+                            <Text fontSize={32} fontWeight="700" color="$green11">
+                                +{tokenInfo.amount}
+                            </Text>
+                            <Text fontSize={20} fontWeight="500" color="$gray10" mt="$2">
+                                SATS
+                            </Text>
+                        </XStack>
+                        <Text fontSize="$4" color="$gray10" mt="$1">
+                            Ready to Receive
+                        </Text>
+                    </YStack>
+                </YStack>
+
+                {/* Status Card */}
+                <YStack mx="$4" p="$4" bg="$gray2" borderRadius="$4" gap="$4" mb="$6">
+                    <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$0" textTransform='uppercase' letterSpacing={1}>
+                        STATUS
+                    </Text>
+
+                    <YStack>
+                        {/* Step 1: Encoded (Done) */}
+                        <XStack gap="$3">
+                            <YStack items="center">
+                                <Circle size={24} bg="$green10">
+                                    <Check size={14} color="black" />
+                                </Circle>
+                                <View width={2} flex={1} bg="$gray8" my="$1" />
+                            </YStack>
+                            <YStack pb="$4">
+                                <Text fontSize="$4" fontWeight="700" color="$color">Encoded Token</Text>
+                                <Text fontSize="$3" color="$gray10">Token decoded successfully</Text>
+                            </YStack>
+                        </XStack>
+
+                        {/* Step 2: Receive (Pending) */}
+                        <XStack gap="$3">
+                            <Circle size={24} bg="$gray5" items="center" justify="center">
+                                <ArrowDownLeft size={14} color="$gray10" />
+                            </Circle>
+                            <YStack>
+                                <Text fontSize="$4" fontWeight="700" color="$gray10">Receive</Text>
+                                <Text fontSize="$3" color="$gray10">Waiting for confirmation...</Text>
+                            </YStack>
+                        </XStack>
+                    </YStack>
+                </YStack>
+
+                {/* Warning for untrusted mint */}
+                {!isMintTrusted && (
+                    <YStack mx="$4" mb="$6" bg="$orange3" p="$3" rounded="$3" gap="$2">
+                        <XStack gap="$2" items="center">
+                            <AlertTriangle size={18} color="$orange10" />
+                            <Text color="$orange10" fontSize="$3" fontWeight="bold">
+                                Untrusted Mint
+                            </Text>
+                        </XStack>
+                        <Text color="$orange10" fontSize="$3">
+                            You are about to add and trust this mint to receive funds.
+                            {tokenInfo.preview ? ' Review the details below.' : ''}
+                        </Text>
+                    </YStack>
+                )}
+
+                {/* Details List */}
+                <YStack px="$4" gap="$4">
+                    <Text fontSize="$5" fontWeight="600" color="$color">Details</Text>
+                    <YStack separator={<Separator borderColor="$gray4" />}>
+                        <DetailItem
+                            label="Amount"
+                            value={`${tokenInfo.amount} sats`}
+                        />
+                        <DetailItem
+                            label="Proofs"
+                            value={tokenInfo.proofCount.toString()}
+                        />
+                        <DetailItem
+                            label="Mint"
+                            value={getMintDisplayName(tokenInfo.mint)}
+                            isCopyable
+                            onCopy={() => handleCopy(tokenInfo.mint, "Mint URL")}
+                        />
+                        {tokenInfo.preview?.description && (
+                            <DetailItem label="Description" value={tokenInfo.preview.description} />
                         )}
-                        <Text fontWeight="600" fontSize="$4" color={isMintTrusted ? "$color" : "$orange10"}>
-                            {getMintDisplayName(tokenInfo.mint)}
-                        </Text>
-                    </XStack>
-                    {tokenInfo.preview?.description && (
-                        <Text fontSize="$2" color="$gray10" numberOfLines={1} mt="$1">
-                            {tokenInfo.preview.description}
-                        </Text>
-                    )}
+                    </YStack>
                 </YStack>
 
-                <YStack position="absolute" style={{ right: 20, bottom: 20 }}>
-                    <H1 fontSize={44} fontWeight="900">₿{tokenInfo.amount}</H1>
-                </YStack>
-            </YStack>
+            </ScrollView>
 
-            {/* Warning for untrusted mint */}
-            {!isMintTrusted && (
-                <YStack bg="$orange3" p="$3" rounded="$3" gap="$2">
-                    <XStack gap="$2" items="center">
-                        <AlertTriangle size={18} color="$orange10" />
-                        <Text color="$orange10" fontSize="$3" fontWeight="bold">
-                            Untrusted Mint
-                        </Text>
-                    </XStack>
-                    <Text color="$orange10" fontSize="$3">
-                        You are about to add and trust this mint to receive funds.
-                        {tokenInfo.preview ? ' Review the details above.' : ''}
-                    </Text>
-                </YStack>
-            )}
-
-            {/* Details Table */}
-            <YStack gap="$4" px="$2">
-                <XStack justify="space-between" items="center">
-                    <XStack gap="$3" items="center">
-                        <ArrowUpDown size={20} opacity={0.6} />
-                        <Text color="$gray11" fontSize="$5" fontWeight="500">Amount</Text>
-                    </XStack>
-                    <Text fontWeight="700" fontSize="$5">₿{tokenInfo.amount}</Text>
-                </XStack>
-
-                <XStack justify="space-between" items="center">
-                    <XStack gap="$3" items="center">
-                        <View width={22} height={22} borderWidth={1.5} borderColor="$gray11" rounded="$1" justify="center" items="center">
-                            <DollarSign size={16} color="$gray11" />
-                        </View>
-                        <Text color="$gray11" fontSize="$5" fontWeight="500">Proofs</Text>
-                    </XStack>
-                    <Text fontWeight="700" fontSize="$5">{tokenInfo.proofCount}</Text>
-                </XStack>
-
-                <XStack justify="space-between" items="center">
-                    <XStack gap="$3" items="center">
-                        <Building2 size={20} opacity={0.6} />
-                        <Text color="$gray11" fontSize="$5" fontWeight="500">Mint</Text>
-                    </XStack>
-                    <Text fontWeight="700" fontSize="$5" opacity={0.9} numberOfLines={1} style={{ maxWidth: 180 }}>
-                        {getMintDisplayName(tokenInfo.mint)}
-                    </Text>
-                </XStack>
-            </YStack>
-
-            {/* Action Buttons */}
-            <YStack mt="auto" gap="$3" pb="$4">
+            <YStack position="absolute" bottom="$4" left="$4" right="$4">
                 <Button
-                    chromeless
-                    onPress={onBack}
+                    bg={isMintTrusted ? "$green9" : "$orange9"}
+                    color="white"
+                    height={50}
+                    rounded="$4"
                     disabled={isLoading}
-                    pressStyle={{ opacity: 0.7 }}
-                >
-                    <Text fontWeight="700" fontSize="$4" color="$gray11">GO BACK</Text>
-                </Button>
-
-                <Button
-                    bg="white"
-                    color="black"
-                    height={65}
-                    rounded="$10"
-                    disabled={isLoading}
-                    icon={isLoading ? <Spinner size="small" /> : undefined}
+                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
+                    fontWeight="700" fontSize="$4"
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                         onConfirm();
                     }}
                     pressStyle={{ opacity: 0.9, scale: 0.98 }}
                 >
-                    <Text fontWeight="900" fontSize="$5">
-                        {isLoading ? 'RECEIVING...' : (isMintTrusted ? 'RECEIVE' : 'TRUST & RECEIVE')}
-                    </Text>
+
+                    {isLoading ? 'RECEIVING...' : (isMintTrusted ? 'RECEIVE ECASH' : 'TRUST & RECEIVE')}
+
+                </Button>
+                <Button
+                    chromeless
+                    mt="$2"
+                    onPress={onBack}
+                    disabled={isLoading}
+                    pressStyle={{ opacity: 0.7 }}
+                    fontWeight="600" fontSize="$4" color="$gray10">
+
+                    Cancel
                 </Button>
             </YStack>
-        </YStack>
+        </YStack >
+    );
+}
+
+function DetailItem({ label, value, isCopyable, onCopy }: { label: string, value: string, isCopyable?: boolean, onCopy?: () => void }) {
+    return (
+        <XStack justify="space-between" items="center" py="$3" borderBottomWidth={1} borderColor="$gray3">
+            <Text fontSize="$4" color="$gray10" fontWeight="500">{label}</Text>
+            <XStack gap="$2" items="center">
+                <Text fontSize="$4" fontWeight="600" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                    {value}
+                </Text>
+                {isCopyable && (
+                    <Button size="$2" chromeless icon={<Copy size={14} color="$gray10" />} onPress={onCopy} />
+                )}
+            </XStack>
+        </XStack>
     );
 }

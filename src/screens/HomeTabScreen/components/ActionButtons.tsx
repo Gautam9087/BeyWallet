@@ -22,7 +22,7 @@ export default function ActionButtons() {
         <>
             <XStack gap="$2" justify="space-between">
                 <Button
-                    bg="$color3"
+                    bg="$gray4"
                     flex={1}
                     size="$7"
                     rounded="$4"
@@ -33,7 +33,7 @@ export default function ActionButtons() {
                     }}
                 />
                 <Button
-                    bg="$color3"
+                    bg="$gray4"
                     flex={1}
                     size="$7"
                     rounded="$4"
@@ -43,7 +43,7 @@ export default function ActionButtons() {
                     }}
                 />
                 <Button
-                    bg="$color3"
+                    bg="$gray4"
                     flex={1}
                     size="$7"
                     rounded="$4"

@@ -48,13 +48,13 @@ export default function BitcoinPriceCard() {
     return (
         <YStack
             width="100%"
-            height={140}
+            height={120}
             justify="space-between"
-            borderColor="$borderColor"
+            borderColor="$gray3"
             borderWidth={0.5}
             rounded="$5"
-            bg="$color2"
-            p="$3"
+            bg="$gray2"
+            p="$2"
             pressStyle={{ opacity: 0.9, scale: 0.99 }}
             onPress={handleRefresh}
         >
@@ -91,7 +91,7 @@ export default function BitcoinPriceCard() {
                                 {formatCurrency(data.price)}
                             </RollingNumber>
 
-                            <XStack gap="$2" items="center">
+                            <XStack gap="$2" items="flex-end" justify="flex-end">
                                 <View
                                     bg={isPositive ? "$green3" : "$red3"}
                                     px="$2"

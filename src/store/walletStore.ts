@@ -17,6 +17,7 @@ interface WalletState {
     error: string | null;
     mints: MintInfo[]; // List of registered mints with trust status
     refreshCounter: number;
+    balances: Record<string, number>;
 
     // Actions
     initialize: () => Promise<void>;
@@ -40,6 +41,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     error: null,
     mints: [],
     refreshCounter: 0,
+    balances: {},
 
     initialize: async () => {
         set({ isInitializing: true, error: null });
@@ -235,7 +237,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             }
 
             console.log('[WalletStore] Setting balance:', balance);
-            set({ balance, refreshCounter: get().refreshCounter + 1 });
+            set({ balance, balances, refreshCounter: get().refreshCounter + 1 });
         } catch (err) {
             console.error('[WalletStore] Error refreshing balance:', err);
         }

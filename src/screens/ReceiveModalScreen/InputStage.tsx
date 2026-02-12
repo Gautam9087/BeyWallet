@@ -1,6 +1,6 @@
 import React from 'react';
-import { YStack, XStack, Text, Button, View, TextArea } from 'tamagui';
-import { Scan, Nfc, AlertCircle } from '@tamagui/lucide-icons';
+import { YStack, XStack, Text, Button, View, TextArea, ScrollView } from 'tamagui';
+import { Scan, Nfc, AlertCircle, ClipboardPaste } from '@tamagui/lucide-icons';
 import { Spinner } from '../../components/UI/Spinner';
 import * as Haptics from 'expo-haptics';
 import * as ClipboardAPI from 'expo-clipboard';
@@ -38,89 +38,106 @@ export function InputStage({ token, setToken, isLoading, error, onContinue, onSc
     };
 
     return (
-        <YStack flex={1} bg="$background" gap="$6" pt="$4">
-            {/* Token Input Card */}
-            <YStack bg="$color3" rounded="$4" p="$4" minHeight={180}>
-                <XStack justify="space-between" items="center" mb="$2">
-                    <Text color="$gray11" fontSize="$4">Cashu token</Text>
-                    <Button
-                        size="$3"
-                        chromeless
-                        onPress={handlePaste}
-                        p="$2"
-                    >
-                        <Text color="$color" fontWeight="700">Paste</Text>
-                    </Button>
-                </XStack>
-                <TextArea
-                    value={token}
-                    onChangeText={setToken}
-                    placeholder="Paste cashu token here..."
-                    bg="transparent"
-                    borderWidth={0}
-                    fontSize="$5"
-                    p={0}
-                    flex={1}
-                    textAlignVertical="top"
-                    placeholderTextColor="$gray9"
-                />
-            </YStack>
+        <YStack flex={1} bg="$background" p="$4">
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                <YStack gap="$4">
+                    {/* Token Input Card */}
+                    <YStack bg="$gray2" rounded="$4" p="$4" minHeight={180}>
+                        <XStack justify="space-between" items="center" mb="$2">
+                            <Text color="$gray10" fontSize="$4" fontWeight="600">Enter Token</Text>
+                            <Button
+                                size="$2.5"
+                                bg="$gray4"
+                                onPress={handlePaste}
+                                icon={<ClipboardPaste size={14} color="$gray10" />}
+                                scaleIcon={1.2}
+                            >
+                                <Text color="$gray10" fontWeight="600">Paste</Text>
+                            </Button>
+                        </XStack>
+                        <TextArea
+                            value={token}
+                            onChangeText={setToken}
+                            placeholder="Usage: Paste Cashu token, Lightning invoice, or LNURL..."
+                            bg="transparent"
+                            borderWidth={0}
+                            fontSize="$5"
+                            color="$color"
+                            p={0}
+                            flex={1}
+                            textAlignVertical="top"
+                            placeholderTextColor="$gray8"
+                            selectionColor="$green9"
+                        />
+                    </YStack>
 
-            {/* Error Display */}
-            {error && (
-                <XStack bg="$red3" p="$3" rounded="$3" gap="$2" items="center">
-                    <AlertCircle size={18} color="$red10" />
-                    <Text color="$red10" fontSize="$3" flex={1}>{error}</Text>
-                </XStack>
-            )}
+                    {/* Error Display */}
+                    {error && (
+                        <XStack bg="$red3" p="$3" rounded="$3" gap="$2" items="center">
+                            <AlertCircle size={18} color="$red10" />
+                            <Text color="$red10" fontSize="$3" flex={1}>{error}</Text>
+                        </XStack>
+                    )}
 
-            {/* Scanning Options */}
-            <YStack gap="$3">
-                <Button
-                    height={80}
-                    bg="$color3"
-                    rounded="$4"
-                    onPress={handleScanPress}
-                    pressStyle={{ bg: '$color4' }}
-                    p="$4"
-                >
-                    <XStack flex={1} items="center" gap="$4">
-                        <View bg="$color5" p="$3" rounded="$3">
-                            <Scan size={28} color="$color" />
-                        </View>
-                        <YStack>
-                            <Text fontSize="$5" fontWeight="700">Scan QR Code</Text>
-                            <Text color="$gray10" fontSize="$3">Tap to scan a cashu token</Text>
-                        </YStack>
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" ml="$1" mt="$2">
+                        Or scan code
+                    </Text>
+
+                    {/* Scanning Options */}
+                    <XStack gap="$3">
+                        <Button
+                            flex={1}
+                            height={100}
+                            bg="$gray2"
+                            rounded="$4"
+                            onPress={handleScanPress}
+                            pressStyle={{ bg: '$gray3' }}
+                        >
+                            <YStack items="center" gap="$2">
+                                <View bg="$gray4" p="$3" rounded="$10">
+                                    <Scan size={24} color="$color" />
+                                </View>
+                                <Text fontSize="$4" fontWeight="600" color="$color">QR Code</Text>
+                            </YStack>
+                        </Button>
+
+                        <Button
+                            flex={1}
+                            height={100}
+                            bg="$gray2"
+                            rounded="$4"
+                            disabled
+                            opacity={0.5}
+                        >
+                            <YStack items="center" gap="$2">
+                                <View bg="$gray4" p="$3" rounded="$10">
+                                    <Nfc size={24} color="$gray10" />
+                                </View>
+                                <Text fontSize="$4" fontWeight="600" color="$gray10">NFC</Text>
+                            </YStack>
+                        </Button>
                     </XStack>
-                </Button>
-
-                <Button
-                    height={60}
-                    chromeless
-                    onPress={() => { }}
-                    pressStyle={{ opacity: 0.7 }}
-                >
-                    <XStack items="center" gap="$2" justify="center">
-                        <Nfc size={24} color="$color" />
-                        <Text fontSize="$5" fontWeight="700">NFC</Text>
-                    </XStack>
-                </Button>
-            </YStack>
+                </YStack>
+            </ScrollView>
 
             {/* Continue Button */}
             {isValidToken && (
-                <Button
-                    mt="auto"
-                    theme="accent"
-                    size="$5"
-                    fontWeight="800"
-                    disabled={isLoading}
-                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
-                    onPress={onContinue}
-                >
-                    {isLoading ? 'Decoding...' : 'Preview Token'}
-                </Button>
+                <View position="absolute" px="$4" bottom="$4" left="$0" right="$0">
+                    <Button
+                        theme="active"
+                        bg="$green9"
+                        color="white"
+                        size="$5"
+                        fontWeight="700"
+                        rounded="$4"
+                        disabled={isLoading}
+                        icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
+                        onPress={onContinue}
+                        pressStyle={{ opacity: 0.9, scale: 0.98 }}
+                    >
+                        {isLoading ? 'Decoding...' : 'Preview Token'}
+                    </Button>
+                </View>
             )}
         </YStack>
     );

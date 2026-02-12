@@ -8,8 +8,9 @@ import { useQuery } from "@tanstack/react-query";
 import { bitcoinService } from "../../../services/bitcoinService";
 
 export default function Balance() {
-    const { balance, activeMintUrl, refreshCounter, mints } = useWalletStore();
+    const { balance, activeMintUrl, refreshCounter, mints, balances } = useWalletStore();
     const { secondaryCurrency } = useSettingsStore();
+    const [showAllMints, setShowAllMints] = React.useState(false);
 
     const { data: btcData } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
@@ -21,26 +22,44 @@ export default function Balance() {
     const normalizeUrl = (url: string) => url.replace(/\/$/, '');
 
     const activeMint = mints.find(m => activeMintUrl && normalizeUrl(m.mintUrl) === normalizeUrl(activeMintUrl));
-    const mintName = activeMint?.nickname || activeMint?.name || activeMintUrl?.replace(/^https?:\/\//, '').replace(/\/$/, '') || "No Mint Selected";
+
+    // Determine display values based on toggle state
+    const currentBalance = showAllMints
+        ? Object.values(balances).reduce((acc, val) => acc + val, 0)
+        : balance;
+
+    const displayName = showAllMints
+        ? "All Mints"
+        : (activeMint?.nickname || activeMint?.name || activeMintUrl?.replace(/^https?:\/\//, '').replace(/\/$/, '') || "No Mint Selected");
 
     const secondaryBalance = React.useMemo(() => {
         if (!btcData?.price) return 0;
-        return currencyService.convertSatsToCurrency(balance, btcData.price);
-    }, [balance, btcData?.price]);
+        return currencyService.convertSatsToCurrency(currentBalance, btcData.price);
+    }, [currentBalance, btcData?.price]);
 
     return (
         <YStack py="$2" gap="$2">
             <XStack width="100%" items="center">
-                <Paragraph color="$accent9" px="$2" py="$0.5" rounded="$2" bg="$gray5" fontSize="$2" fontWeight="600">
-                    {mintName}
+                <Paragraph
+                    color="$accent9"
+                    px="$2"
+                    py="$0.5"
+                    rounded="$2"
+                    bg="$gray5"
+                    fontSize="$2"
+                    fontWeight="600"
+                    onPress={() => setShowAllMints(prev => !prev)}
+                    pressStyle={{ opacity: 0.7 }}
+                    suppressHighlighting
+                >
+                    {displayName} {showAllMints}
                 </Paragraph>
             </XStack>
             <XStack justify="space-between" py="$2" items="flex-end">
 
                 <RollingNumber
-                    value={balance}
+                    value={currentBalance}
                     prefix="₿"
-
                     trigger={refreshCounter}
                     letterSpacing={-1}
                     fontSize={30}

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme } from 'tamagui';
-import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck } from '@tamagui/lucide-icons';
+import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp } from '@tamagui/lucide-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cocoService } from '../../services/cocoService';
 import { Spinner } from '../../components/UI/Spinner';
@@ -61,8 +61,8 @@ export function HistoryScreen() {
     const getTransactionStyle = (type: string) => {
         const isOutgoing = type === 'send' || type === 'melt';
         return {
-            icon: isOutgoing ? ArrowUpRight : ArrowDownLeft,
-            iconColor: isOutgoing ? '$red10' : '$green10',
+            icon: isOutgoing ? ArrowUp : ArrowDownLeft,
+            iconColor: isOutgoing ? '$red10' : '$green11',
             bgColor: isOutgoing ? '$red2' : '$green2',
             sign: isOutgoing ? '-' : '+',
         };
@@ -97,22 +97,6 @@ export function HistoryScreen() {
 
     return (
         <YStack flex={1} bg="$background">
-            <XStack p="$4" justify="space-between" items="center">
-                <YStack>
-                    <Text fontSize="$6" fontWeight="800">History</Text>
-                    <Text fontSize="$2" color="$gray10">Your recent activity</Text>
-                </YStack>
-                <Button
-                    size="$3"
-                    circular
-                    icon={<RefreshCw size={18} />}
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        refetch();
-                    }}
-                    chromeless
-                />
-            </XStack>
 
             <ScrollView
                 flex={1}
@@ -139,7 +123,7 @@ export function HistoryScreen() {
                             </YStack>
                         </YStack>
                     ) : (
-                        <YStack gap="$2">
+                        <YStack gap="$4">
                             {history.map((entry: HistoryEntry) => {
                                 const style = getTransactionStyle(entry.type);
                                 const status = entry.state || 'completed';
@@ -150,19 +134,31 @@ export function HistoryScreen() {
                                         onPress={() => handleTransactionPress(entry.id)}
                                         pressStyle={{ opacity: 0.7, scale: 0.98 }}
                                     >
-                                        <XStack justify="space-between" items="center" p="$3" bg="$gray3" rounded="$7" >
+                                        <XStack justify="space-between" items="center"  >
                                             <XStack gap="$3" items="center">
                                                 <View
                                                     p="$2.5"
                                                     rounded="$10"
-                                                    bg="$gray4"
+
+                                                    borderWidth={2}
+                                                    borderColor="$borderColor"
                                                 >
-                                                    <style.icon size={20} color={style.iconColor as any} />
+                                                    <style.icon size={24} strokeWidth={3} color={style.iconColor as any} />
                                                 </View>
                                                 <YStack>
-                                                    <Text fontWeight="700" fontSize="$4">
-                                                        {getTypeLabel(entry.type)}
-                                                    </Text>
+                                                    <XStack gap="$2" items="center">
+
+                                                        <Text fontWeight="700" fontSize="$4">
+                                                            {getTypeLabel(entry.type)}
+                                                        </Text>
+                                                        {status !== 'completed' && (
+                                                            <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
+                                                                <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
+                                                                    {status}
+                                                                </Text>
+                                                            </XStack>
+                                                        )}
+                                                    </XStack>
                                                     <Text fontSize="$2" color="$gray10">
                                                         {formatLocalTime(entry.createdAt)}
                                                     </Text>
@@ -172,18 +168,12 @@ export function HistoryScreen() {
                                             <YStack items="flex-end" gap="$1">
                                                 <Text
                                                     fontWeight="800"
-                                                    fontSize="$4"
+                                                    fontSize="$5"
                                                     color={style.iconColor as any}
                                                 >
                                                     {style.sign}{entry.amount} {entry.unit?.toUpperCase() || 'SATS'}
                                                 </Text>
-                                                {status !== 'completed' && (
-                                                    <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
-                                                        <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
-                                                            {status}
-                                                        </Text>
-                                                    </XStack>
-                                                )}
+
                                             </YStack>
                                         </XStack>
                                     </YStack>

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { YStack } from 'tamagui'
+import { YStack, View } from 'tamagui'
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 import { InputStage } from './InputStage'
 import { ConfirmStage } from './ConfirmStage'
@@ -138,10 +138,12 @@ export function ReceiveModalScreen() {
     }
 
     return (
-        <YStack flex={1} bg="$background" px="$4">
+        <YStack flex={1} bg="$background" >
             <Stack.Screen
                 options={{
-                    title: step === 'result' ? (status === 'success' ? 'Success' : 'Error') : 'Receive Ecash',
+                    headerTitle: step === 'result' ? (status === 'success' ? 'Success' : 'Error') : 'Receive Ecash',
+                    headerTitleStyle: { fontWeight: '600' },
+                    headerBackTitle: 'Back',
                 }}
             />
 
