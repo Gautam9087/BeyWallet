@@ -60,6 +60,7 @@ export class CustomReceiveService {
 
         // 3. Ensure updated mint (keysets)
         const { keysets } = await mintService.ensureUpdatedMint(mint);
+        console.log('[CustomReceiveService] Mint keysets:', JSON.stringify(keysets, null, 2));
 
         // 3.5 Determine Unit from Keyset (Prioritize Keyset derived unit)
         try {
@@ -76,19 +77,24 @@ export class CustomReceiveService {
                 });
 
                 if (matchingKeyset) {
-                    const keysetUnit = matchingKeyset.unit || 'sat';
-                    if (unit && unit !== keysetUnit) {
+                    // Trust the keyset's unit exactly as is, even if it is empty string
+                    const keysetUnit = matchingKeyset.unit;
+                    if (unit && unit !== keysetUnit && keysetUnit !== undefined) {
                         console.warn(`[CustomReceiveService] Token metadata says '${unit}' but keyset says '${keysetUnit}'. Using keyset unit.`);
                     }
-                    unit = keysetUnit;
+                    if (keysetUnit !== undefined) {
+                        unit = keysetUnit;
+                    }
                 }
             }
         } catch (e) {
             console.warn('[CustomReceiveService] Failed to infer unit from token proofs', e);
         }
 
-        // Final fallback to 'sat' if still undefined or empty
-        unit = unit || 'sat';
+        // Final fallback to 'sat' ONLY if undefined. Allow '' if that's what we found.
+        if (unit === undefined) {
+            unit = 'sat';
+        }
 
         console.log(`[CustomReceiveService] Using mint: ${mint}, unit: ${unit || 'default(sat)'}`);
 
@@ -107,13 +113,28 @@ export class CustomReceiveService {
 
         const receiveAmount = proofs.reduce((acc, p) => acc + p.amount, 0);
 
-        // 6. Create Outputs (with UNIT support)
+        // 6. Create Outputs (with UNIT support and Keyset Alignment)
         const fees = wallet.getFeesForProofs(proofs);
+
+        let preferredKeysetId: string | undefined;
+        // We found a matching keyset earlier?
+        // Reuse logic to find it again or just remember it.
+        // Let's re-find it to be safe or use state if we had class state. 
+        // We have `keysets` from ensureUpdatedMint.
+        if (proofs.length > 0) {
+            const firstProofId = proofs[0].id;
+            const matching = keysets.find((k: any) => k.id === firstProofId);
+            if (matching && matching.active) {
+                preferredKeysetId = matching.id;
+            }
+        }
+
         const { keep: outputData } = await customProofService.createOutputsAndIncrementCounters(
             mint,
             { keep: receiveAmount - fees, send: 0 },
             undefined,
-            unit // PASSING UNIT HERE FIXES THE BUG
+            unit, // PASSING UNIT HERE FIXES THE BUG
+            preferredKeysetId // Enforce same keyset if possible
         );
 
         if (!outputData || outputData.length === 0) {
@@ -124,7 +145,7 @@ export class CustomReceiveService {
         // This exchanges proofs (swap)
         // wallet.receive uses this.keys but we ensured wallet was built with correct unit keys
         const newProofs = await wallet.receive(
-            { mint, proofs, unit: wallet.unit },
+            { mint, proofs, unit },
             undefined,
             { type: 'custom', data: outputData }
         );

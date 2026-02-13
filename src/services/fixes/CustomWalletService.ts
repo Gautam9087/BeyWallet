@@ -44,7 +44,8 @@ export class CustomWalletService {
 
     async getWalletWithActiveKeysetId(
         mintUrl: string,
-        unit?: string
+        unit?: string,
+        preferredKeysetId?: string
     ): Promise<{
         wallet: Wallet;
         keysetId: string;
@@ -52,7 +53,19 @@ export class CustomWalletService {
         keys: any; // MintKeys
     }> {
         const wallet = await this.getWallet(mintUrl, unit);
-        const keyset = wallet.keyChain.getCheapestKeyset();
+
+        let keyset = wallet.keyChain.getCheapestKeyset();
+
+        // If a specific keyset is preferred (e.g. from the input proofs) and it exists/is active, use it.
+        // This ensures input/output alignment for strict mints.
+        if (preferredKeysetId) {
+            const preferred = wallet.keyChain.getKeyset(preferredKeysetId);
+            if (preferred) {
+                console.log(`[CustomWalletService] Using preferred keyset: ${preferredKeysetId}`);
+                keyset = preferred;
+            }
+        }
+
         const mintKeys = keyset.toMintKeys(); // This might return null/undefined if empty?
         // WalletService.ts handles null check, let's replicate
         if (!mintKeys) {
@@ -71,25 +84,32 @@ export class CustomWalletService {
         const { mintService, seedService } = getInternals();
 
         // This calls the existing MintService to get cached/fresh keysets
+        // This calls the existing MintService to get cached/fresh keysets
         const { mint, keysets } = await mintService.ensureUpdatedMint(mintUrl);
 
-        // Normalize targetUnit to 'sat' if it's empty or undefined
-        const targetUnit = (unit && unit !== '') ? unit : DEFAULT_UNIT;
-        console.log(`[CustomWalletService] Building wallet for ${mintUrl}, targetUnit normalized to: ${targetUnit}`);
+        // Normalize targetUnit: Use DEFAULT_UNIT only if unit is undefined/null.
+        // If unit is "" (empty string), we MUST respect it because some mints use "" for sats.
+        const targetUnit = (unit !== undefined && unit !== null) ? unit : DEFAULT_UNIT;
+        console.log(`[CustomWalletService] Building wallet for ${mintUrl}, targetUnit normalized to: '${targetUnit}'`);
 
         // Filter keysets matching the requested unit
         const validKeysets = keysets.filter(
             (keyset: any) =>
                 keyset.keypairs &&
                 Object.keys(keyset.keypairs).length > 0 &&
-                (keyset.unit === targetUnit || ((!keyset.unit || keyset.unit === '') && targetUnit === DEFAULT_UNIT))
+                (
+                    keyset.unit === targetUnit ||
+                    // Fallback: If target is DEFAULT_UNIT ('sat'), also accept empty unit keysets
+                    (targetUnit === DEFAULT_UNIT && (!keyset.unit || keyset.unit === ''))
+                )
         );
 
         if (validKeysets.length === 0) {
-            throw new Error(`No valid keysets found for mint ${mintUrl} and unit ${targetUnit}`);
+            throw new Error(`No valid keysets found for mint ${mintUrl} and unit '${targetUnit}'`);
         }
 
-        const walletUnit = validKeysets[0].unit ?? DEFAULT_UNIT;
+        // Use the actual unit from the keyset for the wallet
+        const walletUnit = validKeysets[0].unit;
 
         // Construct cache for Wallet
         const keysetCache = validKeysets.map((keyset: any) => ({

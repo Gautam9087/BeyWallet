@@ -19,7 +19,8 @@ export class CustomProofService {
         mintUrl: string,
         amount: { keep: number; send: number },
         options?: { includeFees?: boolean },
-        unit?: string
+        unit?: string,
+        preferredKeysetId?: string
     ): Promise<{ keep: OutputData[]; send: OutputData[]; sendAmount: number; keepAmount: number }> {
         const { counterService, seedService } = getInternals();
 
@@ -37,7 +38,7 @@ export class CustomProofService {
 
         // Use our CustomWalletService with unit support
         const { wallet, keys, keysetId } =
-            await customWalletService.getWalletWithActiveKeysetId(mintUrl, unit);
+            await customWalletService.getWalletWithActiveKeysetId(mintUrl, unit, preferredKeysetId);
 
         const seed = await seedService.getSeed();
         const currentCounter = await counterService.getCounter(mintUrl, keys.id);

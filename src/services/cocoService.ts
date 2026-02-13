@@ -4,6 +4,7 @@ import { ExpoSqliteRepositories } from '../store/test';
 import * as SQLite from 'expo-sqlite';
 import { seedService } from './seedService';
 import { AppState, AppStateStatus } from 'react-native';
+import { customSendService } from './fixes/CustomSendService';
 
 let cocoManager: Manager | null = null;
 let repo: ExpoSqliteRepositories | null = null;
@@ -553,6 +554,7 @@ export const cocoService = {
     // SENDING (Balance → Ecash Token)
     // ==========================================
 
+
     /**
      * Send tokens from a mint directly (no prepare/execute saga).
      * @param mintUrl - The mint to send from
@@ -563,8 +565,11 @@ export const cocoService = {
         if (!cocoManager) {
             throw new Error('CocoManager not initialized');
         }
-        console.log(`[CocoService] Sending: ${amount} sats from ${mintUrl}`);
-        const token = await cocoManager.wallet.send(mintUrl, amount);
+        console.log(`[CocoService] Sending (Custom): ${amount} sats from ${mintUrl}`);
+
+        // Use custom service to fix strict unit/keyset issues
+        const token = await customSendService.send(mintUrl, amount);
+
         console.log('[CocoService] Send complete, token created');
 
         // Ensure token is saved in metadata for easy retrieval
