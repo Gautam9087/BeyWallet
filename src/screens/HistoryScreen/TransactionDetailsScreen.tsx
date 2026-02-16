@@ -87,12 +87,22 @@ export function TransactionDetailsScreen() {
     const status = entry?.state || 'completed';
 
     // Animated QR states
-    const [qrCodeFragment, setQrCodeFragment] = useState<string>(token || '');
+    const [qrCodeFragment, setQrCodeFragment] = useState<string>('');
     const [showAnimatedQR, setShowAnimatedQR] = useState(false);
     const [fragmentLength, setFragmentLength] = useState(150); // L=150, M=100, S=50
     const [intervalMs, setIntervalMs] = useState(140); // F=140, M=250, S=500
     const encoderRef = useRef<UREncoder | null>(null);
     const [tokenVersion, setTokenVersion] = useState<'V3' | 'V4'>(token?.startsWith('cashuB') ? 'V4' : 'V3');
+
+    // Initialize/Update token version and fragment when token changes
+    useEffect(() => {
+        if (token) {
+            setTokenVersion(token.startsWith('cashuB') ? 'V4' : 'V3');
+            if (!showAnimatedQR) {
+                setQrCodeFragment(token);
+            }
+        }
+    }, [token]);
 
     useEffect(() => {
         if (!token) return;
@@ -251,10 +261,10 @@ export function TransactionDetailsScreen() {
 
     // Auto-refresh on mount if pending
     useEffect(() => {
-        if (entry && (status === 'pending' || status === 'unclaimed') && entry.type === 'send') {
+        if (entry && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && initService.isInitialized()) {
             handleRefresh();
         }
-    }, [entry?.id]);
+    }, [entry?.id, entry?.state]);
 
     if (!entry) {
         return (
@@ -273,7 +283,10 @@ export function TransactionDetailsScreen() {
     const amountSign = isOutgoing ? '-' : '+';
 
     // Status text formatting
-    const formattedStatus = status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    const formattedStatus = useMemo(() => {
+        if (!status) return 'Unknown';
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }, [status]);
 
     return (
 
@@ -347,45 +360,100 @@ export function TransactionDetailsScreen() {
                 <DetailItem label="Mint" value={entry.mintUrl.replace(/^https?:\/\//, '').split('/')[0]} />
             </YStack>
 
-            {token && typeof token === 'string' && (
-                <YStack gap="$4" pb="$10">
+            {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && (
+                <YStack gap="$4" pb="$10" mt="$4">
+                    <YStack items="center" gap="$4">
+                        <View
+                            bg="white"
+                            p="$3"
+                            rounded="$6"
+
+                        >
+                            <QRCode
+                                value={showAnimatedQR ? (qrCodeFragment || 'cashu:') : (token.startsWith('cashu:') ? token : `cashu:${token}`)}
+                                size={280}
+                                backgroundColor="white"
+                                color="black"
+                                quietZone={10}
+                            />
+                        </View>
+
+                        <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
+                            {showAnimatedQR && (
+                                <>
+                                    <Button
+                                        size="$2.5"
+                                        chromeless
+                                        icon={<Gauge size={16} />}
+                                        onPress={changeSpeed}
+                                        color="$color"
+                                        fontWeight="700"
+                                    >
+                                        {speedLabel}
+                                    </Button>
+                                    <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                    <Button
+                                        size="$2.5"
+                                        chromeless
+                                        icon={<ZoomIn size={16} />}
+                                        onPress={changeSize}
+                                        color="$color"
+                                        fontWeight="700"
+                                    >
+                                        {sizeLabel}
+                                    </Button>
+                                    <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                </>
+                            )}
+                            <Button
+                                size="$2.5"
+                                chromeless
+                                icon={<Hexagon size={16} />}
+                                onPress={handleToggleVersion}
+                                color="$color"
+                                fontWeight="700"
+                            >
+                                {tokenVersion}
+                            </Button>
+                        </XStack>
+                    </YStack>
+
+                    <XStack gap="$2">
+                        <Button
+                            flex={1}
+                            bg="$gray3"
+                            color="$color"
+                            icon={<Copy size={18} />}
+                            onPress={handleCopyToken}
+                            fontWeight="800"
+                        >
+                            Copy
+                        </Button>
+                        <Button
+                            flex={1}
+                            bg="$gray3"
+                            color="$color"
+                            icon={<Share2 size={18} />}
+                            onPress={handleShare}
+                            fontWeight="800"
+                        >
+                            Share
+                        </Button>
+                    </XStack>
+                </YStack>
+            )}
+
+            {token && typeof token === 'string' && (status === 'claimed' || status === 'completed') && (
+                <YStack gap="$4" pb="$10" mt="$4">
                     <Button
                         bg="$gray3"
                         color="$color"
                         icon={<Copy size={18} />}
                         onPress={handleCopyToken}
-                        fontWeight="600"
+                        fontWeight="800"
                     >
                         Copy Token
                     </Button>
-                    <Button
-                        bg="$gray3"
-                        color="$color"
-                        icon={<Share2 size={18} />}
-                        onPress={handleShare}
-                        fontWeight="600"
-                    >
-                        Share Token
-                    </Button>
-
-                    <YStack bg="$gray2" rounded="$4" p="$4" items="center" gap="$4">
-                        {/* QRCode disabled due to crashes
-                                <QRCode
-                                    value={showAnimatedQR ? qrCodeFragment : (token.startsWith('cashu:') ? token : `cashu:${token}`)}
-                                    size={200}
-                                    backgroundColor="white"
-                                    color="black"
-                                />
-                                {showAnimatedQR && (
-                                    <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" justify="center">
-                                        <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
-                                        <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                        <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
-                                    </XStack>
-                                )}
-                                */}
-                        <Text color="$gray10">QR Code disabled</Text>
-                    </YStack>
                 </YStack>
             )}
 
