@@ -18,6 +18,7 @@ import { useAuthStore } from '~/store/authStore'
 import HomeHeaderMintSelector from '~/components/HomeMintSelector'
 import SettingsIcon from '~/components/icons/Settings'
 import WalletIcon from '~/components/icons/Wallet'
+import HistoryVolume from '~/components/HistoryVolume'
 import LockIcon from '~/components/icons/Lock'
 import * as Haptics from 'expo-haptics'
 
@@ -119,16 +120,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <History strokeWidth={2.5} color={color as any} />,
           headerRight: () => (
             <XStack pr="$4">
-              <Button
-                circular
-                size="$3"
-                chromeless
-                icon={<Filter size={24} color="$color" />}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                  console.log('Filter')
-                }}
-              />
+              <HistoryVolume />
             </XStack>
           ),
         }}

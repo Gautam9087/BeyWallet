@@ -6,6 +6,7 @@ import * as Localization from 'expo-localization';
  * @returns Formatted date/time string
  */
 export function formatLocalTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return 'Unknown time';
     const date = new Date(timestamp * 1000);
     const now = new Date();
 
@@ -56,6 +57,7 @@ export function formatLocalTime(timestamp: number): string {
  * Returns a full detailed local time string for the details page.
  */
 export function formatFullLocalTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return 'Unknown date';
     const date = new Date(timestamp * 1000);
     const options: Intl.DateTimeFormatOptions = {
         weekday: 'long',
@@ -74,6 +76,7 @@ export function formatFullLocalTime(timestamp: number): string {
  * Returns a relative time string (e.g. "2 min ago", "just now").
  */
 export function formatRelativeTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return 'recently';
     const now = Math.floor(Date.now() / 1000);
     const diff = now - timestamp;
 

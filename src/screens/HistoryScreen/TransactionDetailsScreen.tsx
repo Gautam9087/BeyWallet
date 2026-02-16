@@ -38,13 +38,15 @@ export function TransactionDetailsScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const toast = useToastController();
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const params = useLocalSearchParams<{ id: string }>();
+    const id = params.id?.toString();
     const { secondaryCurrency } = useSettingsStore();
 
     const { data: entry, refetch, isRefetching } = useQuery({
         queryKey: ['transaction', id],
         queryFn: async () => {
-            const history = await historyService.getHistory(100, 0);
+            if (!id) return undefined;
+            const history = await historyService.getHistory(200, 0);
             return history.find((e: any) => e.id === id) as HistoryEntry | undefined;
         },
         enabled: !!id,
@@ -54,14 +56,18 @@ export function TransactionDetailsScreen() {
 
     useEffect(() => {
         if (!entry) return;
+        console.log('[TransactionDetails] Entry loaded:', entry.id, 'Type:', entry.type);
+
+        // Extract metadata safely
+        const metadata = typeof entry.metadata === 'string' ? JSON.parse(entry.metadata) : entry.metadata;
 
         // Priority 1: Token in metadata (already encoded string)
-        if (entry.metadata?.token) {
-            if (typeof entry.metadata.token === 'string') {
-                setToken(entry.metadata.token);
+        if (metadata?.token) {
+            if (typeof metadata.token === 'string') {
+                setToken(metadata.token);
             } else {
                 try {
-                    const encoded = encodeToken(entry.metadata.token);
+                    const encoded = encodeToken(metadata.token);
                     setToken(encoded);
                 } catch (e) {
                     console.warn('[TransactionDetails] Failed to encode metadata token:', e);
@@ -73,7 +79,6 @@ export function TransactionDetailsScreen() {
         // Priority 2: Token object in entry (needs encoding)
         if (entry.token) {
             try {
-                // Ensure we have a valid token object or string
                 const encoded = typeof entry.token === 'string'
                     ? entry.token
                     : encodeToken(entry.token);
@@ -118,7 +123,7 @@ export function TransactionDetailsScreen() {
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
                 const messageBuffer = Buffer.from(clean);
-                const ur = UR.fromBuffer(messageBuffer);
+                const ur = new UR(messageBuffer, "cashu");
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
                 setShowAnimatedQR(false);
@@ -155,15 +160,15 @@ export function TransactionDetailsScreen() {
     }, [status, entry?.type]);
 
     const title = useMemo(() => {
-        if (!entry) return '';
-        switch (entry.type) {
+        const type = entry?.type || 'transaction';
+        switch (type) {
             case 'send': return 'Send Ecash';
             case 'receive': return 'Receive Ecash';
             case 'mint': return 'Mint Ecash';
             case 'melt': return 'Melt Ecash';
             default: return 'Transaction';
         }
-    }, [entry]);
+    }, [entry?.type]);
 
 
     const handleCopyToken = async () => {
@@ -234,7 +239,10 @@ export function TransactionDetailsScreen() {
                 else newState = 'unclaimed';
 
                 if (entry && newState !== entry.state) {
-                    await (initService.getRepo().historyRepository as any).updateHistoryEntryState(entry.id, newState);
+                    const repo = initService.getRepo();
+                    if (repo?.historyRepository) {
+                        await (repo.historyRepository as any).updateHistoryEntryState(entry.id, newState);
+                    }
                 }
             } catch (err) {
                 console.warn('[TransactionDetails] Failed to refresh proof states:', err);
@@ -265,202 +273,155 @@ export function TransactionDetailsScreen() {
             handleRefresh();
         }
     }, [entry?.id, entry?.state]);
-
-    if (!entry) {
-        return (
-            <YStack flex={1} bg="$background" items="center" justify="center" p="$4">
-                <Spinner size="large" />
-                <Text mt="$4" color="$gray10">Loading transaction...</Text>
-            </YStack>
-        );
-    }
-
-    const speedLabel = intervalMs === 140 ? "F" : intervalMs === 250 ? "M" : "S";
-    const sizeLabel = fragmentLength === 150 ? "L" : fragmentLength === 100 ? "M" : "S";
-
-    const isOutgoing = entry.type === 'send' || entry.type === 'melt';
-    const amountColor = isOutgoing ? '$red10' : '$green11';
-    const amountSign = isOutgoing ? '-' : '+';
-
     // Status text formatting
     const formattedStatus = useMemo(() => {
         if (!status) return 'Unknown';
         return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }, [status]);
 
-    return (
+    const speedLabel = intervalMs === 140 ? "F" : intervalMs === 250 ? "M" : "S";
+    const sizeLabel = fragmentLength === 150 ? "L" : fragmentLength === 100 ? "M" : "S";
 
-        <ScrollView p="$4" pb="$2" bg="$background" showsVerticalScrollIndicator={false}>
-            {/* Header */}
-
-
-            {/* Amount Display */}
-            <YStack gap="$1" mb="$6" >
-                <XStack items="center">
-                    <Text fontSize="$9" fontWeight="800" color={amountColor}>
-                        {amountSign}₿{entry.amount.toLocaleString()}
-                    </Text>
-                </XStack>
-                <Text fontSize="$5" color="$gray10">
-                    $0.00
-                </Text>
-            </YStack>
-
-            {/* Timeline / Status Card */}
-            <YStack bg="$gray2" rounded="$4" p="$4" mb="$6">
-                <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$2" textTransform='uppercase' letterSpacing={1}>
-                    {entry.type} • {formattedStatus}
-                </Text>
-                <Text fontSize="$5" fontWeight="800" color="$orange10" mb="$4">
-                    {formattedStatus.toUpperCase()}
-                </Text>
-
-                <YStack>
-                    {/* Step 1: Prepared */}
-                    <XStack gap="$3">
-                        <YStack items="center">
-                            <Circle size={24} bg="$green10">
-                                <Check size={14} color="black" />
-                            </Circle>
-                            <View width={2} flex={1} bg={status === 'completed' || status === 'claimed' ? "$green10" : "$gray8"} my="$1" />
-                        </YStack>
-                        <YStack pb="$4">
-                            <Text fontSize="$4" fontWeight="700" color="$color">Prepared</Text>
-                            <Text fontSize="$3" color="$gray10">{formatFullLocalTime(entry.createdAt)}</Text>
-                        </YStack>
-                    </XStack>
-
-                    {/* Step 2: Current Status */}
-                    <XStack gap="$3">
-                        <Circle size={24} bg={statusConfig.color as any} items="center" justify="center">
-                            <statusConfig.icon size={14} color={status === 'completed' || status === 'claimed' ? "black" : "$color"} />
-                        </Circle>
-                        <YStack>
-                            <Text fontSize="$4" fontWeight="700" color="$color">{formattedStatus}</Text>
-                            <Text fontSize="$3" color="$gray10">
-                                {status === 'pending' ? 'Waiting for recipient...' :
-                                    status === 'claimed' ? 'Tokens claimed by recipient' :
-                                        status === 'completed' ? 'Transaction completed' :
-                                            'Token funds returned to your balance'}
-                            </Text>
-                        </YStack>
-                    </XStack>
+    if (!entry) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+                <YStack flex={1} bg="$background" items="center" justify="center" p="$4">
+                    <Spinner size="large" />
+                    <Text mt="$4" color="$gray10">Loading transaction details...</Text>
                 </YStack>
-            </YStack>
+            </SafeAreaView>
+        );
+    }
 
+    try {
+        const isOutgoing = entry.type === 'send' || entry.type === 'melt';
+        const amountColor = isOutgoing ? '$red10' : '$green11';
+        const amountSign = isOutgoing ? '-' : '+';
 
-
-            {/* Details List */}
-            <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
-                <DetailItem label="Amount" value={`${entry.amount} ${entry.unit || 'sats'}`} />
-                <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
-                <DetailItem label="Type" value={`${title} • ${entry.type === 'send' ? 'Send' : 'Receive'}`} />
-                <DetailItem label="Status" value={formattedStatus} />
-                <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
-                <DetailItem label="Mint" value={entry.mintUrl.replace(/^https?:\/\//, '').split('/')[0]} />
-            </YStack>
-
-            {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && (
-                <YStack gap="$4" pb="$10" mt="$4">
-                    <YStack items="center" gap="$4">
-                        <View
-                            bg="white"
-                            p="$3"
-                            rounded="$6"
-
-                        >
-                            <QRCode
-                                value={showAnimatedQR ? (qrCodeFragment || 'cashu:') : (token.startsWith('cashu:') ? token : `cashu:${token}`)}
-                                size={280}
-                                backgroundColor="white"
-                                color="black"
-                                quietZone={10}
-                            />
-                        </View>
-
-                        <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
-                            {showAnimatedQR && (
-                                <>
-                                    <Button
-                                        size="$2.5"
-                                        chromeless
-                                        icon={<Gauge size={16} />}
-                                        onPress={changeSpeed}
-                                        color="$color"
-                                        fontWeight="700"
-                                    >
-                                        {speedLabel}
-                                    </Button>
-                                    <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                    <Button
-                                        size="$2.5"
-                                        chromeless
-                                        icon={<ZoomIn size={16} />}
-                                        onPress={changeSize}
-                                        color="$color"
-                                        fontWeight="700"
-                                    >
-                                        {sizeLabel}
-                                    </Button>
-                                    <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                </>
-                            )}
-                            <Button
-                                size="$2.5"
-                                chromeless
-                                icon={<Hexagon size={16} />}
-                                onPress={handleToggleVersion}
-                                color="$color"
-                                fontWeight="700"
-                            >
-                                {tokenVersion}
-                            </Button>
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+                <ScrollView p="$4" pb="$2" bg="$background" showsVerticalScrollIndicator={false}>
+                    {/* Amount Display */}
+                    <YStack gap="$1" mb="$6" >
+                        <XStack items="center">
+                            <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
+                                {isOutgoing ? <ArrowUpRight size={20} color="white" /> : <ArrowDownLeft size={20} color="white" />}
+                            </Circle>
+                            <Text fontSize="$9" fontWeight="800" color={amountColor}>
+                                {amountSign}₿{entry.amount?.toLocaleString() ?? '0'}
+                            </Text>
                         </XStack>
+                        <Text fontSize="$5" color="$gray10" ml={52}>
+                            Ecash {entry.unit?.toUpperCase() || 'SATS'}
+                        </Text>
                     </YStack>
 
-                    <XStack gap="$2">
-                        <Button
-                            flex={1}
-                            bg="$gray3"
-                            color="$color"
-                            icon={<Copy size={18} />}
-                            onPress={handleCopyToken}
-                            fontWeight="800"
-                        >
-                            Copy
-                        </Button>
-                        <Button
-                            flex={1}
-                            bg="$gray3"
-                            color="$color"
-                            icon={<Share2 size={18} />}
-                            onPress={handleShare}
-                            fontWeight="800"
-                        >
-                            Share
-                        </Button>
-                    </XStack>
+                    {/* Timeline / Status Card */}
+                    <YStack bg="$gray2" rounded="$4" p="$4" mb="$6">
+                        <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$2" textTransform='uppercase' letterSpacing={1}>
+                            {(entry.type || 'unknown').toUpperCase()} • {formattedStatus}
+                        </Text>
+                        <Text fontSize="$5" fontWeight="800" color={statusConfig.color as any} mb="$4">
+                            {formattedStatus.toUpperCase()}
+                        </Text>
+
+                        <YStack>
+                            {/* Step 1: Prepared */}
+                            <XStack gap="$3">
+                                <YStack items="center">
+                                    <Circle size={24} bg="$green10">
+                                        <Check size={14} color="black" />
+                                    </Circle>
+                                    <View width={2} flex={1} bg={status === 'completed' || status === 'claimed' ? "$green10" : "$gray8"} my="$1" />
+                                </YStack>
+                                <YStack pb="$4">
+                                    <Text fontSize="$4" fontWeight="700" color="$color">Prepared</Text>
+                                    <Text fontSize="$3" color="$gray10">{formatFullLocalTime(entry.createdAt)}</Text>
+                                </YStack>
+                            </XStack>
+
+                            {/* Step 2: Current Status */}
+                            <XStack gap="$3">
+                                <Circle size={24} bg={statusConfig.color as any} items="center" justify="center">
+                                    <statusConfig.icon size={14} color={status === 'completed' || status === 'claimed' ? "black" : "$color"} />
+                                </Circle>
+                                <YStack>
+                                    <Text fontSize="$4" fontWeight="700" color="$color">{formattedStatus}</Text>
+                                    <Text fontSize="$3" color="$gray10">
+                                        {status === 'pending' ? 'Waiting for recipient...' :
+                                            status === 'claimed' ? 'Tokens claimed by recipient' :
+                                                status === 'completed' ? 'Transaction completed' :
+                                                    'Funds processed successfully'}
+                                    </Text>
+                                </YStack>
+                            </XStack>
+                        </YStack>
+                    </YStack>
+
+                    {/* Details List */}
+                    <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
+                        <DetailItem label="Amount" value={`${entry.amount || 0} ${entry.unit || 'sats'}`} />
+                        <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
+                        <DetailItem label="Type" value={`${title} • ${entry.type === 'send' ? 'Outgoing' : 'Incoming'}`} />
+                        <DetailItem label="Status" value={formattedStatus} />
+                        <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
+                        <DetailItem label="Mint" value={(entry.mintUrl || 'Unknown').replace(/^https?:\/\//, '').split('/')[0]} />
+                    </YStack>
+
+                    {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && (
+                        <YStack gap="$4" pb="$10" mt="$4">
+                            <YStack items="center" gap="$4">
+                                <View bg="white" p="$3" rounded="$6">
+                                    <QRCode
+                                        value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
+                                        size={280}
+                                        backgroundColor="white"
+                                        color="black"
+                                        quietZone={10}
+                                    />
+                                </View>
+
+                                <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
+                                    {showAnimatedQR && (
+                                        <>
+                                            <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
+                                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                            <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
+                                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                        </>
+                                    )}
+                                    <Button size="$2.5" chromeless icon={<Hexagon size={16} />} onPress={handleToggleVersion} color="$color" fontWeight="700">{tokenVersion}</Button>
+                                </XStack>
+                            </YStack>
+
+                            <XStack gap="$2">
+                                <Button flex={1} bg="$gray3" color="$color" icon={<Copy size={18} />} onPress={handleCopyToken} fontWeight="800">Copy</Button>
+                                <Button flex={1} bg="$gray3" color="$color" icon={<Share2 size={18} />} onPress={handleShare} fontWeight="800">Share</Button>
+                            </XStack>
+                        </YStack>
+                    )}
+
+                    {token && typeof token === 'string' && (status === 'claimed' || status === 'completed') && (
+                        <YStack gap="$4" pb="$10" mt="$4">
+                            <Button bg="$gray3" color="$color" icon={<Copy size={18} />} onPress={handleCopyToken} fontWeight="800">Copy Token</Button>
+                        </YStack>
+                    )}
+                </ScrollView>
+            </SafeAreaView>
+        );
+    } catch (e: any) {
+        console.error('[TransactionDetails] Error during render:', e);
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '$background' }}>
+                <YStack flex={1} items="center" justify="center" p="$6" gap="$4">
+                    <AlertCircle size={48} color="$red10" />
+                    <Text fontSize="$6" fontWeight="800">Render Error</Text>
+                    <Text color="$gray10" text="center">{e.message}</Text>
+                    <Button mt="$4" onPress={() => router.back()}>Go Back</Button>
                 </YStack>
-            )}
-
-            {token && typeof token === 'string' && (status === 'claimed' || status === 'completed') && (
-                <YStack gap="$4" pb="$10" mt="$4">
-                    <Button
-                        bg="$gray3"
-                        color="$color"
-                        icon={<Copy size={18} />}
-                        onPress={handleCopyToken}
-                        fontWeight="800"
-                    >
-                        Copy Token
-                    </Button>
-                </YStack>
-            )}
-
-
-        </ScrollView>
-
-    );
+            </SafeAreaView>
+        );
+    }
 }
 
 function DetailItem({ label, value, isCopyable, copyValue, onCopy }: { label: string, value: string, isCopyable?: boolean, copyValue?: string, onCopy?: () => void }) {

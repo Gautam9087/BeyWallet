@@ -137,6 +137,7 @@ export function ReceiveResultStage({
                     size="$5"
                     onPress={onClose}
                     fontWeight="800"
+                    color="white"
                     rounded="$4"
                 >
                     {isSuccess ? 'DONE' : 'CLOSE'}

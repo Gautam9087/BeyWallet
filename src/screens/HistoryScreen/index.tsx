@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme } from 'tamagui';
-import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp } from '@tamagui/lucide-icons';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme, ListItem, YGroup } from 'tamagui';
+import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp, ChevronDown, Check, Calendar, Building2 } from '@tamagui/lucide-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { initService, historyService, eventService } from '../../services/core';
 import { Spinner } from '../../components/UI/Spinner';
@@ -8,6 +8,8 @@ import { RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { formatLocalTime } from '~/utils/time';
+import { useWalletStore } from '../../store/walletStore';
+import AppBottomSheet, { AppBottomSheetRef } from '../../components/UI/AppBottomSheet';
 
 interface HistoryEntry {
     id: string;
@@ -24,16 +26,59 @@ export function HistoryScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
 
+    const [mintFilter, setMintFilter] = useState('all');
+    const [timeFilter, setTimeFilter] = useState('all');
+    const { mints } = useWalletStore();
+
+    const mintSheetRef = useRef<AppBottomSheetRef>(null);
+    const timeSheetRef = useRef<AppBottomSheetRef>(null);
+
     const { data: history = [], isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['history'],
         queryFn: async () => {
             if (!initService.isInitialized()) {
                 return [];
             }
-            return historyService.getHistory(100, 0) as Promise<HistoryEntry[]>;
+            return historyService.getHistory(200, 0) as Promise<HistoryEntry[]>;
         },
         enabled: initService.isInitialized(),
     });
+
+    const filteredHistory = useMemo(() => {
+        let filtered = history;
+
+        // Mint filtering
+        if (mintFilter !== 'all') {
+            filtered = filtered.filter(entry =>
+                entry.mintUrl.replace(/\/$/, '') === mintFilter.replace(/\/$/, '')
+            );
+        }
+
+        // Time filtering
+        if (timeFilter !== 'all') {
+            const now = Date.now();
+            let cutoff = 0;
+            const startOfToday = new Date().setHours(0, 0, 0, 0);
+
+            switch (timeFilter) {
+                case 'today':
+                    cutoff = startOfToday;
+                    break;
+                case '3days':
+                    cutoff = now - (3 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'week':
+                    cutoff = now - (7 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'month':
+                    cutoff = now - (30 * 24 * 60 * 60 * 1000);
+                    break;
+            }
+            filtered = filtered.filter(entry => entry.createdAt >= cutoff);
+        }
+
+        return filtered;
+    }, [history, mintFilter, timeFilter]);
 
     // Real-time updates via coco events
     useEffect(() => {
@@ -82,6 +127,35 @@ export function HistoryScreen() {
         });
     };
 
+    const handleMintSelect = (url: string) => {
+        setMintFilter(url);
+        mintSheetRef.current?.dismiss();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+
+    const handleTimeSelect = (val: string) => {
+        setTimeFilter(val);
+        timeSheetRef.current?.dismiss();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+
+    const getTimeFilterLabel = (val: string) => {
+        switch (val) {
+            case 'today': return 'Today';
+            case '3days': return 'Last 3 Days';
+            case 'week': return 'Last Week';
+            case 'month': return 'Last Month';
+            default: return 'All Time';
+        }
+    };
+
+    const getMintFilterLabel = (val: string) => {
+        if (val === 'all') return 'All Mints';
+        const mint = mints.find(m => m.mintUrl === val);
+        if (mint) return mint.nickname || mint.name || val.replace(/^https?:\/\//, '').substring(0, 15);
+        return val.replace(/^https?:\/\//, '').substring(0, 15);
+    };
+
     if (isLoading && !isRefetching) {
         return (
             <YStack flex={1} items="center" justify="center" bg="$background">
@@ -93,6 +167,39 @@ export function HistoryScreen() {
 
     return (
         <YStack flex={1} bg="$background">
+
+            {/* Filters */}
+            <XStack px="$4" py="$3" gap="$2">
+                <Button
+                    flex={1}
+                    size="$3"
+                    bg="$gray2"
+                    borderWidth={0}
+                    rounded="$4"
+                    onPress={() => mintSheetRef.current?.present()}
+                    icon={<Building2 size={14} color="$gray10" />}
+                    iconAfter={<ChevronDown size={14} color="$gray10" />}
+                >
+                    <Text fontSize="$3" maxW={100} ellipsizeMode="tail" fontWeight="600" numberOfLines={1}>
+                        {getMintFilterLabel(mintFilter)}
+                    </Text>
+                </Button>
+
+                <Button
+                    flex={1}
+                    size="$3"
+                    bg="$gray2"
+                    borderWidth={0}
+                    rounded="$4"
+                    onPress={() => timeSheetRef.current?.present()}
+                    icon={<Calendar size={14} color="$gray10" />}
+                    iconAfter={<ChevronDown size={14} color="$gray10" />}
+                >
+                    <Text fontSize="$3" fontWeight="600" numberOfLines={1}>
+                        {getTimeFilterLabel(timeFilter)}
+                    </Text>
+                </Button>
+            </XStack>
 
             <ScrollView
                 flex={1}
@@ -106,7 +213,7 @@ export function HistoryScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 <YStack px="$4" pb="$10">
-                    {history.length === 0 ? (
+                    {filteredHistory.length === 0 ? (
                         <YStack py="$10" items="center" justify="center" gap="$3">
                             <View p="$4" bg="$gray2" rounded="$10">
                                 <Clock size={32} color="$gray9" />
@@ -120,7 +227,7 @@ export function HistoryScreen() {
                         </YStack>
                     ) : (
                         <YStack gap="$4">
-                            {history.map((entry: HistoryEntry) => {
+                            {filteredHistory.map((entry: HistoryEntry) => {
                                 const style = getTransactionStyle(entry.type);
                                 const status = entry.state || 'completed';
 
@@ -135,7 +242,6 @@ export function HistoryScreen() {
                                                 <View
                                                     p="$2.5"
                                                     rounded="$10"
-
                                                     borderWidth={2}
                                                     borderColor="$borderColor"
                                                 >
@@ -143,7 +249,6 @@ export function HistoryScreen() {
                                                 </View>
                                                 <YStack>
                                                     <XStack gap="$2" items="center">
-
                                                         <Text fontWeight="700" fontSize="$4">
                                                             {getTypeLabel(entry.type)}
                                                         </Text>
@@ -169,7 +274,6 @@ export function HistoryScreen() {
                                                 >
                                                     {style.sign}{entry.amount} {entry.unit?.toUpperCase() || 'SATS'}
                                                 </Text>
-
                                             </YStack>
                                         </XStack>
                                     </YStack>
@@ -179,6 +283,62 @@ export function HistoryScreen() {
                     )}
                 </YStack>
             </ScrollView>
+
+            {/* Mint Selection Sheet */}
+            <AppBottomSheet ref={mintSheetRef}>
+                <YStack p="$4" gap="$4">
+                    <Text fontSize="$6" fontWeight="700">Filter by Mint</Text>
+                    <YGroup bordered separator={<Separator />}>
+                        <YGroup.Item>
+                            <ListItem
+                                title="All Mints"
+                                iconAfter={mintFilter === 'all' ? <Check size={18} color="$green10" /> : null}
+                                onPress={() => handleMintSelect('all')}
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
+                            />
+                        </YGroup.Item>
+                        {mints.map((mint) => (
+                            <YGroup.Item key={mint.mintUrl}>
+                                <ListItem
+                                    title={mint.nickname || mint.name || mint.mintUrl.replace(/^https?:\/\//, '')}
+                                    subTitle={mint.mintUrl}
+                                    iconAfter={mintFilter === mint.mintUrl ? <Check size={18} color="$green10" /> : null}
+                                    onPress={() => handleMintSelect(mint.mintUrl)}
+                                    hoverStyle={{ bg: '$backgroundHover' }}
+                                    pressStyle={{ bg: '$backgroundPress' }}
+                                />
+                            </YGroup.Item>
+                        ))}
+                    </YGroup>
+                </YStack>
+            </AppBottomSheet>
+
+            {/* Time Selection Sheet */}
+            <AppBottomSheet ref={timeSheetRef}>
+                <YStack p="$4" gap="$4">
+                    <Text fontSize="$6" fontWeight="700">Filter by Time</Text>
+                    <YGroup bordered separator={<Separator />}>
+                        {[
+                            { val: 'all', label: 'All Time' },
+                            { val: 'today', label: 'Today' },
+                            { val: '3days', label: 'Last 3 Days' },
+                            { val: 'week', label: 'Last Week' },
+                            { val: 'month', label: 'Last Month' },
+                        ].map((item) => (
+                            <YGroup.Item key={item.val}>
+                                <ListItem
+                                    title={item.label}
+                                    iconAfter={timeFilter === item.val ? <Check size={18} color="$green10" /> : null}
+                                    onPress={() => handleTimeSelect(item.val)}
+                                    hoverStyle={{ bg: '$backgroundHover' }}
+                                    pressStyle={{ bg: '$backgroundPress' }}
+                                />
+                            </YGroup.Item>
+                        ))}
+                    </YGroup>
+                </YStack>
+            </AppBottomSheet>
         </YStack>
     );
 }

@@ -54,7 +54,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
 
     return (
         <YStack flex={1} bg="$background">
-            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 200 }} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <YStack items="center" py="$6" gap="$4">
 
@@ -124,7 +124,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
                 )}
 
                 {/* Details List */}
-                <YStack px="$4" gap="$4">
+                <YStack mx="$4" p="$4" bg="$gray2" rounded="$4" gap="$4">
                     <Text fontSize="$5" fontWeight="600" color="$color">Details</Text>
                     <YStack separator={<Separator borderColor="$gray4" />}>
                         <DetailItem
