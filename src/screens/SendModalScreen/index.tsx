@@ -23,8 +23,10 @@ export function SendModalScreen() {
     const [status, setStatus] = useState<'success' | 'error'>('success')
     const [error, setError] = useState<string | null>(null)
     const [encodedToken, setEncodedToken] = useState<string | null>(null)
+    const [operationId, setOperationId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
     const router = useRouter()
+
     const { balance, activeMintUrl, refreshBalance, mints } = useWalletStore()
     const { secondaryCurrency } = useSettingsStore()
     const confirmSheetRef = React.useRef<AppBottomSheetRef>(null)
@@ -73,8 +75,9 @@ export function SendModalScreen() {
 
         try {
             // Send and get encoded token for sharing
-            const tokenString = await walletService.send(activeMintUrl, amountSats);
-            setEncodedToken(tokenString);
+            const result = await walletService.send(activeMintUrl, amountSats);
+            setEncodedToken(result.token);
+            setOperationId(result.id);
 
             setStatus('success');
             refreshBalance();
@@ -141,6 +144,7 @@ export function SendModalScreen() {
                     amount={amount}
                     token={encodedToken}
                     mintUrl={activeMintUrl || ''}
+                    operationId={operationId || undefined}
                     error={error}
                     onClose={handleClose}
                 />
@@ -149,9 +153,7 @@ export function SendModalScreen() {
             <AppBottomSheet ref={confirmSheetRef}>
                 <YStack p="$4" pt="$2" gap="$5">
                     <YStack items="center" gap="$2" pt="$2">
-
                         <Text fontSize="$6" fontWeight="800">Review Transaction</Text>
-                        {/* <Text color="$gray10" text="center">You are about to create an ecash token from your balance.</Text> */}
                     </YStack>
 
                     <YStack borderWidth={1} borderColor="$color4" rounded="$4" overflow="hidden">
@@ -202,7 +204,6 @@ export function SendModalScreen() {
                             </XStack>
                         </XStack>
                     </YStack>
-
 
                     <YStack gap="$3" pt="$2">
                         <Button

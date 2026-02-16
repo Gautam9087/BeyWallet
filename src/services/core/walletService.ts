@@ -42,14 +42,24 @@ export const walletService = {
      * @param amount - Amount to send in the mint's unit
      * @returns Encoded token string (V4) to share with recipient
      */
-    send: async (mintUrl: string, amount: number): Promise<string> => {
+    send: async (mintUrl: string, amount: number): Promise<{ token: string; id: string }> => {
         console.log(`[WalletService] Sending ${amount} from ${mintUrl}`);
 
-        const token: Token = await mgr().wallet.send(mintUrl, amount);
-        const encoded = encodeToken(token);
+        const res = await mgr().wallet.send(mintUrl, amount);
+        // coco-cashu-core returns a Token object if called directly,
+        // but it also creates a history entry.
+        // We need to find the history entry that was just created.
 
-        console.log('[WalletService] Send complete');
-        return encoded;
+        const encoded = encodeToken(res);
+
+        // Find the history entry by searching for the token in the metadata
+        // or just getting the last entry since this is sequential.
+        const history = await mgr().history.getPaginatedHistory(0, 1);
+        const lastEntry = history[0];
+
+
+        console.log('[WalletService] Send complete, history ID:', lastEntry?.id);
+        return { token: encoded, id: lastEntry?.id || '' };
     },
 
     /**
