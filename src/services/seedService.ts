@@ -2,6 +2,8 @@ import '../polyfills';
 import * as bip39 from 'bip39';
 import * as SecureStore from 'expo-secure-store';
 import { Buffer } from 'buffer';
+import { getPublicKey } from 'nostr-tools/pure';
+import * as nip19 from 'nostr-tools/nip19';
 
 const MNEMONIC_KEY = 'bey_wallet_mnemonic';
 
@@ -44,6 +46,27 @@ export const seedService = {
         console.log('[SeedService] Deriving seed');
         const seed = await bip39.mnemonicToSeed(mnemonic);
         return Buffer.from(seed);
+    },
+
+    /**
+     * Derives a deterministic Nostr private key from the mnemonic.
+     * We use the first 32 bytes of the BIP39 seed for simplicity and consistency.
+     */
+    getNostrKeys: async (mnemonic: string) => {
+        const seed = await bip39.mnemonicToSeed(mnemonic);
+        const privateKeyBytes = new Uint8Array(seed.slice(0, 32));
+        const privateKeyHex = Buffer.from(privateKeyBytes).toString('hex');
+
+        const publicKey = getPublicKey(privateKeyBytes);
+        const npub = nip19.npubEncode(publicKey);
+        const nsec = nip19.nsecEncode(privateKeyBytes);
+
+        return {
+            privkey: privateKeyHex,
+            pubkey: publicKey,
+            npub,
+            nsec
+        };
     },
 
     /**

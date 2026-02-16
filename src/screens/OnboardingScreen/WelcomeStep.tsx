@@ -1,19 +1,25 @@
 import React from 'react'
 import { YStack, Text, Button, H1, Image, View } from 'tamagui'
-import { Wallet } from '@tamagui/lucide-icons'
+import { Wallet, KeyRound } from '@tamagui/lucide-icons'
 import * as Haptics from 'expo-haptics'
 import { useAppTheme } from '../../context/ThemeContext'
 
 interface WelcomeStepProps {
     onCreateWallet: () => void
+    onImportWallet: () => void
 }
 
-export function WelcomeStep({ onCreateWallet }: WelcomeStepProps) {
+export function WelcomeStep({ onCreateWallet, onImportWallet }: WelcomeStepProps) {
     const { resolvedTheme } = useAppTheme()
 
-    const handlePress = () => {
+    const handleCreate = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
         onCreateWallet()
+    }
+
+    const handleImport = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+        onImportWallet()
     }
 
     return (
@@ -53,13 +59,13 @@ export function WelcomeStep({ onCreateWallet }: WelcomeStepProps) {
                 </YStack>
             </YStack>
 
-            {/* Bottom - CTA */}
-            <YStack gap="$4" items="center" pb="$4">
+            {/* Bottom - CTAs */}
+            <YStack gap="$3" items="center" pb="$4">
                 <Button
                     size="$5"
                     theme="accent"
                     width="100%"
-                    onPress={handlePress}
+                    onPress={handleCreate}
                     icon={<Wallet size={24} />}
                     fontSize="$5"
                     fontWeight="700"
@@ -69,6 +75,20 @@ export function WelcomeStep({ onCreateWallet }: WelcomeStepProps) {
                     Create New Wallet
                 </Button>
 
+                <Button
+                    size="$5"
+                    theme="gray"
+                    width="100%"
+                    onPress={handleImport}
+                    icon={<KeyRound size={24} />}
+                    fontSize="$5"
+                    fontWeight="700"
+                    rounded="$4"
+                    pressStyle={{ scale: 0.98, opacity: 0.9 }}
+                >
+                    Import Existing Wallet
+                </Button>
+
                 <Text color="$gray9" fontSize="$2" text="center">
                     Your keys, your coins
                 </Text>
@@ -76,3 +96,4 @@ export function WelcomeStep({ onCreateWallet }: WelcomeStepProps) {
         </YStack>
     )
 }
+

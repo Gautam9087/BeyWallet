@@ -3,7 +3,7 @@ import { useFonts } from 'expo-font'
 import { SplashScreen } from 'expo-router'
 import { Provider } from '../Provider'
 import { RootLayoutNav } from './RootLayoutNav'
-import { cocoService } from '../../services/cocoService'
+import { initService } from '../../services/core'
 import { useWalletStore } from '../../store/walletStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -29,7 +29,7 @@ export function RootLayout() {
     useEffect(() => {
         const checkStatus = async () => {
             await checkOnboardingStatus()
-            const exists = await cocoService.walletExists()
+            const exists = await initService.walletExists()
             setWalletExists(exists)
         }
         checkStatus()
@@ -73,7 +73,7 @@ export function RootLayout() {
     // Get the manager after initialization
     const manager = !isInitializing ? (() => {
         try {
-            return cocoService.getManager();
+            return initService.getManager();
         } catch (e) {
             return null;
         }

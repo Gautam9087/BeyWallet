@@ -10,7 +10,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { UR, UREncoder } from "@gandlaf21/bc-ur";
 import { Buffer } from 'buffer';
 import { formatFullLocalTime, formatRelativeTime } from '~/utils/time';
-import { cocoService } from '~/services/cocoService';
+import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3 } from '~/services/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,7 +44,7 @@ export function TransactionDetailsScreen() {
     const { data: entry, refetch, isRefetching } = useQuery({
         queryKey: ['transaction', id],
         queryFn: async () => {
-            const history = await cocoService.getHistory(100, 0);
+            const history = await historyService.getHistory(100, 0);
             return history.find((e: any) => e.id === id) as HistoryEntry | undefined;
         },
         enabled: !!id,
@@ -61,7 +61,7 @@ export function TransactionDetailsScreen() {
                 setToken(entry.metadata.token);
             } else {
                 try {
-                    const encoded = cocoService.encodeToken(entry.metadata.token);
+                    const encoded = encodeToken(entry.metadata.token);
                     setToken(encoded);
                 } catch (e) {
                     console.warn('[TransactionDetails] Failed to encode metadata token:', e);
@@ -76,7 +76,7 @@ export function TransactionDetailsScreen() {
                 // Ensure we have a valid token object or string
                 const encoded = typeof entry.token === 'string'
                     ? entry.token
-                    : cocoService.encodeToken(entry.token);
+                    : encodeToken(entry.token);
                 setToken(encoded);
             } catch (e) {
                 console.warn('[TransactionDetails] Failed to encode token from entry:', e);
@@ -98,16 +98,16 @@ export function TransactionDetailsScreen() {
         if (!token) return;
 
         try {
-            const cleanToken = cocoService._cleanToken(token);
-            const decoded = cocoService.decodeToken(cleanToken) as any;
+            const clean = cleanToken(token);
+            const decoded = decodeToken(clean) as any;
             const proofs = decoded.token?.[0]?.proofs || [];
 
             // Animate if the token is large (>400 chars) or has more than 2 proofs
-            const shouldAnimate = proofs.length > 2 || cleanToken.length > 400;
+            const shouldAnimate = proofs.length > 2 || clean.length > 400;
 
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
-                const messageBuffer = Buffer.from(cleanToken);
+                const messageBuffer = Buffer.from(clean);
                 const ur = UR.fromBuffer(messageBuffer);
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
@@ -166,7 +166,7 @@ export function TransactionDetailsScreen() {
 
     const handleCopyEmoji = async () => {
         if (token) {
-            const peanut = cocoService.encodeTokenPeanut(cocoService._cleanToken(token));
+            const peanut = encodePeanut(cleanToken(token));
             await Clipboard.setStringAsync(peanut);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             toast.show('Copied as Emoji!', { message: 'Peanut token copied to clipboard' });
@@ -190,14 +190,14 @@ export function TransactionDetailsScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            const decoded = cocoService.decodeToken(token);
+            const decoded = decodeToken(token);
             if (tokenVersion === 'V3') {
-                const encodedV4 = cocoService.encodeTokenV4(decoded);
+                const encodedV4 = encodeTokenV4(decoded);
                 setToken(encodedV4);
                 setTokenVersion('V4');
                 toast.show('Switched to V4', { message: 'Using compact CBOR encoding' });
             } else {
-                const encodedV3 = cocoService.encodeTokenV3(decoded);
+                const encodedV3 = encodeTokenV3(decoded);
                 setToken(encodedV3);
                 setTokenVersion('V3');
                 toast.show('Switched to V3', { message: 'Using standard JSON encoding' });
@@ -214,7 +214,7 @@ export function TransactionDetailsScreen() {
 
         if (token) {
             try {
-                const states = await cocoService.checkProofStates(token);
+                const states = await proofService.checkProofStates(token);
                 const isSpent = states.some((s: any) => s.state === 'SPENT');
                 const isPending = states.some((s: any) => s.state === 'PENDING');
 
@@ -224,7 +224,7 @@ export function TransactionDetailsScreen() {
                 else newState = 'unclaimed';
 
                 if (entry && newState !== entry.state) {
-                    await (cocoService.getRepo().historyRepository as any).updateHistoryEntryState(entry.id, newState);
+                    await (initService.getRepo().historyRepository as any).updateHistoryEntryState(entry.id, newState);
                 }
             } catch (err) {
                 console.warn('[TransactionDetails] Failed to refresh proof states:', err);

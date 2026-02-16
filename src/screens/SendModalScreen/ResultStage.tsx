@@ -15,7 +15,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useQuery } from '@tanstack/react-query';
 import { bitcoinService } from '../../services/bitcoinService';
 import { currencyService, CurrencyCode } from '../../services/currencyService';
-import { cocoService } from '../../services/cocoService';
+import { cleanToken, decodeToken, encodePeanut, encodeTokenV4, encodeTokenV3 } from '../../services/core';
 import { Hexagon } from "@tamagui/lucide-icons";
 
 // Ensure Buffer is available globally
@@ -75,17 +75,17 @@ export function ResultStage({
 
         try {
             // Normalize token (strip prefix for decoding)
-            const cleanToken = cocoService._cleanToken(currentToken);
-            const decoded = cocoService.decodeToken(cleanToken) as any;
+            const clean = cleanToken(currentToken);
+            const decoded = decodeToken(clean) as any;
             const proofs = decoded.token?.[0]?.proofs || [];
 
             // Animate if the token is large (>400 chars) or has more than 2 proofs
             // This ensures readability as static QR modules become too small for some cameras
-            const shouldAnimate = proofs.length > 2 || cleanToken.length > 400;
+            const shouldAnimate = proofs.length > 2 || clean.length > 400;
 
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
-                const messageBuffer = Buffer.from(cleanToken);
+                const messageBuffer = Buffer.from(clean);
                 const ur = UR.fromBuffer(messageBuffer);
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
@@ -146,7 +146,7 @@ export function ResultStage({
 
     const handleCopyEmoji = async () => {
         if (currentToken) {
-            const peanut = cocoService.encodeTokenPeanut(cocoService._cleanToken(currentToken));
+            const peanut = encodePeanut(cleanToken(currentToken));
             await Clipboard.setStringAsync(peanut);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             toast.show('Copied as Emoji!', { message: 'Peanut token copied to clipboard' });
@@ -158,14 +158,14 @@ export function ResultStage({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            const decoded = cocoService.decodeToken(currentToken);
+            const decoded = decodeToken(currentToken);
             if (tokenVersion === 'V3') {
-                const encodedV4 = cocoService.encodeTokenV4(decoded);
+                const encodedV4 = encodeTokenV4(decoded);
                 setCurrentToken(encodedV4);
                 setTokenVersion('V4');
                 toast.show('Switched to V4', { message: 'Using compact CBOR encoding' });
             } else {
-                const encodedV3 = cocoService.encodeTokenV3(decoded);
+                const encodedV3 = encodeTokenV3(decoded);
                 setCurrentToken(encodedV3);
                 setTokenVersion('V3');
                 toast.show('Switched to V3', { message: 'Using standard JSON encoding' });

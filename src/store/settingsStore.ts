@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { cocoService } from '../services/cocoService';
+import { initService } from '../services/core';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -22,18 +22,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
         const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-        // Retry to wait for cocoService to initialize the repo, 
+        // Retry to wait for initService to initialize the repo, 
         // but only if a wallet exists.
         for (let i = 0; i < 15; i++) {
             try {
                 // Check if wallet exists first. If not, we don't need to try getRepo.
-                const exists = await cocoService.walletExists();
+                const exists = await initService.walletExists();
                 if (!exists) {
                     set({ initialized: true });
                     return;
                 }
 
-                const repo = cocoService.getRepo();
+                const repo = initService.getRepo();
                 const storedTheme = await repo.settingsRepository.getSetting('theme');
                 if (storedTheme) {
                     set({ theme: storedTheme as ThemePreference });
@@ -58,9 +58,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     setTheme: async (theme: ThemePreference) => {
         try {
-            const exists = await cocoService.walletExists();
+            const exists = await initService.walletExists();
             if (exists) {
-                const repo = cocoService.getRepo();
+                const repo = initService.getRepo();
                 await repo.settingsRepository.setSetting('theme', theme);
             }
             set({ theme });
@@ -73,9 +73,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     setSecondaryCurrency: async (currency: string) => {
         try {
-            const exists = await cocoService.walletExists();
+            const exists = await initService.walletExists();
             if (exists) {
-                const repo = cocoService.getRepo();
+                const repo = initService.getRepo();
                 await repo.settingsRepository.setSetting('secondaryCurrency', currency);
             }
             set({ secondaryCurrency: currency });

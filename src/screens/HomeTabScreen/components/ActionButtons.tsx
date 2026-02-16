@@ -40,6 +40,7 @@ export default function ActionButtons() {
                     icon={<SwapIcon size={32} />}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.push("/swap");
                     }}
                 />
                 <Button

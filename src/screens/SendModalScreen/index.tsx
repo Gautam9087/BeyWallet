@@ -4,7 +4,7 @@ import { useWalletStore } from '~/store/walletStore'
 import { AmountStage } from './AmountStage'
 import { ResultStage } from './ResultStage'
 import { biometricService } from '~/services/biometricService'
-import { cocoService } from '~/services/cocoService'
+import { walletService } from '~/services/core'
 import * as Haptics from 'expo-haptics'
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet'
 import { Text, YStack, XStack, Button, Separator, View } from 'tamagui'
@@ -72,11 +72,8 @@ export function SendModalScreen() {
         setError(null);
 
         try {
-            // Send directly (no saga-style prepare/execute)
-            const token = await cocoService.send(activeMintUrl, amountSats);
-
-            // Encode the token for sharing
-            const tokenString = cocoService.encodeToken(token);
+            // Send and get encoded token for sharing
+            const tokenString = await walletService.send(activeMintUrl, amountSats);
             setEncodedToken(tokenString);
 
             setStatus('success');

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme } from 'tamagui';
 import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp } from '@tamagui/lucide-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { cocoService } from '../../services/cocoService';
+import { initService, historyService, eventService } from '../../services/core';
 import { Spinner } from '../../components/UI/Spinner';
 import { RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -27,34 +27,30 @@ export function HistoryScreen() {
     const { data: history = [], isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['history'],
         queryFn: async () => {
-            if (!cocoService.isInitialized()) {
+            if (!initService.isInitialized()) {
                 return [];
             }
-            return cocoService.getHistory(100, 0) as Promise<HistoryEntry[]>;
+            return historyService.getHistory(100, 0) as Promise<HistoryEntry[]>;
         },
-        enabled: cocoService.isInitialized(),
+        enabled: initService.isInitialized(),
     });
 
     // Real-time updates via coco events
     useEffect(() => {
-        if (!cocoService.isInitialized()) return;
+        if (!initService.isInitialized()) return;
 
         const handleUpdate = () => {
             queryClient.invalidateQueries({ queryKey: ['history'] });
         };
 
-        cocoService.on('history:updated', handleUpdate);
-        cocoService.on('receive:created', handleUpdate);
-        cocoService.on('send:created', handleUpdate);
+        const unsubs = [
+            eventService.on('history:updated', handleUpdate),
+            eventService.on('receive:created', handleUpdate),
+            eventService.on('send:created', handleUpdate),
+        ];
 
         return () => {
-            try {
-                cocoService.off('history:updated', handleUpdate);
-                cocoService.off('receive:created', handleUpdate);
-                cocoService.off('send:created', handleUpdate);
-            } catch (e) {
-                // Ignore cleanup errors if manager is gone
-            }
+            unsubs.forEach(u => u());
         };
     }, [queryClient]);
 

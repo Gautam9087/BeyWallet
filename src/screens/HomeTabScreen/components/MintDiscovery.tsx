@@ -5,7 +5,7 @@ import { Search, Star, MessageSquare, Plus, RefreshCw, Check, Sprout, Info, Exte
 import { useQuery } from '@tanstack/react-query';
 import { mintRecommendationService } from '../../../services/mintRecommendationService';
 import { useWalletStore } from '../../../store/walletStore';
-import { cocoService } from '../../../services/cocoService';
+import { initService } from '../../../services/core';
 import * as Haptics from 'expo-haptics';
 import { useToastController } from '@tamagui/toast';
 import { useRouter } from 'expo-router';
@@ -23,7 +23,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
     const { data: recommendations = [], isLoading, error, refetch, isRefetching } = useQuery({
         queryKey: ['mint-recommendations'],
         queryFn: async () => {
-            const repo = cocoService.getRepo();
+            const repo = initService.getRepo();
 
             setLoadingMessage('Fetching from local database...');
             const cached = await repo.mintRecommendationRepository.getAll();
@@ -50,7 +50,7 @@ export function MintDiscovery({ refreshTrigger, onRefreshStarted, onRefreshFinis
         try {
             const discovered = await mintRecommendationService.discoverMints();
             if (discovered.length > 0) {
-                const repo = cocoService.getRepo();
+                const repo = initService.getRepo();
                 await repo.mintRecommendationRepository.deleteAll();
                 await repo.mintRecommendationRepository.saveAll(discovered);
                 refetch();

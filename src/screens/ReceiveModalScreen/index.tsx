@@ -3,9 +3,8 @@ import { YStack, View } from 'tamagui'
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 import { InputStage } from './InputStage'
 import { ConfirmStage } from './ConfirmStage'
-import { ResultStage } from '../SendModalScreen/ResultStage'
-import { cocoService } from '../../services/cocoService'
-import { customReceiveService } from '../../services/fixes/CustomReceiveService';
+import { ReceiveResultStage } from './ReceiveResultStage'
+import { walletService, decodeToken, mintManager } from '../../services/core';
 import { useWalletStore } from '../../store/walletStore'
 
 type ReceiveStep = 'input' | 'confirm' | 'result';
@@ -47,7 +46,7 @@ export function ReceiveModalScreen() {
         setError(null);
 
         try {
-            const decoded = cocoService.decodeToken(targetToken.trim());
+            const decoded = decodeToken(targetToken.trim());
             const mintUrl = decoded.mint;
 
             // Calculate total amount from proofs
@@ -94,19 +93,33 @@ export function ReceiveModalScreen() {
         setError(null);
 
         try {
-            // Ensure mint is trusted before receiving
-            const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
-            const isTrusted = mints.some(m => normalizeUrl(m.mintUrl) === normalizeUrl(tokenInfo.mint) && m.trusted);
+            const mintUrl = tokenInfo.mint;
+            console.log('[ReceiveModal] Starting receive for mint:', mintUrl);
 
-            if (!isTrusted) {
-                console.log('[ReceiveModal] Trusting mint before receive:', tokenInfo.mint);
-                await addMint(tokenInfo.mint, { trusted: true });
+            // 1. Ensure mint is trusted. Using store.addMint ensures UI refreshes.
+            try {
+                const isTrusted = await mintManager.isMintTrusted(mintUrl);
+                if (!isTrusted) {
+                    console.log('[ReceiveModal] Adding and trusting mint via store:', mintUrl);
+                    await addMint(mintUrl, { trusted: true });
+                }
+            } catch (e: any) {
+                console.warn('[ReceiveModal] Mint add/trust error:', e?.message);
             }
 
-            // Use custom service to fix unit mismatch issues
-            await customReceiveService.receive(token.trim());
+            // 2. Repair keysets (fix empty unit values)
+            try {
+                await mintManager.repairMintKeysets(mintUrl, 'sat');
+            } catch (e) {
+                console.warn('[ReceiveModal] Keyset repair warning:', e);
+            }
+
+            // 3. Receive the token via core wallet service
+            console.log('[ReceiveModal] Calling walletService.receive...');
+            await walletService.receive(token.trim());
+
             setStatus('success');
-            refreshBalance();
+            await refreshBalance();
             setStep('result');
         } catch (err: any) {
             console.error('[ReceiveModal] Failed to receive token:', err);
@@ -116,7 +129,7 @@ export function ReceiveModalScreen() {
         } finally {
             setIsReceiving(false);
         }
-    }, [token, tokenInfo, mints, addMint, refreshBalance]);
+    }, [token, tokenInfo, refreshBalance]);
 
     const handleNext = () => {
         if (step === 'input') handleDecodeToken();
@@ -174,9 +187,11 @@ export function ReceiveModalScreen() {
             )}
 
             {step === 'result' && (
-                <ResultStage
+                <ReceiveResultStage
                     status={status}
                     amount={tokenInfo?.amount?.toString() || "0"}
+                    mintUrl={tokenInfo?.mint}
+                    token={token}
                     error={error}
                     onClose={handleClose}
                     title={status === 'success' ? 'Ecash Received' : 'Receive Failed'}

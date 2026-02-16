@@ -7,7 +7,7 @@ import { useWalletStore } from "../store/walletStore";
 import AppBottomSheet, { AppBottomSheetRef } from "./UI/AppBottomSheet";
 import AddMintModal, { AddMintModalRef } from "./AddMintModal";
 import EditNicknameModal, { EditNicknameModalRef } from "./EditNicknameModal";
-import { cocoService } from "../services/cocoService";
+import { initService } from "../services/core";
 
 export default function HomeHeaderMintSelector() {
     const { activeMintUrl, balance, mints, setActiveMint, refreshMintList } = useWalletStore();
@@ -20,7 +20,7 @@ export default function HomeHeaderMintSelector() {
 
     // Refresh mint list when sheet opens
     useEffect(() => {
-        if (cocoService.isInitialized()) {
+        if (initService.isInitialized()) {
             refreshMintList();
         }
     }, []);
@@ -70,6 +70,7 @@ export default function HomeHeaderMintSelector() {
                 borderWidth={1}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+                    refreshMintList();
                     sheetRef.current?.present();
                 }}
                 maxW={170}

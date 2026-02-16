@@ -6,7 +6,7 @@ import { ConfirmStage } from "./ConfirmStage";
 import { PaymentStage } from "./PaymentStage";
 import { ResultStage } from "./ResultStage";
 import { useWalletStore } from "../../store/walletStore";
-import { cocoService } from "../../services/cocoService";
+import { eventService, quotesService } from "../../services/core";
 
 type MintStep = 'amount' | 'confirm' | 'payment' | 'result';
 type MintResultStatus = 'success' | 'error' | 'cancelled';
@@ -41,9 +41,9 @@ export default function MintScreen() {
             }
         };
 
-        cocoService.on('mint-quote:redeemed', handleRedeemed);
+        const unsub = eventService.on('mint-quote:redeemed', handleRedeemed);
         return () => {
-            cocoService.off('mint-quote:redeemed', handleRedeemed);
+            unsub();
         };
     }, [quoteData, refreshBalance]);
 
@@ -62,7 +62,7 @@ export default function MintScreen() {
                 throw new Error('Invalid amount');
             }
 
-            const quote = await cocoService.createMintQuote(activeMintUrl, amountSats);
+            const quote = await quotesService.createMintQuote(activeMintUrl, amountSats);
 
             setQuoteData({
                 quoteId: quote.quote,
@@ -102,7 +102,7 @@ export default function MintScreen() {
         // But don't block on errors - watchers will handle it if payment went through
         if (quoteData && activeMintUrl) {
             try {
-                await cocoService.redeemMintQuote(activeMintUrl, quoteData.quoteId);
+                await quotesService.redeemMintQuote(activeMintUrl, quoteData.quoteId);
                 setStatus('success');
                 refreshBalance();
                 setStep('result');
