@@ -24,6 +24,7 @@ export function useCocoEvents() {
         console.log('[useCocoEvents] Balance update triggered');
         refreshBalance();
         queryClient.invalidateQueries({ queryKey: ['history'] });
+        queryClient.invalidateQueries({ queryKey: ['history-volume'] });
     }, [refreshBalance, queryClient]);
 
     const handleMintQuoteRedeemed = useCallback((payload: any) => {
@@ -59,6 +60,7 @@ export function useCocoEvents() {
     const handleHistoryUpdated = useCallback((payload: any) => {
         console.log('[useCocoEvents] History updated');
         queryClient.invalidateQueries({ queryKey: ['history'] });
+        queryClient.invalidateQueries({ queryKey: ['history-volume'] });
     }, [queryClient]);
 
     useEffect(() => {

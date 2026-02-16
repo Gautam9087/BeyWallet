@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { YStack, XStack, Text, Button, ScrollView, View, Separator, Circle, Popover, ListItem, Adapt, Sheet, Square } from 'tamagui';
 import { ChevronLeft, RefreshCw, Copy, Share2, ArrowUpRight, ArrowDownLeft, Calendar, Coins, Zap, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2, Check, RotateCcw, MoreHorizontal, Link, Contact2, Scan, Trash2, Gauge, ZoomIn, Hexagon, History, X, Ban, CheckCircle } from '@tamagui/lucide-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
@@ -299,19 +299,31 @@ export function TransactionDetailsScreen() {
         const amountSign = isOutgoing ? '-' : '+';
 
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <>
+                <Stack.Screen
+                    options={{
+                        headerRight: () => (
+                            <Button
+                                circular
+                                size="$3"
+                                icon={isRefetching ? <Spinner /> : <RefreshCw size={22} color={isRefetching ? "$color" : "$color"} />}
+                                chromeless
+                                onPress={handleRefresh}
+                                disabled={isRefetching}
+                            />
+                        ),
+                    }}
+                />
                 <ScrollView p="$4" pb="$2" bg="$background" showsVerticalScrollIndicator={false}>
                     {/* Amount Display */}
                     <YStack gap="$1" mb="$6" >
-                        <XStack items="center">
-                            <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
-                                {isOutgoing ? <ArrowUpRight size={20} color="white" /> : <ArrowDownLeft size={20} color="white" />}
-                            </Circle>
-                            <Text fontSize="$9" fontWeight="800" color={amountColor}>
-                                {amountSign}₿{entry.amount?.toLocaleString() ?? '0'}
-                            </Text>
-                        </XStack>
-                        <Text fontSize="$5" color="$gray10" ml={52}>
+                        <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
+                            {isOutgoing ? <ArrowUpRight size={20} color="white" /> : <ArrowDownLeft size={20} color="white" />}
+                        </Circle>
+                        <Text fontSize="$9" fontWeight="800" color={amountColor}>
+                            {amountSign}₿{entry.amount?.toLocaleString() ?? '0'}
+                        </Text>
+                        <Text fontSize="$5" color="$gray10" >
                             Ecash {entry.unit?.toUpperCase() || 'SATS'}
                         </Text>
                     </YStack>
@@ -407,7 +419,7 @@ export function TransactionDetailsScreen() {
                         </YStack>
                     )}
                 </ScrollView>
-            </SafeAreaView>
+            </>
         );
     } catch (e: any) {
         console.error('[TransactionDetails] Error during render:', e);

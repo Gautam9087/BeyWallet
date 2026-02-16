@@ -83,17 +83,7 @@ export default function ModalLayout() {
             <Stack.Screen
                 name="transaction-details"
                 options={{
-
                     title: 'Transaction Details',
-                    headerRight: () => (
-                        <Button
-                            circular
-                            size="$3"
-                            icon={<RefreshCw size={24} color="$gray10" />} // Placeholder icon, or Refreh if needed
-                            chromeless
-
-                        />
-                    ),
                 }}
             />
         </Stack>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { YStack, XStack, Text, Button, ScrollView, Separator, View, Theme, ListItem, YGroup } from 'tamagui';
-import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp, ChevronDown, Check, Calendar, Building2 } from '@tamagui/lucide-icons';
+import { RefreshCw, ArrowUpRight, ArrowDownLeft, Clock, Info, ShieldCheck, ArrowUp, ChevronDown, Check, Calendar, Building2, BanknoteArrowUp, BanknoteArrowDown, Landmark } from '@tamagui/lucide-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { initService, historyService, eventService } from '../../services/core';
 import { Spinner } from '../../components/UI/Spinner';
@@ -102,7 +102,7 @@ export function HistoryScreen() {
     const getTransactionStyle = (type: string) => {
         const isOutgoing = type === 'send' || type === 'melt';
         return {
-            icon: isOutgoing ? ArrowUp : ArrowDownLeft,
+            icon: isOutgoing ? BanknoteArrowUp : BanknoteArrowDown, "Minted": Landmark,
             iconColor: isOutgoing ? '$red10' : '$green11',
             bgColor: isOutgoing ? '$red2' : '$green2',
             sign: isOutgoing ? '-' : '+',
@@ -245,7 +245,7 @@ export function HistoryScreen() {
                                                     borderWidth={2}
                                                     borderColor="$borderColor"
                                                 >
-                                                    <style.icon size={24} strokeWidth={3} color={style.iconColor as any} />
+                                                    <style.icon size={24} strokeWidth={2} color={style.iconColor as any} />
                                                 </View>
                                                 <YStack>
                                                     <XStack gap="$2" items="center">

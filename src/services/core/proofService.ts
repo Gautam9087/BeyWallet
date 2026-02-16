@@ -21,18 +21,45 @@ export const proofService = {
      */
     checkProofStates: async (tokenString: string) => {
         const cleaned = cleanToken(tokenString);
-        const decoded = decodeToken(cleaned);
+        let decoded: any;
+        try {
+            decoded = decodeToken(cleaned);
+        } catch (e) {
+            console.warn('[ProofService] Failed to decode token for check:', e);
+            return [];
+        }
 
         if (!decoded || !decoded.proofs || decoded.proofs.length === 0) {
-            throw new Error('Could not decode token for status check');
+            return [];
         }
 
         try {
-            const mint = new CashuMint(decoded.mint);
-            const states = await mint.check({ Ys: decoded.proofs.map((p: any) => p.Y || p.secret) });
-            return states;
-        } catch (err) {
-            console.warn(`[ProofService] Failed to check proof states at ${decoded.mint}:`, err);
+            console.log(`[ProofService] Checking state for ${decoded.mint} with ${decoded.proofs.length} proofs`);
+
+            // Get a wallet instance from the manager to use its checkProofsStates method
+            const manager = initService.getManager();
+            if (!manager) {
+                console.warn('[ProofService] Manager not initialized, cannot check state');
+                return [];
+            }
+
+            const wallet = await manager.wallet.getWallet(decoded.mint);
+
+            // The library method handles the Y derivation internally from the secrets
+            // It only needs the secret field, which we have in decoded.proofs
+            console.log('[ProofService] Checking state via library...');
+            const states = await wallet.checkProofsStates(decoded.proofs);
+
+            console.log('[ProofService] States received:', states.length);
+
+            // Map the states back to a consistent format if needed, 
+            // though usually they match the NUT-07 response
+            return states.map((s, i) => ({
+                ...s,
+                secret: decoded.proofs[i].secret // Attach secret for UI convenience
+            }));
+        } catch (err: any) {
+            console.error(`[ProofService] Failed to check proof states at ${decoded.mint}:`, err);
             return [];
         }
     },

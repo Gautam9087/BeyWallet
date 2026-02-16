@@ -15,6 +15,7 @@ import * as SQLite from 'expo-sqlite';
 import { seedService } from '../seedService';
 import { AppState, type AppStateStatus } from 'react-native';
 import { nostrService } from '../nostrService';
+import { HistoryWatcherPlugin } from './plugins/HistoryWatcherPlugin';
 
 // ─── Singleton State ──────────────────────────────────────────
 
@@ -89,6 +90,7 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
                 initialEnqueueDelayMs: 500,
             },
         },
+        plugins: [HistoryWatcherPlugin],
     });
 
     repo = repositories;

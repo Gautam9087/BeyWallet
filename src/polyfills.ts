@@ -1,6 +1,12 @@
 import * as Crypto from 'expo-crypto';
-import 'text-encoding';
+import { TextEncoder, TextDecoder } from 'text-encoding';
 import { Buffer } from 'buffer';
+
+// @ts-ignore
+global.TextEncoder = TextEncoder;
+// @ts-ignore
+global.TextDecoder = TextDecoder;
+
 
 // Filter out verbose coco-cashu library logs
 const originalConsoleLog = console.log;
