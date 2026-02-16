@@ -1,15 +1,8 @@
-/**
- * Proof service — proof state checks and direct proof queries.
- *
- * For most operations (send, receive, mint, melt), proof management
- * is handled internally by the Manager. This service provides
- * additional utilities for proof status checking and direct queries.
- */
-
-import { CashuMint } from '@cashu/cashu-ts';
-import { initService } from './initService';
+import { Wallet } from '@cashu/cashu-ts';
 import { cleanToken, decodeToken } from './tokenUtils';
 import type { CoreProof } from 'coco-cashu-core';
+
+
 
 export const proofService = {
     /**
@@ -36,14 +29,10 @@ export const proofService = {
         try {
             console.log(`[ProofService] Checking state for ${decoded.mint} with ${decoded.proofs.length} proofs`);
 
-            // Get a wallet instance from the manager to use its checkProofsStates method
-            const manager = initService.getManager();
-            if (!manager) {
-                console.warn('[ProofService] Manager not initialized, cannot check state');
-                return [];
-            }
+            // We instantiate a new Wallet instance for the state check.
+            // This is safer than relying on private services in the manager.
+            const wallet = new Wallet(decoded.mint);
 
-            const wallet = await manager.wallet.getWallet(decoded.mint);
 
             // The library method handles the Y derivation internally from the secrets
             // It only needs the secret field, which we have in decoded.proofs
