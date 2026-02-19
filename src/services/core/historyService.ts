@@ -18,4 +18,11 @@ export const historyService = {
     getHistory: async (limit = 25, offset = 0): Promise<HistoryEntry[]> => {
         return initService.getManager().history.getPaginatedHistory(offset, limit);
     },
+    /**
+     * Delete multiple history entries by their IDs.
+     * @param ids - Array of history entry IDs
+     */
+    deleteHistoryEntries: async (ids: string[]): Promise<void> => {
+        return initService.getRepo().historyRepository.deleteHistoryEntriesByIds(ids);
+    },
 };

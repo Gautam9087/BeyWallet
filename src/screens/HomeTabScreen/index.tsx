@@ -1,5 +1,6 @@
 import { RefreshControl } from 'react-native'
 import { Anchor, H2, Paragraph, XStack, YStack, ScrollView, Button } from 'tamagui'
+import * as Haptics from 'expo-haptics'
 import { ToastControl } from 'components/CurrentToast'
 import { ThemeSelector } from './components/ThemeSelector'
 import { LocalizationTest } from './components/LocalizationTest'
@@ -23,6 +24,7 @@ export function HomeTabScreen() {
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true)
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
         try {
             await refreshBalance()
         } finally {
@@ -72,37 +74,6 @@ export function HomeTabScreen() {
                 <ManageBalances />
 
                 {/* Test Status Screens */}
-                <YStack width="100%" gap="$2" mt="$4">
-                    <Paragraph fontSize="$3" color="$gray10">
-                        Status Screen Tests
-                    </Paragraph>
-                    <XStack gap="$2" width="100%">
-                        <Button
-                            flex={1}
-                            size="$3"
-                            theme="green"
-                            onPress={() => setShowStatus('success')}
-                        >
-                            Success
-                        </Button>
-                        <Button
-                            flex={1}
-                            size="$3"
-                            theme="red"
-                            onPress={() => setShowStatus('error')}
-                        >
-                            Error
-                        </Button>
-                        <Button
-                            flex={1}
-                            size="$3"
-                            theme="orange"
-                            onPress={() => setShowStatus('pending')}
-                        >
-                            Pending
-                        </Button>
-                    </XStack>
-                </YStack>
 
                 {/* <MintDiscovery /> */}
                 {/* 

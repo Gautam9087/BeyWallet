@@ -1,12 +1,17 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { View, Text, YStack, XStack, H4, H6, Image, styled, H5 } from 'tamagui'
 import { ChevronRight } from '@tamagui/lucide-icons'
 import { RollingNumber } from '~/components/UI/RollingNumber'
+import { useRouter } from 'expo-router'
+import { useWalletStore } from '~/store/walletStore'
+import { useQuery } from '@tanstack/react-query'
+import { historyService } from '~/services/core'
+import * as Haptics from 'expo-haptics'
 
 interface BalanceItem {
     id: string
     title: string
-    value?: string
+    value: number | string
     imageSource: any
     onPress?: () => void
     isComingSoon?: boolean
@@ -21,16 +26,22 @@ const RowContainer = styled(XStack, {
 
 interface BalanceRowProps {
     item: BalanceItem
+    trigger?: any
 }
 
-const BalanceRow = ({ item }: BalanceRowProps) => {
+const BalanceRow = ({ item, trigger }: BalanceRowProps) => {
     const { title, value, imageSource, onPress, isComingSoon } = item
 
     return (
         <RowContainer
-            onPress={onPress}
+            onPress={() => {
+                if (onPress) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+                    onPress()
+                }
+            }}
             opacity={isComingSoon ? 0.5 : 1}
-            disabled={isComingSoon || !onPress}
+            disabled={isComingSoon}
         >
             <XStack items="center" gap="$2">
                 <Image
@@ -48,18 +59,16 @@ const BalanceRow = ({ item }: BalanceRowProps) => {
 
             <YStack>
                 <RollingNumber
-
                     letterSpacing={-1}
-                    fontSize={16}
+                    fontSize={20}
                     fontWeight="900"
-                    color="$accent8"
+                    color="$accent4"
                     decimalOpacity={0.4}
                     showDecimals={false}
+                    prefix={isComingSoon ? '' : '₿'}
+                    trigger={trigger}
                 >
-
-
                     {isComingSoon ? 'Coming soon...' : value}
-
                 </RollingNumber>
             </YStack>
         </RowContainer>
@@ -67,24 +76,45 @@ const BalanceRow = ({ item }: BalanceRowProps) => {
 }
 
 const ManageBalances = () => {
+    const router = useRouter()
+    const { balances, refreshCounter } = useWalletStore()
+
+
+    const { data: history = [] } = useQuery({
+        queryKey: ['history', 'pending'],
+        queryFn: async () => {
+            const entries = await historyService.getHistory(500, 0)
+            return entries.filter((e: any) => e.state === 'pending' || e.state === 'unclaimed')
+        }
+    })
+
+    const totalSpendable = useMemo(() => {
+        return Object.values(balances).reduce((sum, b) => sum + b, 0)
+    }, [balances])
+
+    const totalPending = useMemo(() => {
+        return history.reduce((sum, e) => sum + (e.amount || 0), 0)
+    }, [history])
+
     const balanceData: BalanceItem[] = [
         {
             id: 'ecash',
             title: 'E-Cash',
-            value: '₿78500',
+            value: totalPending,
             imageSource: require("../../../assets/images/Cashu.jpg"),
-            onPress: () => console.log('E-Cash pressed'),
+            onPress: () => router.push('/(modals)/ecash'),
         },
         {
             id: 'mints',
             title: 'Mints',
-            value: '₿1364',
+            value: totalSpendable,
             imageSource: require("../../../assets/images/Mint.png"),
-            onPress: () => console.log('Mints pressed'),
+            onPress: () => router.push('/(modals)/mints'),
         },
         {
             id: 'bitcoin',
             title: 'Bitcoin LN',
+            value: 0,
             imageSource: require("../../../assets/images/Bitcoin.png"),
             isComingSoon: true,
         },
@@ -97,9 +127,10 @@ const ManageBalances = () => {
             </XStack>
             <YStack gap="$3">
                 {balanceData.map((item) => (
-                    <BalanceRow key={item.id} item={item} />
+                    <BalanceRow key={item.id} item={item} trigger={refreshCounter} />
                 ))}
             </YStack>
+
         </YStack>
     )
 }

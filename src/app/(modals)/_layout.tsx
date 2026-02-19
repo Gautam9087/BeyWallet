@@ -86,6 +86,19 @@ export default function ModalLayout() {
                     title: 'Transaction Details',
                 }}
             />
+            <Stack.Screen
+                name="ecash"
+                options={{
+                    title: 'E-Cash',
+                }}
+            />
+            <Stack.Screen
+                name="mints"
+                options={{
+                    title: 'Mints',
+                }}
+            />
         </Stack>
     )
 }
+

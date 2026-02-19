@@ -6,6 +6,7 @@ import { useSettingsStore } from "../../../store/settingsStore";
 import { currencyService, CurrencyCode } from "../../../services/currencyService";
 import { useQuery } from "@tanstack/react-query";
 import { bitcoinService } from "../../../services/bitcoinService";
+import * as Haptics from 'expo-haptics';
 
 export default function Balance() {
     const { balance, activeMintUrl, refreshCounter, mints, balances, isRestoring, nostrBalance, syncError } = useWalletStore();
@@ -55,7 +56,10 @@ export default function Balance() {
                         bg="$gray5"
                         fontSize="$2"
                         fontWeight="600"
-                        onPress={() => setShowAllMints(prev => !prev)}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setShowAllMints(prev => !prev);
+                        }}
                         pressStyle={{ opacity: 0.7 }}
                         suppressHighlighting
                     >

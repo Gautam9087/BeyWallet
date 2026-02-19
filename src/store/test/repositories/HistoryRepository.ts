@@ -305,6 +305,12 @@ export class ExpoHistoryRepository {
         ]);
     }
 
+    async deleteHistoryEntriesByIds(ids: string[]): Promise<void> {
+        if (ids.length === 0) return;
+        const placeholders = ids.map(() => '?').join(',');
+        await this.db.run(`DELETE FROM coco_cashu_history WHERE id IN (${placeholders})`, ids);
+    }
+
     private async getById(id: number): Promise<HistoryEntry> {
         const row = await this.db.get<Row>(
             `SELECT id, mintUrl, type, unit, amount, createdAt, quoteId, state, paymentRequest, tokenJson, metadata, operationId

@@ -1,5 +1,5 @@
 import { YStack } from "tamagui";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { useState, useEffect, useCallback } from "react";
 import { AmountStage } from "./AmountStage";
 import { ConfirmStage } from "./ConfirmStage";
@@ -125,6 +125,7 @@ export default function MintScreen() {
 
     return (
         <YStack flex={1} bg="$background" p="$4">
+            <Stack.Screen options={{ headerTitle: 'Mint Cash' }} />
             {step === 'amount' && (
                 <AmountStage
                     amount={amount}

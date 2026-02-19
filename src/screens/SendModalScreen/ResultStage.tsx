@@ -249,22 +249,11 @@ export function ResultStage({
     return (
         <YStack flex={1} bg="$background">
             <Stack.Screen options={{ title: title }} />
-            <ScrollView pb="$10" contentContainerStyle={{ flex: 1 }}>
-
-
-
-                {/* Layout Order: 1. Amount Display */}
-                <YStack gap="$1" mb="$6" mt="$4" items="center">
-                    <Circle size={40} bg="$red10" items="center" justify="center">
-                        <ArrowUpRight size={20} color="white" />
-                    </Circle>
-                    <Text fontSize="$9" fontWeight="800" color="$red10">
-                        -₿{Number(amount || 0).toLocaleString()}
-                    </Text>
-                    <Text fontSize="$5" color="$gray10">
-                        Ecash SATS
-                    </Text>
-                </YStack>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1 } as any}
+                px="$0"
+            >
 
                 {/* 2. QR Code (matching TransactionDetails) */}
                 <YStack items="center" gap="$4" mb="$6">
@@ -302,6 +291,21 @@ export function ResultStage({
                     </XStack>
                 </YStack>
 
+
+                {/* Layout Order: 1. Amount Display */}
+                <YStack gap="$1" mb="$6" mt="$6" items="center">
+                    <Circle size={40} bg="$red10" items="center" justify="center">
+                        <ArrowUpRight size={20} color="white" />
+                    </Circle>
+                    <Text fontSize="$9" fontWeight="800" color="$red10">
+                        -₿{Number(amount || 0).toLocaleString()}
+                    </Text>
+                    <Text fontSize="$5" color="$gray10">
+                        Ecash SATS
+                    </Text>
+                </YStack>
+
+
                 {/* 3. Details Table (matching TransactionDetails) */}
                 <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
                     <DetailItem label="Fee" value={`₿${fee} sats`} />
@@ -311,42 +315,45 @@ export function ResultStage({
                 </YStack>
 
                 {/* 4. Action Buttons */}
-                <XStack mt="auto" pb="$8" gap="$2" width="100%">
-                    {onReclaim && (
+                <YStack mt="auto" pb="$8">
+                    <XStack gap="$2" width="100%">
+                        {onReclaim && (
+                            <Button
+                                flex={1}
+                                onPress={handleReclaim}
+                                theme="gray"
+                                size="$5"
+                                fontWeight="800"
+                                icon={isReclaiming ? <Spinner size="small" /> : <RotateCcw size={18} />}
+                                disabled={isReclaiming}
+                            >
+                                {isReclaiming ? '' : 'Reclaim'}
+                            </Button>
+                        )}
                         <Button
                             flex={1}
-                            onPress={handleReclaim}
+                            onPress={handleShare}
                             theme="gray"
                             size="$5"
                             fontWeight="800"
-                            icon={isReclaiming ? <Spinner size="small" /> : <RotateCcw size={18} />}
-                            disabled={isReclaiming}
+                            icon={<Share2 size={18} />}
+                        />
+                        <Button
+                            flex={2}
+                            onPress={handleCopy}
+                            size="$5"
+                            theme="accent"
+                            fontWeight="800"
+                            icon={copied ? <Check size={18} /> : <Copy size={18} />}
                         >
-                            {isReclaiming ? '' : 'Reclaim'}
+                            {copied ? 'Copied!' : 'Copy Token'}
                         </Button>
-                    )}
-                    <Button
-                        flex={1}
-                        onPress={handleShare}
-                        theme="gray"
-                        size="$5"
-                        fontWeight="800"
-                        icon={<Share2 size={18} />}
-                    />
-                    <Button
-                        flex={2}
-                        onPress={handleCopy}
-                        size="$5"
-                        theme="accent"
-                        fontWeight="800"
-                        icon={copied ? <Check size={18} /> : <Copy size={18} />}
-                    >
-                        {copied ? 'Copied!' : 'Copy Token'}
-                    </Button>
-                </XStack>
+                    </XStack>
+                </YStack>
             </ScrollView>
         </YStack>
     );
+
 }
 
 function DetailItem({ label, value, isCopyable, copyValue, onCopy }: { label: string, value: string, isCopyable?: boolean, copyValue?: string, onCopy?: () => void }) {
