@@ -239,9 +239,9 @@ export default function MintsModal() {
                             </View>
                         </XStack>
 
-                        <YStack gap="$4" p='$3' rounded="$5" bg="$gray2">
+                        <YStack rounded="$5" bg="$gray2" overflow="hidden">
                             {mints.length === 0 ? (
-                                <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5}>
+                                <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5} p="$3">
                                     <View p="$4" bg="$gray2" rounded="$10">
                                         <Globe size={32} color="$gray9" />
                                     </View>
@@ -253,67 +253,65 @@ export default function MintsModal() {
                                     </YStack>
                                 </YStack>
                             ) : (
-                                mints.map((mint) => {
+                                mints.map((mint, index) => {
                                     const balance = balances[mint.mintUrl] || 0;
                                     const isActive = mint.mintUrl === activeMintUrl;
 
                                     return (
-                                        <YStack
-
-                                            key={mint.mintUrl}
-                                            onPress={() => handleMintPress(mint)}
-                                            pressStyle={{ opacity: 0.7, scale: 0.98 }}
-                                        >
-                                            <XStack justify="space-between" items="center">
-                                                <XStack gap="$3" items="center">
-                                                    {selectionMode && (
-                                                        <View
-                                                            width={22} height={22} rounded="$10"
-                                                            borderWidth={2}
-                                                            borderColor={selectedUrls.has(mint.mintUrl) ? "$accent10" : "$gray8"}
-                                                            bg={selectedUrls.has(mint.mintUrl) ? "$accent10" : "transparent"}
-                                                            items="center" justify="center"
-                                                        >
-                                                            {selectedUrls.has(mint.mintUrl) && <Check size={14} color="white" strokeWidth={3} />}
-                                                        </View>
-                                                    )}
-                                                    <Avatar rounded="$4" size="$3" borderWidth={1} borderColor="$borderColor">
-                                                        <Avatar.Image src={mint.icon} />
-                                                        <Avatar.Fallback backgroundColor="$gray2" alignItems="center" justifyContent="center">
-                                                            <Building2 size={24} color="$gray10" />
-                                                        </Avatar.Fallback>
-                                                    </Avatar>
-                                                    <YStack>
-                                                        <XStack gap="$2" items="center" >
-                                                            <Text fontWeight="800" fontSize="$4" numberOfLines={1} style={{ maxWidth: 150 }}>
+                                        <React.Fragment key={mint.mintUrl}>
+                                            <YStack
+                                                onPress={() => handleMintPress(mint)}
+                                                pressStyle={{ opacity: 0.7, scale: 0.98 }}
+                                                py="$2"
+                                                px="$2"
+                                            >
+                                                <XStack justify="space-between" items="center">
+                                                    <XStack gap="$3" items="center">
+                                                        {selectionMode && (
+                                                            <View
+                                                                width={22} height={22} rounded="$10"
+                                                                borderWidth={2}
+                                                                borderColor={selectedUrls.has(mint.mintUrl) ? "$accent10" : "$gray8"}
+                                                                bg={selectedUrls.has(mint.mintUrl) ? "$accent10" : "transparent"}
+                                                                items="center" justify="center"
+                                                            >
+                                                                {selectedUrls.has(mint.mintUrl) && <Check size={14} color="white" strokeWidth={3} />}
+                                                            </View>
+                                                        )}
+                                                        <Avatar rounded="$4" size="$3" borderWidth={1} borderColor="$borderColor">
+                                                            <Avatar.Image src={mint.icon} />
+                                                            <Avatar.Fallback backgroundColor="$gray2" alignItems="center" justifyContent="center">
+                                                                <Building2 size={24} color="$gray10" />
+                                                            </Avatar.Fallback>
+                                                        </Avatar>
+                                                        <YStack>
+                                                            <XStack gap="$2" items="center" >
                                                                 {mint.trusted ? (
                                                                     <ShieldCheck size={16} color="$green10" />
                                                                 ) : (
                                                                     <ShieldAlert size={16} color="$orange10" />
                                                                 )}
-                                                                {mint.nickname || mint.name || 'Unnamed Mint'}
-                                                            </Text>
-                                                            {isActive && (
-                                                                <XStack px="$1.5" py="$0.5" bg="$accent3" rounded="$2">
-                                                                    <Text fontSize="$1" fontWeight="800" color="$accent11">ACTIVE</Text>
-                                                                </XStack>
-                                                            )}
-                                                        </XStack>
-                                                        <XStack items="center" gap="$1">
+                                                                <Text fontWeight="800" fontSize="$4" numberOfLines={2} color="$accent4" style={{ maxWidth: 100 }}>
+                                                                    {mint.nickname || mint.name || 'Unnamed Mint'}
+                                                                </Text>
+                                                                {isActive && (
+                                                                    <XStack px="$1.5" py="$0.5" bg="$accent3" rounded="$2">
+                                                                        <Text fontSize="$1" fontWeight="800" color="$accent11">ACTIVE</Text>
+                                                                    </XStack>
+                                                                )}
+                                                            </XStack>
+                                                        </YStack>
+                                                    </XStack>
 
-
-                                                        </XStack>
+                                                    <YStack items="flex-end">
+                                                        <Text fontWeight="900" fontSize="$5" color="$accent4">
+                                                            ₿{balance.toLocaleString()}
+                                                        </Text>
                                                     </YStack>
                                                 </XStack>
-
-                                                <YStack items="flex-end">
-                                                    <Text fontWeight="900" fontSize="$5" color="$accent4">
-                                                        ₿{balance.toLocaleString()}
-                                                    </Text>
-
-                                                </YStack>
-                                            </XStack>
-                                        </YStack>
+                                            </YStack>
+                                            {index < mints.length - 1 && <Separator borderColor="$borderColor" opacity={0.5} />}
+                                        </React.Fragment>
                                     );
                                 })
                             )}
@@ -358,11 +356,13 @@ export default function MintsModal() {
                         <YStack gap="$2" items="center" bg="$gray2" p="$4" rounded="$6">
                             <Text fontSize="$4" color="$gray10" fontWeight="700">Spendable Balance</Text>
                             <XStack items="baseline" gap="$0">
-                                <Text fontSize={40} fontWeight="900" color="$accent11">₿</Text>
+
                                 <RollingNumber
-                                    fontSize={40}
+                                    letterSpacing={-1}
+                                    prefix='₿'
+                                    fontSize={32}
                                     fontWeight="900"
-                                    color="$accent11"
+                                    color="$accent4"
                                     showDecimals={false}
                                 >
                                     {selectedMintForSheet ? (balances[selectedMintForSheet.mintUrl] || 0) : 0}

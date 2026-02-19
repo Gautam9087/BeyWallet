@@ -240,9 +240,9 @@ export default function EcashModal() {
 
                         </XStack>
 
-                        <YStack gap="$4">
+                        <YStack rounded="$5" bg="$gray2" overflow="hidden">
                             {filteredHistory.length === 0 ? (
-                                <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5}>
+                                <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5} p="$3">
                                     <View p="$4" bg="$gray2" rounded="$10">
                                         <HistoryIcon size={32} color="$gray9" />
                                     </View>
@@ -254,71 +254,74 @@ export default function EcashModal() {
                                     </YStack>
                                 </YStack>
                             ) : (
-                                filteredHistory.map((entry: any) => {
+                                filteredHistory.map((entry: any, index: number) => {
                                     const style = getTransactionStyle(entry.type);
                                     const status = entry.state || 'pending';
 
                                     return (
-                                        <YStack
-                                            key={entry.id}
-                                            onPress={() => {
-                                                if (selectionMode) {
-                                                    toggleSelection(entry.id);
-                                                } else {
-                                                    handleItemPress(entry.id);
-                                                }
-                                            }}
-                                            pressStyle={{ opacity: 0.7, scale: 0.98 }}
-                                        >
-                                            <XStack justify="space-between" items="center">
-                                                <XStack gap="$3" items="center">
-                                                    {selectionMode && (
+                                        <React.Fragment key={entry.id}>
+                                            <YStack
+                                                onPress={() => {
+                                                    if (selectionMode) {
+                                                        toggleSelection(entry.id);
+                                                    } else {
+                                                        handleItemPress(entry.id);
+                                                    }
+                                                }}
+                                                pressStyle={{ opacity: 0.7, scale: 0.98 }}
+                                                py="$2"
+                                                px="$2"
+                                            >
+                                                <XStack justify="space-between" items="center">
+                                                    <XStack gap="$3" items="center">
+                                                        {selectionMode && (
+                                                            <View
+                                                                width={22} height={22} rounded="$10"
+                                                                borderWidth={2}
+                                                                borderColor={selectedIds.has(entry.id) ? "$accent10" : "$gray8"}
+                                                                bg={selectedIds.has(entry.id) ? "$accent10" : "transparent"}
+                                                                items="center" justify="center"
+                                                            >
+                                                                {selectedIds.has(entry.id) && <Check size={14} color="white" strokeWidth={3} />}
+                                                            </View>
+                                                        )}
                                                         <View
-                                                            width={22} height={22} rounded="$10"
-                                                            borderWidth={2}
-                                                            borderColor={selectedIds.has(entry.id) ? "$accent10" : "$gray8"}
-                                                            bg={selectedIds.has(entry.id) ? "$accent10" : "transparent"}
-                                                            items="center" justify="center"
+                                                            p="$2.5"
+                                                            rounded="$10"
+                                                            borderWidth={1}
+                                                            borderColor="$borderColor"
+                                                            bg="$gray2"
                                                         >
-                                                            {selectedIds.has(entry.id) && <Check size={14} color="white" strokeWidth={3} />}
+                                                            <style.icon size={22} strokeWidth={2.5} color={style.iconColor as any} />
                                                         </View>
-                                                    )}
-                                                    <View
-                                                        p="$2.5"
-                                                        rounded="$10"
-                                                        borderWidth={1}
-                                                        borderColor="$borderColor"
-                                                        bg="$gray2"
-                                                    >
-                                                        <style.icon size={22} strokeWidth={2.5} color={style.iconColor as any} />
-                                                    </View>
-                                                    <YStack>
-                                                        <XStack gap="$2" items="center">
-                                                            <Text fontWeight="700" fontSize="$4" textTransform="capitalize">
-                                                                {entry.type}
-                                                            </Text>
-                                                            <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
-                                                                <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
-                                                                    {status}
+                                                        <YStack>
+                                                            <XStack gap="$2" items="center">
+                                                                <Text fontWeight="700" fontSize="$4" textTransform="capitalize">
+                                                                    {entry.type}
                                                                 </Text>
+                                                                <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
+                                                                    <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
+                                                                        {status}
+                                                                    </Text>
+                                                                </XStack>
                                                             </XStack>
-                                                        </XStack>
+                                                        </YStack>
+                                                    </XStack>
 
+                                                    <YStack items="flex-end">
+                                                        <Text
+                                                            fontWeight="900"
+                                                            fontSize="$5"
+                                                            color={style.iconColor as any}
+                                                        >
+                                                            {style.sign}{entry.amount.toLocaleString()}
+                                                        </Text>
+                                                        <Text fontSize="$1" color="$gray10" fontWeight="600">{entry.unit?.toUpperCase() || 'SATS'}</Text>
                                                     </YStack>
                                                 </XStack>
-
-                                                <YStack items="flex-end">
-                                                    <Text
-                                                        fontWeight="900"
-                                                        fontSize="$5"
-                                                        color={style.iconColor as any}
-                                                    >
-                                                        {style.sign}{entry.amount.toLocaleString()}
-                                                    </Text>
-                                                    <Text fontSize="$1" color="$gray10" fontWeight="600">{entry.unit?.toUpperCase() || 'SATS'}</Text>
-                                                </YStack>
-                                            </XStack>
-                                        </YStack>
+                                            </YStack>
+                                            {index < filteredHistory.length - 1 && <Separator borderColor="$borderColor" opacity={0.5} />}
+                                        </React.Fragment>
                                     );
                                 })
                             )}

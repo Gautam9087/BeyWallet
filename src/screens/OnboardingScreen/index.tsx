@@ -12,7 +12,7 @@ import { useWalletStore } from '../../store/walletStore'
 import { ActivityIndicator } from 'react-native'
 import { YStack, Text } from 'tamagui'
 
-const DEFAULT_MINT = "https://testnut.cashu.space";
+const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
 
 export function OnboardingScreen() {
     const { currentStep, setStep, setGeneratedMnemonic, generatedMnemonic, completeOnboarding } = useOnboardingStore()

@@ -36,7 +36,7 @@ interface WalletState {
     restoreFromNostr: () => Promise<void>;
 }
 
-export const DEFAULT_MINT = "https://testnut.cashu.space";
+export const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
 
 export const useWalletStore = create<WalletState>((set, get) => ({
     activeMintUrl: null,

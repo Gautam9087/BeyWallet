@@ -425,7 +425,7 @@ export async function seedMockData(db: ExpoSqliteDb): Promise<void> {
     await tx.run(`
       INSERT OR REPLACE INTO coco_cashu_mint_recommendations (url, name, description, reviewsCount, averageRating, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, ['https://testnut.cashu.space', 'Testnut', 'A reliable test mint', 100, 4.8, now]);
+    `, ['https://nofee.testnut.cashu.space', 'Testnut', 'A reliable test mint', 100, 4.8, now]);
   });
 
   console.log('[Database] Mock data seeded successfully');

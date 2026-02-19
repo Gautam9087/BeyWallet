@@ -21,7 +21,7 @@ const MINT_INFO_KIND = 38172;
 const RECOMMENDATION_KIND = 38000;
 
 const FEATURED_MINTS = [
-    "https://testnut.cashu.space",
+    "https://nofee.testnut.cashu.space",
     "https://8333.space:3338",
     "https://mint.minibits.cash/Bitcoin",
     "https://legend.lnbits.com/cashu/api/v1/4gr93mame836988",
