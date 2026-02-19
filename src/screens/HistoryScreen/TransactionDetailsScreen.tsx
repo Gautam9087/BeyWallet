@@ -10,7 +10,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { UR, UREncoder } from "@gandlaf21/bc-ur";
 import { Buffer } from 'buffer';
 import { formatFullLocalTime, formatRelativeTime } from '~/utils/time';
-import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3 } from '~/services/core';
+import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3, walletService } from '~/services/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -253,6 +253,35 @@ export function TransactionDetailsScreen() {
         queryClient.invalidateQueries({ queryKey: ['history'] });
     };
 
+    const [isClaiming, setIsClaiming] = useState(false);
+
+    const handleClaimNow = async () => {
+        if (!token || isClaiming) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setIsClaiming(true);
+        try {
+            await walletService.receive(token.trim());
+            toast.show('Claimed!', { message: 'Tokens added to wallet' });
+
+            // Update state in DB
+            const repo = initService.getRepo();
+            if (repo?.historyRepository) {
+                await (repo.historyRepository as any).updateHistoryEntryState(id!, 'claimed');
+            }
+
+            // Wait a bit for DB and then refresh UI
+            setTimeout(() => {
+                handleRefresh();
+            }, 500);
+
+        } catch (err: any) {
+            console.error('[TransactionDetails] Claim failed:', err);
+            toast.show('Claim Failed', { message: err.message });
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+
     const changeSpeed = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (intervalMs === 250) setIntervalMs(500);
@@ -380,35 +409,52 @@ export function TransactionDetailsScreen() {
                         <DetailItem label="Mint" value={(entry.mintUrl || 'Unknown').replace(/^https?:\/\//, '').split('/')[0]} />
                     </YStack>
 
-                    {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && (
+                    {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && (
                         <YStack gap="$4" pb="$10" mt="$4">
-                            <YStack items="center" gap="$4">
-                                <View bg="white" p="$3" rounded="$6">
-                                    <QRCode
-                                        value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
-                                        size={280}
-                                        backgroundColor="white"
-                                        color="black"
-                                        quietZone={10}
-                                    />
-                                </View>
+                            {entry.type === 'send' ? (
+                                <YStack items="center" gap="$4">
+                                    <View bg="white" p="$3" rounded="$6">
+                                        <QRCode
+                                            value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
+                                            size={280}
+                                            backgroundColor="white"
+                                            color="black"
+                                            quietZone={10}
+                                        />
+                                    </View>
 
-                                <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
-                                    {showAnimatedQR && (
-                                        <>
-                                            <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
-                                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                            <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
-                                            <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                        </>
-                                    )}
-                                    <Button size="$2.5" chromeless icon={<Hexagon size={16} />} onPress={handleToggleVersion} color="$color" fontWeight="700">{tokenVersion}</Button>
-                                </XStack>
-                            </YStack>
+                                    <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
+                                        {showAnimatedQR && (
+                                            <>
+                                                <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
+                                                <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                                <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
+                                                <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
+                                            </>
+                                        )}
+                                        <Button size="$2.5" chromeless icon={<Hexagon size={16} />} onPress={handleToggleVersion} color="$color" fontWeight="700">{tokenVersion}</Button>
+                                    </XStack>
+                                </YStack>
+                            ) : entry.type === 'receive' && status === 'unclaimed' ? (
+                                <YStack gap="$2">
+                                    <Button
+                                        bg="$green10"
+                                        color="white"
+                                        size="$5"
+                                        height={55}
+                                        rounded="$4"
+                                        onPress={handleClaimNow}
+                                        disabled={isClaiming}
+                                        icon={isClaiming ? <Spinner size="small" color="white" /> : <ArrowDownLeft size={20} color="white" />}
+                                    >
+                                        CLAIM NOW
+                                    </Button>
+                                </YStack>
+                            ) : null}
 
-                            <XStack gap="$2">
-                                <Button flex={1} bg="$gray3" color="$color" icon={<Copy size={18} />} onPress={handleCopyToken} fontWeight="800">Copy</Button>
-                                <Button flex={1} bg="$gray3" color="$color" icon={<Share2 size={18} />} onPress={handleShare} fontWeight="800">Share</Button>
+                            <XStack gap="$2" px={entry.type === 'receive' ? "$0" : "$0"}>
+                                <Button flex={1} bg="$gray3" color="$color" height={55} icon={<Copy size={18} />} onPress={handleCopyToken} fontWeight="800">Copy</Button>
+                                <Button flex={1} bg="$gray3" color="$color" height={55} icon={<Share2 size={18} />} onPress={handleShare} fontWeight="800">Share</Button>
                             </XStack>
                         </YStack>
                     )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { YStack, XStack, Text, Button, View, Separator, Circle, ScrollView } from 'tamagui';
-import { ArrowDownLeft, Check, ShieldCheck, AlertTriangle, Copy, Building2, DollarSign } from '@tamagui/lucide-icons';
+import { ArrowDownLeft, Check, ShieldCheck, AlertTriangle, Copy, Building2, DollarSign, Clock } from '@tamagui/lucide-icons';
 import { Spinner } from '../../components/UI/Spinner';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -22,12 +22,14 @@ interface ConfirmStageProps {
     tokenInfo: TokenInfo;
     isLoading?: boolean;
     onConfirm: () => void;
+    onReceiveLater: () => void;
     onBack: () => void;
 }
 
-export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }: ConfirmStageProps) {
+export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceiveLater, onBack }: ConfirmStageProps) {
     const { mints } = useWalletStore();
     const toast = useToastController();
+    const [isSavingLater, setIsSavingLater] = React.useState(false);
 
     // Check if mint is trusted
     const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
@@ -54,7 +56,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
 
     return (
         <YStack flex={1} bg="$background">
-            <ScrollView contentContainerStyle={{ paddingBottom: 200 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 250 }} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <YStack items="center" py="$6" gap="$4">
 
@@ -74,7 +76,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
                 </YStack>
 
                 {/* Status Card */}
-                <YStack mx="$4" p="$4" bg="$gray2" borderRadius="$4" gap="$4" mb="$6">
+                <YStack mx="$4" p="$4" bg="$gray2" rounded="$4" gap="$4" mb="$6">
                     <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$0" textTransform='uppercase' letterSpacing={1}>
                         STATUS
                     </Text>
@@ -149,7 +151,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
 
             </ScrollView>
 
-            <YStack position="absolute" bottom="$4" left="$4" right="$4">
+            <YStack position="absolute" bottom="$4" left="$4" right="$4" gap="$2">
                 <Button
                     bg={isMintTrusted ? "$green9" : "$orange9"}
                     color="white"
@@ -168,9 +170,31 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onBack }:
                     {isLoading ? 'RECEIVING...' : (isMintTrusted ? 'RECEIVE ECASH' : 'TRUST & RECEIVE')}
 
                 </Button>
+
+                <Button
+                    bg="$gray3"
+                    color="$color"
+                    height={50}
+                    rounded="$4"
+                    disabled={isLoading}
+                    icon={isSavingLater ? <Spinner size="small" color="$color" /> : <Clock size={18} color="$gray10" />}
+                    fontWeight="700" fontSize="$4"
+                    onPress={async () => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        setIsSavingLater(true);
+                        try {
+                            await onReceiveLater();
+                        } finally {
+                            setIsSavingLater(false);
+                        }
+                    }}
+                    pressStyle={{ opacity: 0.9, scale: 0.98 }}
+                >
+                    {isSavingLater ? 'SAVING...' : 'RECEIVE LATER'}
+                </Button>
+
                 <Button
                     chromeless
-                    mt="$2"
                     onPress={onBack}
                     disabled={isLoading}
                     pressStyle={{ opacity: 0.7 }}

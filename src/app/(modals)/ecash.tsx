@@ -240,10 +240,11 @@ export default function EcashModal() {
 
                         </XStack>
 
-                        <YStack rounded="$5" bg="$gray2" overflow="hidden">
+                        <YStack rounded="$5" bg="$gray2" borderWidth={1}
+                            borderColor="$gray6" overflow="hidden">
                             {filteredHistory.length === 0 ? (
                                 <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5} p="$3">
-                                    <View p="$4" bg="$gray2" rounded="$10">
+                                    <View p="$4" bg="$gray2" rounded="$4">
                                         <HistoryIcon size={32} color="$gray9" />
                                     </View>
                                     <YStack items="center">
@@ -287,7 +288,7 @@ export default function EcashModal() {
                                                         )}
                                                         <View
                                                             p="$2.5"
-                                                            rounded="$10"
+                                                            rounded="$4"
                                                             borderWidth={1}
                                                             borderColor="$borderColor"
                                                             bg="$gray2"

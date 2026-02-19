@@ -239,7 +239,9 @@ export default function MintsModal() {
                             </View>
                         </XStack>
 
-                        <YStack rounded="$5" bg="$gray2" overflow="hidden">
+                        <YStack rounded="$5" bg="$gray2" borderWidth={1}
+                            borderColor="$gray6"
+                            overflow="hidden">
                             {mints.length === 0 ? (
                                 <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5} p="$3">
                                     <View p="$4" bg="$gray2" rounded="$10">
@@ -264,6 +266,7 @@ export default function MintsModal() {
                                                 pressStyle={{ opacity: 0.7, scale: 0.98 }}
                                                 py="$2"
                                                 px="$2"
+
                                             >
                                                 <XStack justify="space-between" items="center">
                                                     <XStack gap="$3" items="center">

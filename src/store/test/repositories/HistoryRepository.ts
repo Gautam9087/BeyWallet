@@ -140,6 +140,7 @@ export class ExpoHistoryRepository {
                 break;
             case 'receive':
                 tokenJson = history.token ? JSON.stringify(history.token as ReceiveToken) : null;
+                state = history.state || null;
                 break;
         }
 
@@ -357,14 +358,15 @@ export class ExpoHistoryRepository {
                 operationId: row.operationId ?? '',
                 state: (row.state ?? 'pending') as SendHistoryState,
                 token: row.tokenJson ? (JSON.parse(row.tokenJson) as SendToken) : undefined,
-            };
+            } as any;
         }
         const token = row.tokenJson ? (JSON.parse(row.tokenJson) as ReceiveToken) : undefined;
         return {
             ...base,
             type: 'receive',
             amount: row.amount,
+            state: row.state,
             token,
-        } satisfies HistoryEntry;
+        } as any;
     }
 }

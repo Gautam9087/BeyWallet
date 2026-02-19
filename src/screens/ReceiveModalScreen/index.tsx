@@ -4,7 +4,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 import { InputStage } from './InputStage'
 import { ConfirmStage } from './ConfirmStage'
 import { ReceiveResultStage } from './ReceiveResultStage'
-import { walletService, decodeToken, mintManager } from '../../services/core';
+import { walletService, decodeToken, mintManager, initService } from '../../services/core';
 import { useWalletStore } from '../../store/walletStore'
 
 type ReceiveStep = 'input' | 'confirm' | 'result';
@@ -31,6 +31,8 @@ export function ReceiveModalScreen() {
     const params = useLocalSearchParams<{ scannedToken?: string }>()
     const { refreshBalance, addMint, fetchMintInfo, mints } = useWalletStore()
 
+    const [isReceiveLater, setIsReceiveLater] = useState(false)
+
     React.useEffect(() => {
         if (params.scannedToken) {
             setToken(params.scannedToken);
@@ -44,6 +46,7 @@ export function ReceiveModalScreen() {
 
         setIsDecoding(true);
         setError(null);
+        setIsReceiveLater(false);
 
         try {
             const decoded = decodeToken(targetToken.trim());
@@ -86,6 +89,54 @@ export function ReceiveModalScreen() {
         }
     }, [token, mints, fetchMintInfo]);
 
+    const handleReceiveLater = useCallback(async () => {
+        if (!tokenInfo) return;
+
+        setIsReceiving(true);
+        setError(null);
+
+        try {
+            const mintUrl = tokenInfo.mint;
+            console.log('[ReceiveModal] Saving for later:', mintUrl);
+
+            // 1. Ensure mint is added/known (optional but good for UI consistency)
+            try {
+                const knownMints = mints.map(m => m.mintUrl.toLowerCase());
+                if (!knownMints.includes(mintUrl.toLowerCase())) {
+                    await addMint(mintUrl, { trusted: true });
+                }
+            } catch (e) {
+                console.warn('[ReceiveModal] Failed to add mint during save later:', e);
+            }
+
+            // 2. Decode to get the full token object for storage
+            const decoded = decodeToken(token.trim());
+
+            // 3. Add to history as 'unclaimed' receive
+            const repo = initService.getRepo();
+            await (repo.historyRepository as any).addHistoryEntry({
+                mintUrl,
+                type: 'receive',
+                unit: 'sat', // default for now, could be dynamic
+                amount: tokenInfo.amount,
+                createdAt: Date.now(),
+                state: 'unclaimed',
+                token: decoded
+            });
+
+            setStatus('success');
+            setIsReceiveLater(true);
+            setStep('result');
+        } catch (err: any) {
+            console.error('[ReceiveModal] Failed to save token for later:', err);
+            setError(err.message || 'Failed to save for later');
+            setStatus('error');
+            setStep('result');
+        } finally {
+            setIsReceiving(false);
+        }
+    }, [token, tokenInfo, mints, addMint]);
+
     const handleReceive = useCallback(async () => {
         if (!tokenInfo) return;
 
@@ -119,6 +170,7 @@ export function ReceiveModalScreen() {
             await walletService.receive(token.trim());
 
             setStatus('success');
+            setIsReceiveLater(false);
             await refreshBalance();
             setStep('result');
         } catch (err: any) {
@@ -182,6 +234,7 @@ export function ReceiveModalScreen() {
                     tokenInfo={tokenInfo}
                     isLoading={isReceiving}
                     onConfirm={handleNext}
+                    onReceiveLater={handleReceiveLater}
                     onBack={handleBack}
                 />
             )}
@@ -193,8 +246,11 @@ export function ReceiveModalScreen() {
                     mintUrl={tokenInfo?.mint}
                     token={token}
                     error={error}
+                    isReceiveLater={isReceiveLater}
+                    isLoading={isReceiving}
+                    onClaimNow={handleReceive}
                     onClose={handleClose}
-                    title={status === 'success' ? 'Ecash Received' : 'Receive Failed'}
+                    title={status === 'success' ? (isReceiveLater ? 'Token Saved' : 'Ecash Received') : 'Receive Failed'}
                 />
             )}
         </YStack>
