@@ -16,7 +16,7 @@ import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spinner } from '~/components/UI/Spinner';
 import { useToastController } from '@tamagui/toast';
-import AppBottomSheet from '~/components/UI/AppBottomSheet';
+import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 
 // Ensure Buffer is available globally
 if (typeof global.Buffer === 'undefined') {
@@ -60,7 +60,15 @@ export function TransactionDetailsScreen() {
         console.log('[TransactionDetails] Entry loaded:', entry.id, 'Type:', entry.type);
 
         // Extract metadata safely
-        const metadata = typeof entry.metadata === 'string' ? JSON.parse(entry.metadata) : entry.metadata;
+        let metadata = entry.metadata;
+        if (typeof entry.metadata === 'string' && entry.metadata.trim().startsWith('{')) {
+            try {
+                metadata = JSON.parse(entry.metadata);
+            } catch (e) {
+                console.warn('[TransactionDetails] Failed to parse metadata:', e);
+                metadata = {};
+            }
+        }
 
         // Priority 1: Token in metadata (already encoded string)
         if (metadata?.token) {
@@ -77,12 +85,20 @@ export function TransactionDetailsScreen() {
             return;
         }
 
-        // Priority 2: Token object in entry (needs encoding)
+        // Priority 2: Token object or string in entry
         if (entry.token) {
             try {
-                const encoded = typeof entry.token === 'string'
-                    ? entry.token
-                    : encodeToken(entry.token);
+                let tokenToEncode = entry.token;
+
+                // Handle legacy or nested formats if token is an array
+                if (Array.isArray(entry.token) && entry.token.length > 0) {
+                    tokenToEncode = entry.token[0];
+                }
+
+                const encoded = typeof tokenToEncode === 'string'
+                    ? tokenToEncode
+                    : encodeToken(tokenToEncode);
+
                 setToken(encoded);
             } catch (e) {
                 console.warn('[TransactionDetails] Failed to encode token from entry:', e);
@@ -91,32 +107,40 @@ export function TransactionDetailsScreen() {
     }, [entry]);
 
     const status = entry?.state || 'completed';
+    console.log('[TransactionDetails] Status:', status, 'EntryType:', entry?.type);
 
     // Animated QR states
     const [qrCodeFragment, setQrCodeFragment] = useState<string>('');
     const [showAnimatedQR, setShowAnimatedQR] = useState(false);
     const [fragmentLength, setFragmentLength] = useState(150); // L=150, M=100, S=50
     const [intervalMs, setIntervalMs] = useState(140); // F=140, M=250, S=500
+    const [tokenVersion, setTokenVersion] = useState<'V3' | 'V4'>('V4');
     const encoderRef = useRef<UREncoder | null>(null);
-    const [tokenVersion, setTokenVersion] = useState<'V3' | 'V4'>(token?.startsWith('cashuB') ? 'V4' : 'V3');
+    const deleteSheetRef = useRef<AppBottomSheetRef>(null);
 
     // Initialize/Update token version and fragment when token changes
     useEffect(() => {
-        if (token) {
+        if (token && typeof token === 'string') {
             setTokenVersion(token.startsWith('cashuB') ? 'V4' : 'V3');
             if (!showAnimatedQR) {
                 setQrCodeFragment(token);
             }
         }
-    }, [token]);
+    }, [token, showAnimatedQR]);
 
     useEffect(() => {
         if (!token) return;
 
         try {
             const clean = cleanToken(token);
-            const decoded = decodeToken(clean) as any;
-            const proofs = decoded.token?.[0]?.proofs || [];
+            if (!clean || typeof clean !== 'string') {
+                setShowAnimatedQR(false);
+                setQrCodeFragment(typeof token === 'string' ? token : '');
+                return;
+            }
+
+            const decoded = decodeToken(clean);
+            const proofs = decoded.proofs || [];
 
             // Animate if the token is large (>400 chars) or has more than 2 proofs
             const shouldAnimate = proofs.length > 2 || clean.length > 400;
@@ -161,8 +185,9 @@ export function TransactionDetailsScreen() {
     }, [status, entry?.type]);
 
     const title = useMemo(() => {
-        const type = entry?.type || 'transaction';
-        switch (type) {
+        const type = entry?.type;
+        if (!type || typeof type !== 'string') return 'Transaction';
+        switch (type.toLowerCase()) {
             case 'send': return 'Send Ecash';
             case 'receive': return 'Receive Ecash';
             case 'mint': return 'Mint Ecash';
@@ -305,8 +330,12 @@ export function TransactionDetailsScreen() {
     }, [entry?.id, entry?.state]);
     // Status text formatting
     const formattedStatus = useMemo(() => {
-        if (!status) return 'Unknown';
-        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        if (!status || typeof status !== 'string') return 'Unknown';
+        try {
+            return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        } catch (e) {
+            return String(status);
+        }
     }, [status]);
 
     const speedLabel = intervalMs === 140 ? "F" : intervalMs === 250 ? "M" : "S";
@@ -322,8 +351,6 @@ export function TransactionDetailsScreen() {
             </SafeAreaView>
         );
     }
-
-    const deleteSheetRef = useRef<any>(null);
 
     const handleDelete = async () => {
         if (!id) return;

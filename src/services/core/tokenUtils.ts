@@ -62,7 +62,17 @@ export function cleanToken(tokenString: any): string {
 
     // Handle potential array of numbers or Buffer
     if (Array.isArray(tokenString)) {
-        clean = String.fromCharCode(...tokenString).trim();
+        // Only if it's an array of numbers (byte array)
+        if (tokenString.length > 0 && typeof tokenString[0] === 'number') {
+            clean = String.fromCharCode(...tokenString).trim();
+        } else {
+            // Probably a standard V3/V4 token object inside an array usually seen in legacy
+            return '';
+        }
+    } else if (typeof tokenString === 'object' && tokenString !== null) {
+        // If it's an object, we can't "clean" it as a string. 
+        // Caller should have encoded it first.
+        return '';
     } else if (typeof tokenString !== 'string') {
         try {
             clean = tokenString.toString().trim();
