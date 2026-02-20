@@ -241,8 +241,8 @@ export function HistoryScreen() {
                                             <XStack gap="$3" items="center">
                                                 <View
                                                     p="$2.5"
-                                                    rounded="$10"
-                                                    borderWidth={2}
+                                                    rounded="$4"
+                                                    borderWidth={1}
                                                     borderColor="$borderColor"
                                                 >
                                                     <style.icon size={24} strokeWidth={2} color={style.iconColor as any} />

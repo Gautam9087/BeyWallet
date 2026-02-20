@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { YStack, XStack, Text, ScrollView, Button, View, Separator, Circle, ListItem, Avatar, Square, Input } from 'tamagui';
 import { ChevronLeft, ChevronDown, RefreshCw, Check, Building2, Globe, ShieldCheck, ShieldAlert, Plus, Trash2, Copy, ExternalLink, ArrowRight, ChevronRight, AlertCircle } from '@tamagui/lucide-icons';
 import { useRouter, Stack } from 'expo-router';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from "react-native-qrcode-svg";
@@ -13,7 +14,7 @@ import { mintService } from '~/services/mintService';
 
 export default function MintsModal() {
     const router = useRouter();
-    const { mints, balances, refreshBalance, isInitializing, activeMintUrl, setActiveMint, untrustMint, refreshMintList } = useWalletStore();
+    const { mints, balances, refreshBalance, isInitializing, activeMintUrl, setActiveMint, untrustMint, removeMint, refreshMintList, trustMint } = useWalletStore();
 
     const [selectedMintForSheet, setSelectedMintForSheet] = useState<any>(null);
     const [amount, setAmount] = useState("1000");
@@ -22,18 +23,12 @@ export default function MintsModal() {
     const [isChecking, setIsChecking] = useState(false);
 
     const sheetRef = useRef<AppBottomSheetRef>(null);
-    const confirmDeleteSheetRef = useRef<AppBottomSheetRef>(null);
+    const deleteOptionsSheetRef = useRef<AppBottomSheetRef>(null);
     const addMintModalRef = useRef<AddMintModalRef>(null);
-    const [selectionMode, setSelectionMode] = useState(false);
-    const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
 
     const totalBalance = useMemo(() => {
         return Object.values(balances).reduce((a, b) => a + b, 0);
     }, [balances]);
-
-    const canDeleteCount = useMemo(() => {
-        return Array.from(selectedUrls).filter(url => (balances[url] || 0) === 0).length;
-    }, [selectedUrls, balances]);
 
     const handleRefresh = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -41,18 +36,10 @@ export default function MintsModal() {
     };
 
     const handleMintPress = (mint: any) => {
-        if (selectionMode) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const next = new Set(selectedUrls);
-            if (next.has(mint.mintUrl)) next.delete(mint.mintUrl);
-            else next.add(mint.mintUrl);
-            setSelectedUrls(next);
-        } else {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setSelectedMintForSheet(mint);
-            setQuote(null);
-            sheetRef.current?.present();
-        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSelectedMintForSheet(mint);
+        setQuote(null);
+        sheetRef.current?.present();
     };
 
     const handleRequestMint = async () => {
@@ -92,51 +79,64 @@ export default function MintsModal() {
         }
     };
 
-    const toggleSelectAll = () => {
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleUntrustOnly = async () => {
+        if (!selectedMintForSheet || isProcessing) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        if (selectedUrls.size === mints.length) {
-            setSelectedUrls(new Set());
-        } else {
-            setSelectedUrls(new Set(mints.map((e: any) => e.mintUrl)));
+        setIsProcessing(true);
+        try {
+            await untrustMint(selectedMintForSheet.mintUrl);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            deleteOptionsSheetRef.current?.dismiss();
+            sheetRef.current?.dismiss();
+            refreshBalance();
+        } catch (err) {
+            console.error('Untrust failed:', err);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
-    const handleDeleteMints = async () => {
-        const toDelete = Array.from(selectedUrls).filter(url => (balances[url] || 0) === 0);
-
-        if (toDelete.length > 0) {
+    const handleUntrustAndDelete = async () => {
+        if (!selectedMintForSheet || isProcessing) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        setIsProcessing(true);
+        try {
+            await removeMint(selectedMintForSheet.mintUrl);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            for (const url of toDelete) {
-                await untrustMint(url);
-            }
-        } else {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            deleteOptionsSheetRef.current?.dismiss();
+            sheetRef.current?.dismiss();
+            refreshBalance();
+        } catch (err) {
+            console.error('Remove failed:', err);
+        } finally {
+            setIsProcessing(false);
         }
+    };
 
-        setSelectionMode(false);
-        setSelectedUrls(new Set());
-        confirmDeleteSheetRef.current?.dismiss();
-        refreshBalance();
-        refreshMintList();
+    const handleTrustAgain = async () => {
+        if (!selectedMintForSheet || isProcessing) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setIsProcessing(true);
+        try {
+            await trustMint(selectedMintForSheet.mintUrl);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            sheetRef.current?.dismiss();
+            refreshBalance();
+        } catch (err) {
+            console.error('Trust failed:', err);
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (
         <YStack flex={1} bg="$background">
             <Stack.Screen
                 options={{
-                    headerTitle: selectionMode ? `${selectedUrls.size} Selected` : 'Mints',
-                    headerLeft: () => selectionMode ? (
-                        <Button
-                            chromeless
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setSelectionMode(false);
-                                setSelectedUrls(new Set());
-                            }}
-                        >
-                            <Text color="$color11" fontWeight="600">Cancel</Text>
-                        </Button>
-                    ) : (
+                    headerTitle: 'Mints',
+                    headerLeft: () => (
                         <Button
                             circular
                             chromeless
@@ -147,46 +147,13 @@ export default function MintsModal() {
                             }}
                         />
                     ),
-                    headerRight: () => selectionMode ? (
-                        <XStack items="center" gap="$2">
-                            <Button
-                                circular
-                                chromeless
-                                icon={<Check size={20} color={selectedUrls.size === mints.length ? "$accent10" : "$gray10"} />}
-                                onPress={toggleSelectAll}
-                            />
-                            <Button
-                                circular
-                                chromeless
-                                disabled={selectedUrls.size === 0}
-                                opacity={selectedUrls.size === 0 ? 0.3 : 1}
-                                icon={<Trash2 size={20} color="$red10" />}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    confirmDeleteSheetRef.current?.present();
-                                }}
-                            />
-                        </XStack>
-                    ) : (
-                        <XStack items="center" gap="$0">
-                            <Button
-                                chromeless
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    setSelectionMode(true);
-                                }}
-                                disabled={mints.length === 0}
-                                opacity={mints.length === 0 ? 0.3 : 1}
-                            >
-                                <Text color="$accent10" fontWeight="700">Edit</Text>
-                            </Button>
-                            <Button
-                                circular
-                                chromeless
-                                icon={<RefreshCw size={20} className={isInitializing ? 'spin' : ''} />}
-                                onPress={handleRefresh}
-                            />
-                        </XStack>
+                    headerRight: () => (
+                        <Button
+                            circular
+                            chromeless
+                            icon={<RefreshCw size={20} className={isInitializing ? 'spin' : ''} />}
+                            onPress={handleRefresh}
+                        />
                     )
                 }}
             />
@@ -214,9 +181,10 @@ export default function MintsModal() {
                     <YStack py="$2">
                         <Text fontSize="$4" color="$gray10" fontWeight="700">Total Balance</Text>
                         <XStack items="baseline" gap="$0" py="$2">
-                            <Text fontSize={34} fontWeight="900" color="$accent4">₿</Text>
+
                             <RollingNumber
                                 fontSize={30}
+                                prefix='₿'
                                 fontWeight="900"
                                 color="$accent4"
                                 showDecimals={false}
@@ -239,7 +207,7 @@ export default function MintsModal() {
                             </View>
                         </XStack>
 
-                        <YStack rounded="$5" bg="$gray2" borderWidth={1}
+                        <YStack rounded="$5" theme="gray" bg="$gray2" borderWidth={1}
                             borderColor="$gray6"
                             overflow="hidden">
                             {mints.length === 0 ? (
@@ -270,17 +238,6 @@ export default function MintsModal() {
                                             >
                                                 <XStack justify="space-between" items="center">
                                                     <XStack gap="$3" items="center">
-                                                        {selectionMode && (
-                                                            <View
-                                                                width={22} height={22} rounded="$10"
-                                                                borderWidth={2}
-                                                                borderColor={selectedUrls.has(mint.mintUrl) ? "$accent10" : "$gray8"}
-                                                                bg={selectedUrls.has(mint.mintUrl) ? "$accent10" : "transparent"}
-                                                                items="center" justify="center"
-                                                            >
-                                                                {selectedUrls.has(mint.mintUrl) && <Check size={14} color="white" strokeWidth={3} />}
-                                                            </View>
-                                                        )}
                                                         <Avatar rounded="$4" size="$3" borderWidth={1} borderColor="$borderColor">
                                                             <Avatar.Image src={mint.icon} />
                                                             <Avatar.Fallback backgroundColor="$gray2" alignItems="center" justifyContent="center">
@@ -313,7 +270,7 @@ export default function MintsModal() {
                                                     </YStack>
                                                 </XStack>
                                             </YStack>
-                                            {index < mints.length - 1 && <Separator borderColor="$borderColor" opacity={0.5} />}
+                                            {index < mints.length - 1 && <Separator borderColor="$color8" opacity={0.5} />}
                                         </React.Fragment>
                                     );
                                 })
@@ -324,7 +281,7 @@ export default function MintsModal() {
             </ScrollView>
 
             <AppBottomSheet ref={sheetRef} snapPoints={["85%"]}>
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <BottomSheetScrollView showsVerticalScrollIndicator={false}>
                     <YStack p="$4" gap="$5">
                         {/* Mint Profile Header */}
                         <XStack gap="$4" items="center">
@@ -335,19 +292,45 @@ export default function MintsModal() {
                                 </Avatar.Fallback>
                             </Avatar>
                             <YStack flex={1}>
-                                <Text fontSize="$7" fontWeight="900">{selectedMintForSheet?.nickname || selectedMintForSheet?.name}</Text>
-                                <Text fontSize="$3" color="$gray10">{selectedMintForSheet?.mintUrl}</Text>
-                                <XStack mt="$2" gap="$2">
+                                <XStack justify="space-between" items="flex-start">
+                                    <YStack flex={1}>
+                                        <Text fontSize="$7" fontWeight="900">{selectedMintForSheet?.nickname || selectedMintForSheet?.name}</Text>
+                                        <Text fontSize="$3" color="$gray10">{selectedMintForSheet?.mintUrl}</Text>
+                                    </YStack>
+                                    <Button
+                                        circular
+                                        size="$3"
+                                        bg="$red2"
+                                        onPress={() => deleteOptionsSheetRef.current?.present()}
+                                        disabled={selectedMintForSheet ? (balances[selectedMintForSheet.mintUrl] || 0) > 0 : true}
+                                        opacity={selectedMintForSheet && (balances[selectedMintForSheet.mintUrl] || 0) > 0 ? 0.3 : 1}
+                                        icon={<Trash2 size={18} color="$red10" />}
+                                    />
+                                </XStack>
+                                <XStack mt="$2" gap="$2" items="center">
                                     {selectedMintForSheet?.trusted ? (
                                         <XStack px="$2" py="$1" bg="$green2" rounded="$2" items="center" gap="$1">
                                             <ShieldCheck size={14} color="$green10" />
                                             <Text fontSize="$1" fontWeight="800" color="$green10">TRUSTED</Text>
                                         </XStack>
                                     ) : (
-                                        <XStack px="$2" py="$1" bg="$orange2" rounded="$2" items="center" gap="$1">
-                                            <ShieldAlert size={14} color="$orange10" />
-                                            <Text fontSize="$1" fontWeight="800" color="$orange10">UNTRUSTED</Text>
-                                        </XStack>
+                                        <>
+                                            <XStack px="$2" py="$1" bg="$orange2" rounded="$2" items="center" gap="$1">
+                                                <ShieldAlert size={14} color="$orange10" />
+                                                <Text fontSize="$1" fontWeight="800" color="$orange10">UNTRUSTED</Text>
+                                            </XStack>
+                                            <Button
+                                                size="$2"
+                                                theme="green"
+                                                px="$2.5"
+                                                rounded="$3"
+                                                onPress={handleTrustAgain}
+                                                disabled={isProcessing}
+                                                icon={<ShieldCheck size={12} color="white" />}
+                                            >
+                                                <Text fontSize="$1" fontWeight="800" color="white">TRUST AGAIN</Text>
+                                            </Button>
+                                        </>
                                     )}
                                 </XStack>
                             </YStack>
@@ -450,43 +433,70 @@ export default function MintsModal() {
                                 View Detailed Profile
                             </Button>
                         </YStack>
+
+                        {/* Danger Zone */}
+                        {(selectedMintForSheet && (balances[selectedMintForSheet.mintUrl] || 0) === 0) && (
+                            <YStack gap="$3" borderTopWidth={1} borderColor="$gray4" pt="$4" pb="$10">
+                                <Text fontSize="$4" fontWeight="800" color="$red10">Danger Zone</Text>
+                                <Button
+                                    bg="$red2"
+                                    color="$red10"
+                                    size="$5"
+                                    fontWeight="800"
+                                    onPress={() => deleteOptionsSheetRef.current?.present()}
+                                    icon={<Trash2 size={20} color="$red10" />}
+                                >
+                                    Untrust & Remove Mint
+                                </Button>
+                                <Text fontSize="$2" color="$gray9" text="center">
+                                    Only mints with zero balance can be removed.
+                                </Text>
+                            </YStack>
+                        )}
                     </YStack>
-                </ScrollView>
+                </BottomSheetScrollView>
             </AppBottomSheet>
 
-            <AppBottomSheet ref={confirmDeleteSheetRef}>
-                <YStack p="$4" gap="$4">
-                    <XStack justify="center" items="center" gap="$2">
-                        <AlertCircle size={24} color="$red10" />
-                        <Text fontSize="$6" fontWeight="800" color="$red10">Remove Mints?</Text>
-                    </XStack>
+            <AppBottomSheet ref={deleteOptionsSheetRef}>
+                <YStack p="$4" gap="$5">
+                    <YStack gap="$2" items="center">
+                        <View p="$4" bg="$red2" rounded="$10">
+                            <Trash2 size={32} color="$red10" />
+                        </View>
+                        <Text fontSize="$6" fontWeight="800">Manage Mint Trust</Text>
+                        <Text color="$gray10" text="center" px="$4">
+                            How do you want to handle this mint? Untrusting will keep the history but hide the mint from new operations.
+                        </Text>
+                    </YStack>
 
-                    <Text text="center" fontSize="$4" color="$gray11">
-                        Are you sure you want to untrust the selected mints?
-                        <Text fontWeight="800" color="$red11"> Note: Only mints with zero balance will be removed. </Text>
-                        Their tokens will remain in your wallet but won't be spendable until re-trusted.
-                    </Text>
-
-                    <YStack gap="$3" mt="$2">
+                    <YStack gap="$3">
                         <Button
-                            bg="$red10"
-                            color="white"
-                            size="$5"
-                            fontWeight="800"
-                            disabled={canDeleteCount === 0}
-                            opacity={canDeleteCount === 0 ? 0.5 : 1}
-                            onPress={handleDeleteMints}
-                        >
-                            Untrust {canDeleteCount} Mints
-                        </Button>
-                        <Button
+                            theme="orange"
                             variant="outlined"
                             size="$5"
                             fontWeight="800"
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                confirmDeleteSheetRef.current?.dismiss();
-                            }}
+                            onPress={handleUntrustOnly}
+                            icon={<ShieldAlert size={20} color="$orange10" />}
+                            disabled={isProcessing}
+                        >
+                            Untrust Only
+                        </Button>
+                        <Button
+                            theme="red"
+                            size="$5"
+                            fontWeight="800"
+                            onPress={handleUntrustAndDelete}
+                            icon={<Trash2 size={20} color="white" />}
+                            disabled={isProcessing || (selectedMintForSheet && (balances[selectedMintForSheet.mintUrl] || 0) > 0)}
+                        >
+                            Untrust and Delete from Device
+                        </Button>
+                        <Button
+                            chromeless
+                            size="$5"
+                            fontWeight="800"
+                            onPress={() => deleteOptionsSheetRef.current?.dismiss()}
+                            disabled={isProcessing}
                         >
                             Cancel
                         </Button>

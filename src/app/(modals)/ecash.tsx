@@ -16,10 +16,6 @@ export default function EcashModal() {
     const [selectedMint, setSelectedMint] = useState('all');
     const sheetRef = useRef<AppBottomSheetRef>(null);
 
-    const [selectionMode, setSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const confirmSheetRef = useRef<AppBottomSheetRef>(null);
-
     const { data: history = [], isFetching, refetch } = useQuery({
         queryKey: ['history', 'pending'],
         queryFn: async () => {
@@ -52,41 +48,6 @@ export default function EcashModal() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setSelectedMint(url);
         sheetRef.current?.dismiss();
-        setSelectionMode(false);
-        setSelectedIds(new Set());
-    };
-
-    const toggleSelection = (id: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const next = new Set(selectedIds);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
-        }
-        setSelectedIds(next);
-    };
-
-    const toggleSelectAll = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        if (selectedIds.size === filteredHistory.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(filteredHistory.map((e: any) => e.id)));
-        }
-    };
-
-    const handleDelete = async () => {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        try {
-            await historyService.deleteHistoryEntries(Array.from(selectedIds));
-            setSelectionMode(false);
-            setSelectedIds(new Set());
-            confirmSheetRef.current?.dismiss();
-            refetch();
-        } catch (err) {
-            console.error('Delete failed:', err);
-        }
     };
 
     const getMintLabel = (url: string) => {
@@ -111,19 +72,8 @@ export default function EcashModal() {
         <YStack flex={1} bg="$background">
             <Stack.Screen
                 options={{
-                    headerTitle: selectionMode ? `${selectedIds.size} Selected` : 'E-Cash',
-                    headerLeft: () => selectionMode ? (
-                        <Button
-                            chromeless
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setSelectionMode(false);
-                                setSelectedIds(new Set());
-                            }}
-                        >
-                            <Text color="$color11" fontWeight="600">Cancel</Text>
-                        </Button>
-                    ) : (
+                    headerTitle: 'E-Cash',
+                    headerLeft: () => (
                         <Button
                             circular
                             chromeless
@@ -134,49 +84,16 @@ export default function EcashModal() {
                             }}
                         />
                     ),
-                    headerRight: () => selectionMode ? (
-                        <XStack items="center" gap="$2">
-                            <Button
-                                circular
-                                chromeless
-                                icon={<Check size={20} color={selectedIds.size === filteredHistory.length ? "$accent10" : "$gray10"} />}
-                                onPress={toggleSelectAll}
-                            />
-                            <Button
-                                circular
-                                chromeless
-                                disabled={selectedIds.size === 0}
-                                opacity={selectedIds.size === 0 ? 0.3 : 1}
-                                icon={<Trash2 size={20} color="$red10" />}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    confirmSheetRef.current?.present();
-                                }}
-                            />
-                        </XStack>
-                    ) : (
-                        <XStack items="center" gap="$0">
-                            <Button
-                                chromeless
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    setSelectionMode(true);
-                                }}
-                                disabled={filteredHistory.length === 0}
-                                opacity={filteredHistory.length === 0 ? 0.3 : 1}
-                            >
-                                <Text color="$accent4" fontWeight="700">Edit</Text>
-                            </Button>
-                            <Button
-                                circular
-                                chromeless
-                                icon={<RefreshCw size={20} className={isFetching ? 'spin' : ''} />}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    refetch();
-                                }}
-                            />
-                        </XStack>
+                    headerRight: () => (
+                        <Button
+                            circular
+                            chromeless
+                            icon={<RefreshCw size={20} className={isFetching ? 'spin' : ''} />}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                refetch();
+                            }}
+                        />
                     )
                 }}
             />
@@ -189,6 +106,7 @@ export default function EcashModal() {
                             size="$2.5"
                             theme="gray"
                             px="$1.5"
+                            bg="$color5"
                             rounded="$3"
                             borderWidth={1}
                             onPress={() => {
@@ -255,6 +173,7 @@ export default function EcashModal() {
                                     </YStack>
                                 </YStack>
                             ) : (
+
                                 filteredHistory.map((entry: any, index: number) => {
                                     const style = getTransactionStyle(entry.type);
                                     const status = entry.state || 'pending';
@@ -262,36 +181,20 @@ export default function EcashModal() {
                                     return (
                                         <React.Fragment key={entry.id}>
                                             <YStack
-                                                onPress={() => {
-                                                    if (selectionMode) {
-                                                        toggleSelection(entry.id);
-                                                    } else {
-                                                        handleItemPress(entry.id);
-                                                    }
-                                                }}
+                                                onPress={() => handleItemPress(entry.id)}
                                                 pressStyle={{ opacity: 0.7, scale: 0.98 }}
                                                 py="$2"
                                                 px="$2"
                                             >
                                                 <XStack justify="space-between" items="center">
                                                     <XStack gap="$3" items="center">
-                                                        {selectionMode && (
-                                                            <View
-                                                                width={22} height={22} rounded="$10"
-                                                                borderWidth={2}
-                                                                borderColor={selectedIds.has(entry.id) ? "$accent10" : "$gray8"}
-                                                                bg={selectedIds.has(entry.id) ? "$accent10" : "transparent"}
-                                                                items="center" justify="center"
-                                                            >
-                                                                {selectedIds.has(entry.id) && <Check size={14} color="white" strokeWidth={3} />}
-                                                            </View>
-                                                        )}
                                                         <View
                                                             p="$2.5"
                                                             rounded="$4"
                                                             borderWidth={1}
                                                             borderColor="$borderColor"
-                                                            bg="$gray2"
+                                                            bg="$color6"
+                                                            theme="gray"
                                                         >
                                                             <style.icon size={22} strokeWidth={2.5} color={style.iconColor as any} />
                                                         </View>
@@ -330,42 +233,6 @@ export default function EcashModal() {
                     </YStack>
                 </YStack>
             </ScrollView>
-
-            <AppBottomSheet ref={confirmSheetRef}>
-                <YStack p="$4" gap="$5">
-                    <YStack gap="$2" items="center">
-                        <View p="$4" bg="$red2" rounded="$10">
-                            <Trash2 size={32} color="$red10" />
-                        </View>
-                        <Text fontSize="$6" fontWeight="800">Delete E-Cash?</Text>
-                        <Text color="$gray10" text="center" px="$4">
-                            You are about to delete {selectedIds.size} token{selectedIds.size > 1 ? 's' : ''} from your database. This cannot be undone.
-                        </Text>
-                    </YStack>
-
-                    <YStack gap="$3">
-                        <Button
-                            theme="red"
-                            size="$5"
-                            fontWeight="800"
-                            onPress={handleDelete}
-                        >
-                            Confirm Delete
-                        </Button>
-                        <Button
-                            chromeless
-                            size="$5"
-                            fontWeight="800"
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                confirmSheetRef.current?.dismiss();
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                    </YStack>
-                </YStack>
-            </AppBottomSheet>
 
             <AppBottomSheet ref={sheetRef} snapPoints={["50%", "85%"]}>
                 <YStack p="$4" gap="$4">

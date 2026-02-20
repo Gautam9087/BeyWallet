@@ -16,6 +16,7 @@ import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spinner } from '~/components/UI/Spinner';
 import { useToastController } from '@tamagui/toast';
+import AppBottomSheet from '~/components/UI/AppBottomSheet';
 
 // Ensure Buffer is available globally
 if (typeof global.Buffer === 'undefined') {
@@ -322,6 +323,23 @@ export function TransactionDetailsScreen() {
         );
     }
 
+    const deleteSheetRef = useRef<any>(null);
+
+    const handleDelete = async () => {
+        if (!id) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        try {
+            await historyService.deleteHistoryEntries([id]);
+            toast.show('Deleted', { message: 'Transaction removed from history' });
+            deleteSheetRef.current?.dismiss();
+            router.back();
+            queryClient.invalidateQueries({ queryKey: ['history'] });
+        } catch (err) {
+            console.error('[TransactionDetails] Delete failed:', err);
+            toast.show('Delete Failed', { message: 'Could not remove transaction' });
+        }
+    };
+
     try {
         const isOutgoing = entry.type === 'send' || entry.type === 'melt';
         const amountColor = isOutgoing ? '$red10' : '$green11';
@@ -332,18 +350,27 @@ export function TransactionDetailsScreen() {
                 <Stack.Screen
                     options={{
                         headerRight: () => (
-                            <Button
-                                circular
-                                size="$3"
-                                icon={isRefetching ? <Spinner /> : <RefreshCw size={22} color={isRefetching ? "$color" : "$color"} />}
-                                chromeless
-                                onPress={handleRefresh}
-                                disabled={isRefetching}
-                            />
+                            <XStack gap="$2">
+                                <Button
+                                    circular
+                                    size="$3"
+                                    icon={isRefetching ? <Spinner /> : <RefreshCw size={22} color="$color" />}
+                                    chromeless
+                                    onPress={handleRefresh}
+                                    disabled={isRefetching}
+                                />
+                                <Button
+                                    circular
+                                    size="$3"
+                                    icon={<Trash2 size={20} color="$red10" />}
+                                    chromeless
+                                    onPress={() => deleteSheetRef.current?.present()}
+                                />
+                            </XStack>
                         ),
                     }}
                 />
-                <ScrollView p="$4" pb="$2" bg="$background" showsVerticalScrollIndicator={false}>
+                <ScrollView p="$4" pb="$8" bg="$background" showsVerticalScrollIndicator={false}>
                     {/* Amount Display */}
                     <YStack gap="$1" mb="$6" >
                         <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
@@ -362,9 +389,16 @@ export function TransactionDetailsScreen() {
                         <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$2" textTransform='uppercase' letterSpacing={1}>
                             {(entry.type || 'unknown').toUpperCase()} • {formattedStatus}
                         </Text>
-                        <Text fontSize="$5" fontWeight="800" color={statusConfig.color as any} mb="$4">
-                            {formattedStatus.toUpperCase()}
-                        </Text>
+                        <XStack justify="space-between" items="center" mb="$4">
+                            <Text fontSize="$5" fontWeight="800" color={statusConfig.color as any}>
+                                {formattedStatus.toUpperCase()}
+                            </Text>
+                            {status === 'pending' && (
+                                <View bg="$orange3" px="$2" py="$1" rounded="$2">
+                                    <Text fontSize="$1" fontWeight="800" color="$orange10">ACTION REQUIRED</Text>
+                                </View>
+                            )}
+                        </XStack>
 
                         <YStack>
                             {/* Step 1: Prepared */}
@@ -399,7 +433,6 @@ export function TransactionDetailsScreen() {
                         </YStack>
                     </YStack>
 
-                    {/* Details List */}
                     <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
                         <DetailItem label="Amount" value={`${entry.amount || 0} ${entry.unit || 'sats'}`} />
                         <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
@@ -410,7 +443,7 @@ export function TransactionDetailsScreen() {
                     </YStack>
 
                     {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && (
-                        <YStack gap="$4" pb="$10" mt="$4">
+                        <YStack gap="$4" pb="$4" mt="$4">
                             {entry.type === 'send' ? (
                                 <YStack items="center" gap="$4">
                                     <View bg="white" p="$3" rounded="$6">
@@ -460,10 +493,61 @@ export function TransactionDetailsScreen() {
                     )}
 
                     {token && typeof token === 'string' && (status === 'claimed' || status === 'completed') && (
-                        <YStack gap="$4" pb="$10" mt="$4">
+                        <YStack gap="$4" pb="$4" mt="$4">
                             <Button bg="$gray3" color="$color" icon={<Copy size={18} />} onPress={handleCopyToken} fontWeight="800">Copy Token</Button>
                         </YStack>
                     )}
+
+                    {/* Danger Zone */}
+                    <YStack gap="$3" mt="$10" pb="$10" borderTopWidth={1} borderColor="$gray4" pt="$6">
+                        <XStack items="center" gap="$2">
+                            <AlertCircle size={14} color="$red9" />
+                            <Text fontSize="$2" fontWeight="800" color="$gray10" textTransform="uppercase" letterSpacing={1}>Danger Zone</Text>
+                        </XStack>
+                        <Button
+                            theme="red"
+                            variant="outlined"
+                            size="$5"
+                            fontWeight="800"
+                            icon={<Trash2 size={20} color="$red10" />}
+                            onPress={() => deleteSheetRef.current?.present()}
+                        >
+                            Delete Transaction History
+                        </Button>
+                    </YStack>
+
+                    <AppBottomSheet ref={deleteSheetRef}>
+                        <YStack p="$4" gap="$5">
+                            <YStack gap="$2" items="center">
+                                <View p="$4" bg="$red2" rounded="$10">
+                                    <Trash2 size={32} color="$red10" />
+                                </View>
+                                <Text fontSize="$6" fontWeight="800">Delete Record?</Text>
+                                <Text color="$gray10" text="center" px="$4">
+                                    This will remove this transaction from your local history. It cannot be undone.
+                                </Text>
+                            </YStack>
+
+                            <YStack gap="$3">
+                                <Button
+                                    theme="red"
+                                    size="$5"
+                                    fontWeight="800"
+                                    onPress={handleDelete}
+                                >
+                                    Confirm Delete
+                                </Button>
+                                <Button
+                                    chromeless
+                                    size="$5"
+                                    fontWeight="800"
+                                    onPress={() => deleteSheetRef.current?.dismiss()}
+                                >
+                                    Cancel
+                                </Button>
+                            </YStack>
+                        </YStack>
+                    </AppBottomSheet>
                 </ScrollView>
             </>
         );

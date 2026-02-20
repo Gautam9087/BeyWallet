@@ -28,6 +28,7 @@ interface WalletState {
     addMint: (url: string, options?: { trusted?: boolean }) => Promise<void>;
     trustMint: (url: string) => Promise<void>;
     untrustMint: (url: string) => Promise<void>;
+    removeMint: (url: string) => Promise<void>;
     setMintNickname: (url: string, nickname: string) => Promise<void>;
     fetchMintInfo: (url: string) => Promise<any>;
     refreshBalance: () => Promise<void>;
@@ -273,6 +274,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             await get().refreshMintList();
         } catch (err: any) {
             console.error('[WalletStore] Failed to untrust mint:', err);
+            set({ error: err.message });
+        }
+    },
+
+    removeMint: async (url: string) => {
+        try {
+            await mintManager.removeMint(url);
+            await get().refreshMintList();
+            if (get().activeMintUrl === url) {
+                set({ activeMintUrl: DEFAULT_MINT });
+            }
+        } catch (err: any) {
+            console.error('[WalletStore] Failed to remove mint:', err);
             set({ error: err.message });
         }
     },

@@ -80,6 +80,9 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
                 snapPoints={snapPoints}
                 backdropComponent={renderBackdrop}
                 stackBehavior="push"
+                keyboardBehavior="extend"
+                keyboardBlurBehavior="restore"
+                android_keyboardInputMode="adjustResize"
                 handleIndicatorStyle={{
                     backgroundColor: theme.color8.val,
                     width: 36,
@@ -87,11 +90,11 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
                 }}
                 backgroundStyle={{
                     backgroundColor: theme.color2.val,
-                    borderRadius: 10,
+                    borderRadius: 20,
                 }}
                 onChange={handleSheetChanges}
                 animationConfigs={{
-                    duration: 100,
+                    duration: 250,
                 }}
                 // Ensure high priority
                 containerStyle={{ zIndex: 1000 }}

@@ -40,6 +40,19 @@ export const mintManager = {
     },
 
     /**
+     * Remove a mint from the device entirely.
+     */
+    removeMint: async (mintUrl: string): Promise<void> => {
+        const repo = initService.getRepo();
+        if ((mgr().mint as any).removeMint) {
+            await (mgr().mint as any).removeMint(mintUrl);
+        } else {
+            await (repo.mintRepository as any).deleteMint?.(mintUrl);
+        }
+        console.log(`[MintManager] Mint removed: ${mintUrl}`);
+    },
+
+    /**
      * Check if a mint is trusted.
      */
     isMintTrusted: async (mintUrl: string): Promise<boolean> => {

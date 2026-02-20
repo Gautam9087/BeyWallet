@@ -1,5 +1,5 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Button, Input, Text, YStack, XStack, Spinner, Paragraph, View } from 'tamagui';
+import { Button, Input, Text, YStack, XStack, Spinner, Paragraph, View, useTheme } from 'tamagui';
 import { Plus, Check, AlertCircle, Sprout, X } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 import AppBottomSheet, { AppBottomSheetRef } from './UI/AppBottomSheet';
@@ -7,6 +7,18 @@ import { useWalletStore } from '../store/walletStore';
 import { useToastController } from '@tamagui/toast';
 
 type Stage = 'input' | 'preview' | 'loading';
+
+import { BottomSheetTextInput, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+
+// Basic URL validation
+const validateUrl = (url: string) => {
+    try {
+        new URL(url.startsWith('http') ? url : `https://${url}`);
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 interface MintPreviewInfo {
     name?: string;
@@ -21,13 +33,15 @@ export interface AddMintModalRef {
 
 const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
     const sheetRef = useRef<AppBottomSheetRef>(null);
+    const theme = useTheme();
     const [stage, setStage] = useState<Stage>('input');
     const [mintUrl, setMintUrl] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [previewInfo, setPreviewInfo] = useState<MintPreviewInfo | null>(null);
 
-    const { fetchMintInfo, addMint, refreshMintList } = useWalletStore();
+    const { fetchMintInfo, addMint, refreshMintList, mints, trustMint } = useWalletStore();
     const toast = useToastController();
+    const [isExistingUntrusted, setIsExistingUntrusted] = useState(false);
 
     useImperativeHandle(ref, () => ({
         present: (url?: string) => {
@@ -47,7 +61,13 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
     const handleFetchWithUrl = async (url: string) => {
         setStage('loading');
         setError(null);
+        setIsExistingUntrusted(false);
         try {
+            const existing = mints.find(m => m.mintUrl.replace(/\/$/, '') === url.replace(/\/$/, ''));
+            if (existing && !existing.trusted) {
+                setIsExistingUntrusted(true);
+            }
+
             const info = await fetchMintInfo(url);
             setPreviewInfo({
                 name: info?.name || 'Unknown Mint',
@@ -66,6 +86,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
         setMintUrl('');
         setError(null);
         setPreviewInfo(null);
+        setIsExistingUntrusted(false);
     };
 
     const handleFetchMintInfo = async () => {
@@ -83,9 +104,15 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
 
         setStage('loading');
         setError(null);
+        setIsExistingUntrusted(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         try {
+            const existing = mints.find(m => m.mintUrl.replace(/\/$/, '') === url.replace(/\/$/, ''));
+            if (existing && !existing.trusted) {
+                setIsExistingUntrusted(true);
+            }
+
             const info = await fetchMintInfo(url);
             setPreviewInfo({
                 name: info?.name || 'Unknown Mint',
@@ -173,23 +200,32 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
 
     const renderInputStage = () => (
         <YStack gap="$4">
-            <XStack justify="center">
+            <XStack justify="center" mb="$2">
                 <Paragraph fontSize="$6" color="$accent5" fontWeight="bold">Add Mint</Paragraph>
             </XStack>
 
             <YStack gap="$2">
-                <Input
-                    size="$4"
+                <BottomSheetTextInput
                     placeholder="https://mint.example.com"
                     value={mintUrl}
                     onChangeText={setMintUrl}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="url"
-                    borderColor={error ? '$red10' : '$borderColor'}
+                    style={{
+                        backgroundColor: theme.color2.val,
+                        color: theme.color.val,
+                        borderRadius: 12,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: error ? theme.red10.val : theme.borderColor.val,
+                        fontSize: 16,
+                        height: 56
+                    }}
+                    placeholderTextColor={theme.gray10.val}
                 />
                 {error && (
-                    <XStack gap="$2" items="center">
+                    <XStack gap="$2" items="center" mt="$1">
                         <AlertCircle size={14} color="$red10" />
                         <Text color="$red10" fontSize="$2">{error}</Text>
                     </XStack>
@@ -242,6 +278,13 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
                         {previewInfo.description}
                     </Text>
                 )}
+
+                {isExistingUntrusted && (
+                    <XStack p="$2" bg="$orange2" rounded="$2" gap="$2" items="center">
+                        <AlertCircle size={14} color="$orange10" />
+                        <Text fontSize="$2" color="$orange10" fontWeight="600">This mint is currently untrusted.</Text>
+                    </XStack>
+                )}
             </YStack>
 
             {error && (
@@ -271,7 +314,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
                     onPress={handleTrustMint}
                     icon={<Check size={18} />}
                 >
-                    Trust Mint
+                    {isExistingUntrusted ? 'Trust this Mint' : 'Trust Mint'}
                 </Button>
             </XStack>
         </YStack>
@@ -286,11 +329,11 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
 
     return (
         <AppBottomSheet ref={sheetRef}>
-            <YStack p="$4">
+            <BottomSheetScrollView contentContainerStyle={{ padding: 16 }}>
                 {stage === 'input' && renderInputStage()}
                 {stage === 'preview' && renderPreviewStage()}
                 {stage === 'loading' && renderLoadingStage()}
-            </YStack>
+            </BottomSheetScrollView>
         </AppBottomSheet>
     );
 });

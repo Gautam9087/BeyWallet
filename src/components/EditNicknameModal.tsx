@@ -1,10 +1,11 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Button, Input, Text, YStack, XStack, Paragraph } from 'tamagui';
+import { Button, Input, Text, YStack, XStack, Paragraph, useTheme } from 'tamagui';
 import { Edit3, Check, X } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 import AppBottomSheet, { AppBottomSheetRef } from './UI/AppBottomSheet';
 import { useWalletStore } from '../store/walletStore';
 import { useToastController } from '@tamagui/toast';
+import { BottomSheetTextInput, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
 export interface EditNicknameModalRef {
     present: (mintUrl: string, currentNickname?: string) => void;
@@ -13,6 +14,7 @@ export interface EditNicknameModalRef {
 
 const EditNicknameModal = forwardRef<EditNicknameModalRef>((_, ref) => {
     const sheetRef = useRef<AppBottomSheetRef>(null);
+    const theme = useTheme();
     const [nickname, setNickname] = useState('');
     const [mintUrl, setMintUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -55,23 +57,32 @@ const EditNicknameModal = forwardRef<EditNicknameModalRef>((_, ref) => {
 
     return (
         <AppBottomSheet ref={sheetRef}>
-            <YStack p="$4" gap="$4">
+            <BottomSheetScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
                 <XStack justify="center">
                     <Paragraph fontSize="$6" color="$accent5" fontWeight="bold">Set Nickname</Paragraph>
                 </XStack>
 
-                <YStack gap="$2">
+                <YStack gap="$2.5">
                     <Text color="$gray10" fontSize="$2" px="$2">Friendly name for this mint</Text>
-                    <Input
-                        size="$4"
+                    <BottomSheetTextInput
                         placeholder="e.g. My Favorite Mint"
                         value={nickname}
                         onChangeText={setNickname}
-                        autoFocus
+                        style={{
+                            backgroundColor: theme.color2.val,
+                            color: theme.color.val,
+                            borderRadius: 12,
+                            padding: 16,
+                            borderWidth: 1,
+                            borderColor: theme.borderColor.val,
+                            fontSize: 16,
+                            height: 56
+                        }}
+                        placeholderTextColor={theme.gray10.val}
                     />
                 </YStack>
 
-                <XStack gap="$3">
+                <XStack gap="$3" mt="$2">
                     <Button
                         flex={1}
                         size="$4"
@@ -86,13 +97,13 @@ const EditNicknameModal = forwardRef<EditNicknameModalRef>((_, ref) => {
                         size="$4"
                         themeInverse
                         onPress={handleSave}
-                        loading={isLoading}
-                        icon={<Check size={18} />}
+                        disabled={isLoading}
+                        icon={isLoading ? undefined : <Check size={18} />}
                     >
-                        Save
+                        {isLoading ? 'Saving...' : 'Save'}
                     </Button>
                 </XStack>
-            </YStack>
+            </BottomSheetScrollView>
         </AppBottomSheet>
     );
 });

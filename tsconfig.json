@@ -3,6 +3,12 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "paths": {
       "~/*": [
         "./src/*"
