@@ -31,6 +31,7 @@ export function RootLayout() {
             await checkOnboardingStatus()
             const exists = await initService.walletExists()
             setWalletExists(exists)
+            console.log(`[RootLayout] Startup check — onboarded: ${isOnboarded}, walletExists: ${exists}`)
         }
         checkStatus()
     }, [isOnboarded]) // Re-check when onboarding status changes
@@ -38,6 +39,7 @@ export function RootLayout() {
     // Initialize wallet only if onboarded and wallet exists
     useEffect(() => {
         if (isOnboarded && walletExists) {
+            console.log('[RootLayout] ✅ Mnemonic found, initializing Coco...')
             initialize()
         }
     }, [isOnboarded, walletExists, initialize])

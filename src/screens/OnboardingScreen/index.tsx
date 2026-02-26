@@ -63,8 +63,9 @@ export function OnboardingScreen() {
         try {
             console.log('[Onboarding] Importing wallet from seed...')
 
-            // 1. Create the wallet with the imported mnemonic
-            await initService.createWallet(mnemonic)
+            // 1. Restore wallet deterministically (fresh DB + NUT-13 sweep)
+            setImportStatus('Restoring wallet from seed (NUT-13)...')
+            await initService.restoreWallet(mnemonic)
 
             // 2. Try to restore from Nostr (mints + balance metadata)
             setImportStatus('Searching Nostr for your wallet backup...')
@@ -73,7 +74,7 @@ export function OnboardingScreen() {
                 if (nostrData && nostrData.mints && nostrData.mints.length > 0) {
                     setImportStatus(`Found backup with ${nostrData.mints.length} mints!`);
 
-                    // Add all mints and trigger restoration
+                    // Add any additional mints from Nostr and restore
                     for (const url of nostrData.mints) {
                         try {
                             setImportStatus(`Restoring ${url.substring(0, 30)}...`);
@@ -85,21 +86,18 @@ export function OnboardingScreen() {
                         }
                     }
                 } else {
-                    // Fallback to default mint if nothing on Nostr
-                    setImportStatus('No backup found on Nostr. Using defaults.');
-                    await setupDefaultMint();
+                    setImportStatus('No extra backup found on Nostr.');
                 }
             } catch (e) {
-                console.warn('[Onboarding] Nostr recovery failed, using default:', e);
-                await setupDefaultMint();
+                console.warn('[Onboarding] Nostr recovery failed (non-fatal):', e);
             }
 
-            // 5. Mark onboarding as complete and enter the app
-            setImportStatus('Welcome back! Finshing setup...')
+            // 3. Mark onboarding as complete and enter the app
+            setImportStatus('Welcome back! Finishing setup...')
             await completeOnboarding()
             await initialize()
 
-            console.log('[Onboarding] Import successful, restoration continuing in background.')
+            console.log('[Onboarding] ✅ Import successful, restoration complete.')
         } catch (err) {
             console.error('[Onboarding] Import failed:', err)
             setImportStatus('Import failed. Please try again.')

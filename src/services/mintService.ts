@@ -27,6 +27,7 @@ export const mintService = {
      */
     requestMintQuote: async (url: string, amount: number) => {
         const manager = initService.getManager();
+        console.log(`[MintService] Creating mint quote: ${amount} sats (unit: sat) from ${url}`);
         return await manager.quotes.createMintQuote(url, amount);
     },
 

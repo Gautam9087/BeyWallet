@@ -22,9 +22,9 @@ export const quotesService = {
      * @returns MintQuoteResponse with `quote` (id) and Lightning `request` (invoice)
      */
     createMintQuote: async (mintUrl: string, amount: number): Promise<MintQuoteResponse> => {
-        console.log(`[QuotesService] Creating mint quote: ${amount} sats from ${mintUrl}`);
+        console.log(`[QuotesService] Creating mint quote: ${amount} sats (unit: sat) from ${mintUrl}`);
         const quote = await mgr().quotes.createMintQuote(mintUrl, amount);
-        console.log(`[QuotesService] Mint quote created: ${quote.quote}`);
+        console.log(`[QuotesService] ✅ Mint quote created: ${quote.quote}`);
         return quote;
     },
 
@@ -65,9 +65,9 @@ export const quotesService = {
      * @returns MeltQuoteResponse with amount, fee_reserve, and quote id
      */
     createMeltQuote: async (mintUrl: string, invoice: string): Promise<MeltQuoteResponse> => {
-        console.log(`[QuotesService] Creating melt quote from ${mintUrl}`);
+        console.log(`[QuotesService] Creating melt quote (unit: sat) from ${mintUrl}`);
         const quote = await mgr().quotes.createMeltQuote(mintUrl, invoice);
-        console.log(`[QuotesService] Melt quote created: ${quote.quote}`);
+        console.log(`[QuotesService] ✅ Melt quote created: ${quote.quote}`);
         return quote;
     },
 

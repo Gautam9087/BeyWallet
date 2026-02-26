@@ -207,8 +207,7 @@ export default function MintsModal() {
                             </View>
                         </XStack>
 
-                        <YStack rounded="$5" theme="gray" bg="$gray2" borderWidth={1}
-                            borderColor="$gray6"
+                        <YStack rounded="$5" theme="gray" bg="$gray2"
                             overflow="hidden">
                             {mints.length === 0 ? (
                                 <YStack py="$10" items="center" justify="center" gap="$3" opacity={0.5} p="$3">

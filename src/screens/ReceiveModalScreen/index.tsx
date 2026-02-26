@@ -174,7 +174,13 @@ export function ReceiveModalScreen() {
             await refreshBalance();
             setStep('result');
         } catch (err: any) {
-            console.error('[ReceiveModal] Failed to receive token:', err);
+            console.error('[ReceiveModal] ❌ Failed to receive token:', {
+                message: err?.message,
+                name: err?.name,
+                code: err?.code,
+                stack: err?.stack?.substring(0, 500),
+                mint: tokenInfo?.mint,
+            });
             setError(err.message || 'Failed to receive token');
             setStatus('error');
             setStep('result');

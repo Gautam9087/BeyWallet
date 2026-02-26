@@ -1,31 +1,65 @@
 import React, { useState, useEffect } from 'react';
-import { YStack, XStack, Text, Button, View, ScrollView, Circle } from 'tamagui';
-import { ShieldCheck, Copy, Eye, EyeOff, ChevronLeft, AlertTriangle } from '@tamagui/lucide-icons';
+import { YStack, XStack, Text, Button, View, ScrollView } from 'tamagui';
+import { ShieldCheck, Copy, Eye, EyeOff, AlertTriangle, CheckCircle2 } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
 import { seedService } from '~/services/seedService';
+import { initService } from '~/services/core';
 
 export function BackupSeedScreen() {
     const router = useRouter();
     const [mnemonic, setMnemonic] = useState<string | null>(null);
     const [isVisible, setIsVisible] = useState(false);
+    const [hasBackedUp, setHasBackedUp] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        const fetchMnemonic = async () => {
-            const m = await seedService.getMnemonic();
+        const fetchOrGenerateMnemonic = async () => {
+            let m = await seedService.getMnemonic();
+
+            if (!m) {
+                // Generate a new mnemonic if one doesn't exist
+                console.log('[BackupSeedScreen] No mnemonic found, generating new one...');
+                m = seedService.generateMnemonic();
+                await seedService.saveMnemonic(m);
+
+                // Re-initialize coco with new seed
+                try {
+                    initService.reset();
+                    await initService.init();
+                    console.log('[BackupSeedScreen] ✅ Coco re-initialized with new seed');
+                } catch (e) {
+                    console.warn('[BackupSeedScreen] Re-init warning (non-fatal):', e);
+                }
+            }
+
             setMnemonic(m);
+
+            // Check if already marked as backed up
+            const backedUp = await SecureStore.getItemAsync('wallet_backed_up');
+            setHasBackedUp(backedUp === 'true');
         };
-        fetchMnemonic();
+        fetchOrGenerateMnemonic();
     }, []);
 
     const handleCopy = async () => {
         if (mnemonic) {
             await Clipboard.setStringAsync(mnemonic);
+            setCopied(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setTimeout(() => setCopied(false), 2000);
         }
     };
 
+    const handleConfirmBackup = async () => {
+        await SecureStore.setItemAsync('wallet_backed_up', 'true');
+        setHasBackedUp(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        console.log('[BackupSeedScreen] ✅ Wallet marked as backed up');
+        router.back();
+    };
 
     const words = mnemonic?.split(' ') || [];
 
@@ -33,7 +67,6 @@ export function BackupSeedScreen() {
         <YStack flex={1} bg="$background">
             <ScrollView showsVerticalScrollIndicator={false}>
                 <YStack p="$4" gap="$6">
-
 
                     <View bg="$yellow2" p="$4" rounded="$4" borderWidth={1} borderColor="$yellow8">
                         <XStack gap="$3">
@@ -98,7 +131,7 @@ export function BackupSeedScreen() {
                             <Button
                                 flex={1}
                                 size="$5"
-                                icon={Copy}
+                                icon={copied ? CheckCircle2 : Copy}
                                 onPress={() => {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     handleCopy();
@@ -106,18 +139,26 @@ export function BackupSeedScreen() {
                                 rounded="$4"
                                 bg="$gray5"
                             >
-                                Copy
+                                {copied ? 'Copied!' : 'Copy'}
                             </Button>
                         </XStack>
                     </YStack>
+
+                    {hasBackedUp ? (
+                        <XStack items="center" gap="$2" justify="center" py="$2">
+                            <CheckCircle2 size={18} color="$green10" />
+                            <Text color="$green10" fontWeight="600">Already backed up</Text>
+                        </XStack>
+                    ) : null}
 
                     <Button
                         theme="blue"
                         size="$5"
                         fontWeight="700"
-                        onPress={() => router.back()}
+                        onPress={handleConfirmBackup}
                         mt="$4"
                         rounded="$4"
+                        icon={<ShieldCheck size={20} />}
                     >
                         I've Backed It Up
                     </Button>

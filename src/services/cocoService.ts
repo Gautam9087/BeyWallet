@@ -437,9 +437,9 @@ export const cocoService = {
         if (!cocoManager) {
             throw new Error('CocoManager not initialized');
         }
-        console.log(`[CocoService] Creating mint quote: ${amount} sats from ${mintUrl}`);
+        console.log(`[CocoService] Creating mint quote: ${amount} sats (unit: sat) from ${mintUrl}`);
         const quote = await cocoManager.quotes.createMintQuote(mintUrl, amount);
-        console.log(`[CocoService] Mint quote created: ${quote.quote}`);
+        console.log(`[CocoService] ✅ Mint quote created: ${quote.quote}`);
         return quote;
     },
 
