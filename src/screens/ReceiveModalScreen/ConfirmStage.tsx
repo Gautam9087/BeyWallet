@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useToastController } from '@tamagui/toast';
 import { useWalletStore } from '../../store/walletStore';
+import { mintManager } from '../../services/core';
 
 interface TokenInfo {
     mint: string;
@@ -30,6 +31,17 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
     const { mints } = useWalletStore();
     const toast = useToastController();
     const [isSavingLater, setIsSavingLater] = React.useState(false);
+    const [estimatedFee, setEstimatedFee] = React.useState(0);
+
+    // Fetch fee for this mint
+    React.useEffect(() => {
+        if (tokenInfo.mint) {
+            mintManager.getFeePpk(tokenInfo.mint).then(feePpk => {
+                const fee = feePpk > 0 ? Math.ceil(tokenInfo.proofCount * feePpk / 1000) : 0;
+                setEstimatedFee(fee);
+            }).catch(() => setEstimatedFee(0));
+        }
+    }, [tokenInfo.mint, tokenInfo.proofCount]);
 
     // Check if mint is trusted
     const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
@@ -145,6 +157,18 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                         />
                         {tokenInfo.preview?.description && (
                             <DetailItem label="Description" value={tokenInfo.preview.description} />
+                        )}
+                        {estimatedFee > 0 && (
+                            <>
+                                <DetailItem
+                                    label="Fee"
+                                    value={`-${estimatedFee} sats`}
+                                />
+                                <DetailItem
+                                    label="You Receive"
+                                    value={`${tokenInfo.amount - estimatedFee} sats`}
+                                />
+                            </>
                         )}
                     </YStack>
                 </YStack>

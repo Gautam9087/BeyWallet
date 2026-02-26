@@ -4,7 +4,7 @@ import { useWalletStore } from '~/store/walletStore'
 import { AmountStage } from './AmountStage'
 import { ResultStage } from './ResultStage'
 import { biometricService } from '~/services/biometricService'
-import { walletService } from '~/services/core'
+import { walletService, mintManager } from '~/services/core'
 import * as Haptics from 'expo-haptics'
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet'
 import { Text, YStack, XStack, Button, Separator, View } from 'tamagui'
@@ -30,6 +30,18 @@ export function SendModalScreen() {
     const { balance, activeMintUrl, refreshBalance, mints } = useWalletStore()
     const { secondaryCurrency } = useSettingsStore()
     const confirmSheetRef = React.useRef<AppBottomSheetRef>(null)
+    const [estimatedFee, setEstimatedFee] = React.useState(0)
+
+    // Fetch fee when active mint changes
+    React.useEffect(() => {
+        if (activeMintUrl) {
+            mintManager.getFeePpk(activeMintUrl).then(feePpk => {
+                // Estimate fee assuming ~4 input proofs (typical swap)
+                const fee = feePpk > 0 ? Math.ceil(4 * feePpk / 1000) : 0;
+                setEstimatedFee(fee);
+            }).catch(() => setEstimatedFee(0));
+        }
+    }, [activeMintUrl])
 
     const { data: btcData } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
@@ -172,7 +184,9 @@ export function SendModalScreen() {
                                 <ShieldCheck size={16} color="$gray10" />
                                 <Text color="$gray10">Fee</Text>
                             </XStack>
-                            <Text fontWeight="600" color="$green10">0 sats</Text>
+                            <Text fontWeight="600" color={estimatedFee > 0 ? "$orange10" : "$green10"}>
+                                {estimatedFee > 0 ? `~${estimatedFee} sats` : '0 sats'}
+                            </Text>
                         </XStack>
 
                         <Separator borderColor="$color4" />

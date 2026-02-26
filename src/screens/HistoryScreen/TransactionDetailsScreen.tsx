@@ -10,7 +10,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { UR, UREncoder } from "@gandlaf21/bc-ur";
 import { Buffer } from 'buffer';
 import { formatFullLocalTime, formatRelativeTime } from '~/utils/time';
-import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3, walletService } from '~/services/core';
+import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3, walletService, mintManager } from '~/services/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '~/store/settingsStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -280,6 +280,16 @@ export function TransactionDetailsScreen() {
     };
 
     const [isClaiming, setIsClaiming] = useState(false);
+    const [mintFee, setMintFee] = useState(0);
+
+    // Fetch fee for this mint
+    useEffect(() => {
+        if (entry?.mintUrl) {
+            mintManager.getFeePpk(entry.mintUrl).then(feePpk => {
+                setMintFee(feePpk);
+            }).catch(() => setMintFee(0));
+        }
+    }, [entry?.mintUrl]);
 
     const handleClaimNow = async () => {
         if (!token || isClaiming) return;
@@ -467,6 +477,9 @@ export function TransactionDetailsScreen() {
                         <DetailItem label="Status" value={formattedStatus} />
                         <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
                         <DetailItem label="Mint" value={(entry.mintUrl || 'Unknown').replace(/^https?:\/\//, '').split('/')[0]} />
+                        {mintFee > 0 && (
+                            <DetailItem label="Fee Rate" value={`${mintFee} ppk (${(mintFee / 10).toFixed(1)}%)`} />
+                        )}
                     </YStack>
 
                     {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && (

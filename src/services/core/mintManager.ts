@@ -157,4 +157,30 @@ export const mintManager = {
         const repo = initService.getRepo();
         await (repo.mintRepository as any).setMintNickname?.(mintUrl, nickname);
     },
+
+    /**
+     * Get the fee per-proof-per-kilo (feePpk) for a mint's active keyset.
+     * Returns 0 if no fee or mint not found.
+     */
+    getFeePpk: async (mintUrl: string): Promise<number> => {
+        try {
+            const repo = initService.getRepo();
+            const keysets = await repo.keysetRepository.getKeysetsByMintUrl(mintUrl);
+            // Find the active keyset, or the first one
+            const active = keysets.find((k: any) => k.active) || keysets[0];
+            return (active as any)?.feePpk || 0;
+        } catch {
+            return 0;
+        }
+    },
+
+    /**
+     * Estimate the total fee for a transaction given a number of input proofs.
+     * Fee formula (NUT-02): ceil(numInputs * feePpk / 1000)
+     */
+    estimateFee: async (mintUrl: string, numInputs: number): Promise<number> => {
+        const feePpk = await mintManager.getFeePpk(mintUrl);
+        if (feePpk <= 0 || numInputs <= 0) return 0;
+        return Math.ceil(numInputs * feePpk / 1000);
+    },
 };
