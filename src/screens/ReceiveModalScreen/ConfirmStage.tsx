@@ -137,10 +137,9 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                     </YStack>
                 )}
 
-                {/* Details List */}
-                <YStack mx="$4" p="$4" bg="$gray2" rounded="$4" gap="$4">
-                    <Text fontSize="$5" fontWeight="600" color="$color">Details</Text>
-                    <YStack separator={<Separator borderColor="$gray4" />}>
+                <Text fontSize="$5" fontWeight="800" color="$color" ml="$4" mb="$-2">Details</Text>
+                <YStack mx="$4" bg="$gray2" rounded="$5" overflow="hidden">
+                    <YStack separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <DetailItem
                             label="Amount"
                             value={`${tokenInfo.amount} sats`}
@@ -233,14 +232,14 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
 
 function DetailItem({ label, value, isCopyable, onCopy }: { label: string, value: string, isCopyable?: boolean, onCopy?: () => void }) {
     return (
-        <XStack justify="space-between" items="center" py="$3" borderBottomWidth={1} borderColor="$gray3">
-            <Text fontSize="$4" color="$gray10" fontWeight="500">{label}</Text>
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
             <XStack gap="$2" items="center">
-                <Text fontSize="$4" fontWeight="600" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
                     {value}
                 </Text>
                 {isCopyable && (
-                    <Button size="$2" chromeless icon={<Copy size={14} color="$gray10" />} onPress={onCopy} />
+                    <Button size="$2" chromeless icon={<Copy size={16} color="$gray10" />} onPress={onCopy} />
                 )}
             </XStack>
         </XStack>

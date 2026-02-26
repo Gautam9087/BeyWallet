@@ -128,12 +128,12 @@ export function SettingsScreen() {
                 {/* Security Section */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Security</Text>
-                    <YGroup>
+                    <YGroup rounded="$5" bg="$gray2" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <YGroup.Item>
                             <ListItem
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 title={<H6>Backup Recovery Phrase</H6>}
                                 subTitle="View your secret 12 words"
@@ -148,10 +148,10 @@ export function SettingsScreen() {
                 {/* Appearance Section */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Appearance</Text>
-                    <YGroup>
+                    <YGroup rounded="$5" bg="$gray2" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <YGroup.Item>
                             <ListItem
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
@@ -164,7 +164,7 @@ export function SettingsScreen() {
                         </YGroup.Item>
                         <YGroup.Item>
                             <ListItem
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 hoverStyle={{ bg: '$backgroundHover' }}
                                 pressStyle={{ bg: '$backgroundPress' }}
@@ -181,10 +181,10 @@ export function SettingsScreen() {
                 {/* General Section */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">General</Text>
-                    <YGroup>
+                    <YGroup rounded="$5" bg="$gray2" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <YGroup.Item>
                             <ListItem
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 opacity={0.5}
                                 title={<H6>Notifications</H6>}
@@ -195,7 +195,7 @@ export function SettingsScreen() {
                         </YGroup.Item>
                         <YGroup.Item>
                             <ListItem
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 opacity={0.5}
                                 title={<H6>Language</H6>}
@@ -210,10 +210,10 @@ export function SettingsScreen() {
                 {/* About Section */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">About</Text>
-                    <YGroup>
+                    <YGroup rounded="$5" bg="$gray2" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <YGroup.Item>
                             <ListItem
-                                bg="$gray5"
+                                bg="transparent"
                                 fontWeight="600"
                                 title="Version"
                                 subTitle="1.0.0 (Alpha)"
@@ -226,10 +226,10 @@ export function SettingsScreen() {
                 {/* Danger Zone */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$red10" px="$2">Danger Zone</Text>
-                    <YGroup>
+                    <YGroup rounded="$5" bg="$red3" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <YGroup.Item>
                             <ListItem
-                                bg="$red3"
+                                bg="transparent"
                                 fontWeight="600"
                                 hoverStyle={{ bg: '$red4' }}
                                 pressStyle={{ bg: '$red5' }}

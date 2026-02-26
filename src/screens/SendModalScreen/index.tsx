@@ -168,33 +168,33 @@ export function SendModalScreen() {
                         <Text fontSize="$6" fontWeight="800">Review Transaction</Text>
                     </YStack>
 
-                    <YStack borderWidth={1} borderColor="$color4" rounded="$4" overflow="hidden">
-                        <XStack justify="space-between" items="center" p="$4">
-                            <Text color="$gray10">Amount</Text>
+                    <YStack rounded="$5" bg="$gray2" overflow="hidden">
+                        <XStack justify="space-between" items="center" px="$4" py="$3">
+                            <Text color="$gray10" fontWeight="600">Amount</Text>
                             <YStack items="flex-end">
                                 <Text fontWeight="800" fontSize="$6">₿{amount} sats</Text>
                                 <Text color="$gray10" fontSize="$3">{fiatValue}</Text>
                             </YStack>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
+                        <Separator borderColor="$borderColor" opacity={0.5} />
 
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" px="$4" py="$3">
                             <XStack gap="$2" items="center">
-                                <ShieldCheck size={16} color="$gray10" />
-                                <Text color="$gray10">Fee</Text>
+                                <ShieldCheck size={18} color="$gray10" />
+                                <Text color="$gray10" fontWeight="600">Fee</Text>
                             </XStack>
-                            <Text fontWeight="600" color={estimatedFee > 0 ? "$orange10" : "$green10"}>
+                            <Text fontWeight="800" fontSize="$5" color={estimatedFee > 0 ? "$orange10" : "$green10"}>
                                 {estimatedFee > 0 ? `~${estimatedFee} sats` : '0 sats'}
                             </Text>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
+                        <Separator borderColor="$borderColor" opacity={0.5} />
 
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" px="$4" py="$3">
                             <XStack gap="$2" items="center">
-                                <Building2 size={16} color="$gray10" />
-                                <Text color="$gray10">Mint</Text>
+                                <Building2 size={18} color="$gray10" />
+                                <Text color="$gray10" fontWeight="600">Mint</Text>
                             </XStack>
                             <XStack gap="$2" items="center">
                                 {activeMint?.icon && (
@@ -202,19 +202,19 @@ export function SendModalScreen() {
                                         <Image source={{ uri: activeMint.icon }} width={20} height={20} />
                                     </View>
                                 )}
-                                <Text fontWeight="600" numberOfLines={1} style={{ maxWidth: 180 }}>{mintName}</Text>
+                                <Text fontWeight="800" fontSize="$5" numberOfLines={1} style={{ maxWidth: 180 }}>{mintName}</Text>
                             </XStack>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
+                        <Separator borderColor="$borderColor" opacity={0.5} />
 
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" px="$4" py="$3">
                             <XStack gap="$2" items="center">
-                                <Zap size={16} color="$gray10" />
-                                <Text color="$gray10">Version</Text>
+                                <Zap size={18} color="$gray10" />
+                                <Text color="$gray10" fontWeight="600">Version</Text>
                             </XStack>
-                            <XStack bg="$accent3" px="$2" py="$0.5" rounded="$2">
-                                <Text color="$accent11" fontSize="$2" fontWeight="800">V4 (Default)</Text>
+                            <XStack bg="$gray5" px="$2" py="$1" rounded="$2">
+                                <Text color="$gray10" fontSize="$2" fontWeight="800">V4 (Default)</Text>
                             </XStack>
                         </XStack>
                     </YStack>

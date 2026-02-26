@@ -184,8 +184,42 @@ export const walletService = {
         // Ensure the manager knows about the mint and its keysets
         await m.mint.addMint(mintUrl);
 
-        // standard coco-cashu-core restore
-        await m.wallet.restore(mintUrl);
+        const unsafeManager = m as any;
+        const walletRestoreService = unsafeManager.walletRestoreService;
+
+        if (walletRestoreService && typeof walletRestoreService.restoreKeyset === 'function') {
+            try {
+                // 1. Fetch all historical keysets for this mint
+                const { keysets } = await unsafeManager.mintService.ensureUpdatedMint(mintUrl);
+                const failedKeysets: string[] = [];
+
+                // We need the internal cashu-ts wallet instance to pass to restoreKeyset
+                const wallet = await unsafeManager.walletService.getWallet(mintUrl);
+
+                // 2. Iterate and restore each keyset individually
+                for (const keyset of keysets) {
+                    try {
+                        console.log(`[WalletService] Restoring keyset: ${keyset.id}`);
+                        await walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
+                    } catch (err: any) {
+                        // 3. Catch and log errors, but CONTINUE processing the rest!
+                        console.warn(`[WalletService] Failed to restore keyset ${keyset.id}:`, err?.message || err);
+                        failedKeysets.push(keyset.id);
+                    }
+                }
+
+                if (failedKeysets.length > 0) {
+                    console.warn(`[WalletService] Restoration completed with errors for keysets: ${failedKeysets.join(', ')}`);
+                }
+            } catch (err: any) {
+                console.error(`[WalletService] Failed to fetch keysets for restore:`, err?.message || err);
+                console.log(`[WalletService] Falling back to standard restore...`);
+                await m.wallet.restore(mintUrl);
+            }
+        } else {
+            console.log(`[WalletService] Falling back to standard restore (internal APIs unavailable)...`);
+            await m.wallet.restore(mintUrl);
+        }
 
         // ALWAYS restore inflight proofs after a sweep to guarantee we don't accidentally
         // leave the user's fetched proofs locked in an 'inflight' state. This exactly mirrors
