@@ -70,7 +70,7 @@ export default function ModalLayout() {
             <Stack.Screen
                 name="melt"
                 options={{
-                    title: 'Send Cash',
+                    title: 'Pay Lightning',
                 }}
             />
             <Stack.Screen

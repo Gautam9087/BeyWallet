@@ -5,14 +5,15 @@
  * Import from '@/services/core' or '../services/core'.
  *
  * Architecture:
- *   initService    — Manager lifecycle (init, create, reset)
- *   walletService  — Send, receive, balance, restore
- *   mintManager    — Mint CRUD, trust, info, keyset repair
- *   quotesService  — Mint quotes (LN→ecash), melt quotes (ecash→LN)
- *   eventService   — Typed CoreEvent subscriptions
- *   historyService — Paginated transaction history
- *   proofService   — Proof state checks and queries
- *   tokenUtils     — Token encode/decode/clean utilities
+ *   initService      — Manager lifecycle (init, create, reset, cleanup)
+ *   walletService    — Send (two-step), receive, balance, restore
+ *   mintManager      — Mint CRUD, trust, info, keyset repair
+ *   quotesService    — Mint quotes (LN→ecash), melt quotes (ecash→LN, two-step)
+ *   eventService     — Typed CoreEvent subscriptions
+ *   historyService   — Paginated transaction history
+ *   proofService     — Proof state checks and queries
+ *   recoveryService  — Reserved/inflight proof recovery
+ *   tokenUtils       — Token encode/decode/clean utilities
  */
 
 // ─── Services ─────────────────────────────────────────────────
@@ -23,6 +24,7 @@ export { quotesService } from './quotesService';
 export { eventService, CORE_EVENT_NAMES } from './eventService';
 export { historyService } from './historyService';
 export { proofService } from './proofService';
+export { recoveryService } from './recoveryService';
 
 // ─── Utilities ────────────────────────────────────────────────
 export {

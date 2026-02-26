@@ -1,16 +1,12 @@
 /**
  * Wallet service — send, receive, balances, restore.
  *
- * Uses Manager.wallet (WalletApi) which internally handles:
- * - Coin selection
- * - Proof management (save/delete/state transitions)
- * - Keyset alignment and unit matching
- * - Deterministic outputs (BIP-39 seed)
- * - History recording
- * - Event emission
+ * Uses Manager APIs:
+ * - manager.send (SendApi) — two-step: prepareSend → executePreparedSend + rollback
+ * - manager.wallet (WalletApi) — receive, getBalances, restore
  *
- * This replaces CustomSendService, CustomReceiveService,
- * CustomProofService, and CustomWalletService entirely.
+ * The two-step send flow prevents stuck/reserved proofs by allowing
+ * rollback if the operation fails after preparation.
  */
 
 import { initService } from './initService';
@@ -28,38 +24,51 @@ export const walletService = {
     // ─── Sending ──────────────────────────────────────────────
 
     /**
-     * Send ecash from a specific mint.
+     * Send ecash from a specific mint using two-step flow.
      *
-     * The Manager's WalletApi.send() handles:
-     * - Proof selection (coin selection algorithm)
-     * - Swap with the mint to create exact-amount proofs
-     * - Saving change proofs back to the repository
-     * - Deleting spent proofs
-     * - Recording history entry
-     * - Emitting 'send:created' event
+     * Step 1: prepareSend() — reserves proofs and prepares the operation
+     * Step 2: executePreparedSend() — executes the swap and creates token
+     *
+     * On error after prepare, automatically rolls back to free reserved proofs.
      *
      * @param mintUrl - The mint to send from
-     * @param amount - Amount to send in the mint's unit
-     * @returns Encoded token string (V4) to share with recipient
+     * @param amount - Amount to send in sats
+     * @returns Encoded token string (V4) and operation ID
      */
     send: async (mintUrl: string, amount: number): Promise<{ token: string; id: string }> => {
         console.log(`[WalletService] Sending ${amount} from ${mintUrl}`);
 
-        const res = await mgr().wallet.send(mintUrl, amount);
-        // coco-cashu-core returns a Token object if called directly,
-        // but it also creates a history entry.
-        // We need to find the history entry that was just created.
+        const m = mgr();
+        let preparedId: string | null = null;
 
-        const encoded = encodeToken(res);
+        try {
+            // Step 1: Prepare the send operation
+            const prepared = await m.send.prepareSend(mintUrl, amount);
+            preparedId = prepared.id;
+            console.log(`[WalletService] Send prepared: ${preparedId}`);
 
-        // Find the history entry by searching for the token in the metadata
-        // or just getting the last entry since this is sequential.
-        const history = await mgr().history.getPaginatedHistory(0, 1);
-        const lastEntry = history[0];
+            // Step 2: Execute the prepared send
+            const { token, operation } = await m.send.executePreparedSend(prepared.id);
+            const encoded = encodeToken(token);
 
-
-        console.log('[WalletService] Send complete, history ID:', lastEntry?.id);
-        return { token: encoded, id: lastEntry?.id || '' };
+            console.log(`[WalletService] Send complete, operation: ${operation.id}`);
+            return { token: encoded, id: operation.id };
+        } catch (err: any) {
+            // Rollback on failure to free reserved proofs
+            if (preparedId) {
+                try {
+                    const operation = await m.send.getOperation(preparedId);
+                    if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
+                        await m.send.rollback(preparedId);
+                        console.log(`[WalletService] Rolled back failed send: ${preparedId}`);
+                    }
+                } catch (rollbackErr) {
+                    console.warn('[WalletService] Rollback failed:', rollbackErr);
+                }
+            }
+            console.error('[WalletService] Send failed:', err?.message || err);
+            throw err;
+        }
     },
 
     /**
@@ -69,9 +78,26 @@ export const walletService = {
         mintUrl: string,
         amount: number
     ): Promise<{ encoded: string; token: Token }> => {
-        const token: Token = await mgr().wallet.send(mintUrl, amount);
-        const encoded = encodeToken(token);
-        return { encoded, token };
+        const m = mgr();
+        let preparedId: string | null = null;
+
+        try {
+            const prepared = await m.send.prepareSend(mintUrl, amount);
+            preparedId = prepared.id;
+            const { token } = await m.send.executePreparedSend(prepared.id);
+            const encoded = encodeToken(token);
+            return { encoded, token };
+        } catch (err) {
+            if (preparedId) {
+                try {
+                    const op = await m.send.getOperation(preparedId);
+                    if (op && ['prepared', 'executing', 'pending'].includes(op.state)) {
+                        await m.send.rollback(preparedId);
+                    }
+                } catch (e) { /* ignore rollback errors */ }
+            }
+            throw err;
+        }
     },
 
     // ─── Receiving ────────────────────────────────────────────
@@ -152,16 +178,41 @@ export const walletService = {
 
     restore: async (mintUrl: string): Promise<void> => {
         const start = Date.now();
-        const manager = mgr();
+        const m = mgr();
         console.log(`[WalletService] 🔄 Starting deterministic NIP-06 restoration for: ${mintUrl}`);
 
         // Ensure the manager knows about the mint and its keysets
-        await manager.mint.addMint(mintUrl);
+        await m.mint.addMint(mintUrl);
 
         // standard coco-cashu-core restore
-        await manager.wallet.restore(mintUrl);
+        await m.wallet.restore(mintUrl);
 
         const duration = ((Date.now() - start) / 1000).toFixed(1);
         console.log(`[WalletService] ✅ NIP-06 backup restored for ${mintUrl} in ${duration}s`);
+    },
+
+    // ─── Send Operations ──────────────────────────────────────
+
+    /**
+     * Rollback a pending send operation. Used to free stuck proofs.
+     */
+    rollbackSend: async (operationId: string): Promise<void> => {
+        console.log(`[WalletService] Rolling back send: ${operationId}`);
+        await mgr().send.rollback(operationId);
+        console.log(`[WalletService] ✅ Send rolled back: ${operationId}`);
+    },
+
+    /**
+     * Get a send operation by ID.
+     */
+    getSendOperation: async (operationId: string) => {
+        return mgr().send.getOperation(operationId);
+    },
+
+    /**
+     * Finalize a send (mark as completed after recipient claims).
+     */
+    finalizeSend: async (operationId: string): Promise<void> => {
+        await mgr().send.finalize(operationId);
     },
 };

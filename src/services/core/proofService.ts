@@ -1,6 +1,7 @@
 import { Wallet } from '@cashu/cashu-ts';
 import { cleanToken, decodeToken } from './tokenUtils';
 import type { CoreProof } from 'coco-cashu-core';
+import { initService } from './initService';
 
 
 

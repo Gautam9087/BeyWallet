@@ -2,6 +2,7 @@
  * Quotes service — mint quotes (deposit LN → ecash) and melt quotes (ecash → LN).
  *
  * Uses Manager.quotes (QuotesApi).
+ * Melt uses two-step flow: prepareMeltBolt11 → executeMelt with rollback support.
  */
 
 import { initService } from './initService';
@@ -22,7 +23,7 @@ export const quotesService = {
      * @returns MintQuoteResponse with `quote` (id) and Lightning `request` (invoice)
      */
     createMintQuote: async (mintUrl: string, amount: number): Promise<MintQuoteResponse> => {
-        console.log(`[QuotesService] Creating mint quote: ${amount} sats (unit: sat) from ${mintUrl}`);
+        console.log(`[QuotesService] Creating mint quote: ${amount} sats from ${mintUrl}`);
         const quote = await mgr().quotes.createMintQuote(mintUrl, amount);
         console.log(`[QuotesService] ✅ Mint quote created: ${quote.quote}`);
         return quote;
@@ -59,26 +60,51 @@ export const quotesService = {
 
     /**
      * Create a melt quote — estimates cost to pay a Lightning invoice.
+     * For backward compat, uses direct createMeltQuote.
      *
      * @param mintUrl - The mint to melt from
      * @param invoice - Lightning invoice (bolt11) to pay
      * @returns MeltQuoteResponse with amount, fee_reserve, and quote id
      */
     createMeltQuote: async (mintUrl: string, invoice: string): Promise<MeltQuoteResponse> => {
-        console.log(`[QuotesService] Creating melt quote (unit: sat) from ${mintUrl}`);
+        console.log(`[QuotesService] Creating melt quote from ${mintUrl}`);
         const quote = await mgr().quotes.createMeltQuote(mintUrl, invoice);
         console.log(`[QuotesService] ✅ Melt quote created: ${quote.quote}`);
         return quote;
     },
 
     /**
-     * Pay a Lightning invoice using ecash (melt).
+     * Prepare a melt operation (two-step flow — step 1).
+     * Reserves proofs and returns an operation that can be executed or rolled back.
      *
-     * The Manager handles:
-     * - Proof selection for the melt amount + fee reserve
-     * - Sending the proofs to the mint
-     * - Recording history entry
-     * - Saving any change proofs
+     * @param mintUrl - The mint to melt from
+     * @param invoice - Lightning invoice to pay
+     * @returns Operation with id, quoteId, amount, fee_reserve
+     */
+    prepareMelt: async (mintUrl: string, invoice: string) => {
+        console.log(`[QuotesService] Preparing melt from ${mintUrl}`);
+        const operation = await mgr().quotes.prepareMeltBolt11(mintUrl, invoice);
+        console.log(`[QuotesService] ✅ Melt prepared: ${operation.id}`);
+        return operation;
+    },
+
+    /**
+     * Execute a prepared melt operation (two-step flow — step 2).
+     *
+     * @param operationId - The operation ID from prepareMelt
+     */
+    executeMelt: async (operationId: string): Promise<void> => {
+        console.log(`[QuotesService] Executing melt: ${operationId}`);
+        await mgr().quotes.executeMelt(operationId);
+        console.log(`[QuotesService] ✅ Melt executed: ${operationId}`);
+    },
+
+    /**
+     * Pay a Lightning invoice using ecash (melt).
+     * Legacy single-step method — wraps prepare + execute.
+     *
+     * @param mintUrl - The mint to melt from
+     * @param quoteId - The quote ID to pay (legacy)
      */
     payMeltQuote: async (mintUrl: string, quoteId: string): Promise<void> => {
         console.log(`[QuotesService] Paying melt quote: ${quoteId}`);

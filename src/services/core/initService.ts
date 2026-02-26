@@ -6,10 +6,14 @@
  * - Manager initialization (existing wallet)
  * - Wallet creation (new mnemonic)
  * - AppState pause/resume for battery savings
+ * - Explicit watcher enable/disable lifecycle
  * - Singleton access to Manager and Repositories
+ *
+ * Architecture matches Sovran's CocoManager pattern using
+ * `new Manager()` constructor with explicit watcher enabling.
  */
 
-import { initializeCoco, type Manager } from 'coco-cashu-core';
+import { Manager, ConsoleLogger } from 'coco-cashu-core';
 import { ExpoSqliteRepositories } from '../../store/test';
 import * as SQLite from 'expo-sqlite';
 import { seedService } from '../seedService';
@@ -22,6 +26,7 @@ import { HistoryWatcherPlugin } from './plugins/HistoryWatcherPlugin';
 let manager: Manager | null = null;
 let repo: ExpoSqliteRepositories | null = null;
 let appStateSubscription: any = null;
+let isInitializing = false;
 
 // ─── Internal Helpers ─────────────────────────────────────────
 
@@ -55,46 +60,99 @@ function setupAppStateListener(): void {
 }
 
 /**
+ * Enable watchers and processors with staggered delays to prevent
+ * transaction conflicts. Matches Sovran's pattern.
+ */
+async function enableWatchers(mgr: Manager): Promise<void> {
+    // Enable mint quote watcher
+    try {
+        await mgr.enableMintQuoteWatcher({
+            watchExistingPendingOnStart: true,
+        });
+        console.log('[InitService] ✅ Mint quote watcher enabled');
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+        console.warn('[InitService] Mint quote watcher failed:', error);
+    }
+
+    // Enable mint quote processor
+    try {
+        await mgr.enableMintQuoteProcessor({
+            processIntervalMs: 5000,
+            maxRetries: 3,
+            baseRetryDelayMs: 1000,
+            initialEnqueueDelayMs: 2000,
+        });
+        console.log('[InitService] ✅ Mint quote processor enabled');
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+        console.warn('[InitService] Mint quote processor failed:', error);
+    }
+
+    // Enable proof state watcher (with retry)
+    try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await mgr.enableProofStateWatcher();
+        console.log('[InitService] ✅ Proof state watcher enabled');
+    } catch (error) {
+        console.warn('[InitService] Proof state watcher failed, retrying...', error);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await mgr.enableProofStateWatcher();
+            console.log('[InitService] ✅ Proof state watcher enabled on retry');
+        } catch (retryError) {
+            console.error('[InitService] Proof state watcher failed on retry:', retryError);
+        }
+    }
+}
+
+/**
+ * Disable all watchers before reset/cleanup.
+ */
+async function disableWatchers(mgr: Manager): Promise<void> {
+    try {
+        await mgr.disableProofStateWatcher();
+    } catch (e) {
+        console.warn('[InitService] Failed to disable proof state watcher:', e);
+    }
+    try {
+        await mgr.disableMintQuoteProcessor();
+    } catch (e) {
+        console.warn('[InitService] Failed to disable mint quote processor:', e);
+    }
+    try {
+        await mgr.disableMintQuoteWatcher();
+    } catch (e) {
+        console.warn('[InitService] Failed to disable mint quote watcher:', e);
+    }
+}
+
+/**
  * Core initialization with a mnemonic. Opens DB, creates repos,
- * calls initializeCoco() with full config.
+ * creates Manager with explicit watcher enabling.
  */
 async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
     const seed = await seedService.deriveSeed(mnemonic);
 
     // Open Expo SQLite database
-    const db = await SQLite.openDatabaseAsync('coco_wallet.db');
+    const db = SQLite.openDatabaseSync('coco_wallet.db');
     const repositories = new ExpoSqliteRepositories({ database: db });
     await repositories.init();
 
-    // Initialize coco-cashu-core Manager
-    manager = await initializeCoco({
-        repo: repositories,
-        seedGetter: async () => new Uint8Array(seed),
-
-        watchers: {
-            mintQuoteWatcher: {
-                disabled: false,
-                watchExistingPendingOnStart: true,
-            },
-            proofStateWatcher: {
-                disabled: false,
-            },
-        },
-
-        processors: {
-            mintQuoteProcessor: {
-                disabled: false,
-                processIntervalMs: 5000,
-                maxRetries: 3,
-                baseRetryDelayMs: 1000,
-                initialEnqueueDelayMs: 500,
-            },
-        },
-        plugins: [HistoryWatcherPlugin],
-    });
+    // Initialize Manager using constructor (rc47 pattern)
+    manager = new Manager(
+        repositories,
+        async () => new Uint8Array(seed),
+        new ConsoleLogger('Coco', { level: 'warn' }),
+        undefined,
+        [HistoryWatcherPlugin]
+    );
 
     repo = repositories;
     setupAppStateListener();
+
+    // Enable watchers with staggered delays
+    await enableWatchers(manager);
 
     console.log('[InitService] Manager ready with watchers and processors');
 
@@ -105,29 +163,6 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
         console.log('[InitService] ✅ Test mints trusted');
     } catch (e) {
         console.warn('[InitService] Test mint trust error (non-fatal):', e);
-    }
-
-    // Clean up stale non-sat keysets from the DB
-    // testnut.cashu.space is multi-unit — old keysets for msat/usd cause unit mismatch errors
-    // The DB has no unit column, so we delete ALL keysets and force a re-fetch
-    // (the patched coco-cashu-core updateMint now filters to sat-only)
-    try {
-        const testMintUrl = 'https://testnut.cashu.space';
-        // Delete all keysets for this mint
-        await repositories.db.run(
-            'DELETE FROM coco_cashu_keysets WHERE mintUrl = ?',
-            [testMintUrl]
-        );
-        // Reset updatedAt to force ensureUpdatedMint to re-fetch
-        await repositories.db.run(
-            'UPDATE coco_cashu_mints SET updatedAt = 0 WHERE mintUrl = ?',
-            [testMintUrl]
-        );
-        // Re-add triggers a fresh updateMint → only sat keysets stored
-        await manager.mint.addMint(testMintUrl, { trusted: true });
-        console.log('[InitService] ✅ Keyset cleanup complete — sat-only keysets re-fetched');
-    } catch (e) {
-        console.warn('[InitService] Keyset cleanup warning (non-fatal):', e);
     }
 
     return manager;
@@ -152,17 +187,33 @@ export const initService = {
             return manager;
         }
 
-        const mnemonic = await seedService.getMnemonic();
-        if (!mnemonic) {
-            throw new Error('No wallet exists. Use createWallet() first.');
+        if (isInitializing) {
+            console.log('[InitService] Initialization in progress, waiting...');
+            let attempts = 0;
+            while (isInitializing && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            if (manager) return manager;
+            if (attempts >= 50) throw new Error('Initialization timeout');
         }
 
-        const m = await initializeWithMnemonic(mnemonic);
+        isInitializing = true;
+        try {
+            const mnemonic = await seedService.getMnemonic();
+            if (!mnemonic) {
+                throw new Error('No wallet exists. Use createWallet() first.');
+            }
 
-        // Initialize Nostr
-        await nostrService.init(mnemonic);
+            const m = await initializeWithMnemonic(mnemonic);
 
-        return m;
+            // Initialize Nostr
+            await nostrService.init(mnemonic);
+
+            return m;
+        } finally {
+            isInitializing = false;
+        }
     },
 
     /**
@@ -171,7 +222,7 @@ export const initService = {
      */
     createWallet: async (mnemonic: string): Promise<Manager> => {
         if (manager) {
-            initService.reset();
+            await initService.cleanup();
         }
 
         await seedService.saveMnemonic(mnemonic);
@@ -211,16 +262,34 @@ export const initService = {
     },
 
     /**
-     * Reset the Manager (for logout or dev purposes).
-     * Cleans up AppState listener and nullifies references.
+     * Properly cleanup watchers and reset state.
      */
-    reset: (): void => {
+    cleanup: async (): Promise<void> => {
+        if (manager) {
+            await disableWatchers(manager);
+        }
         if (appStateSubscription) {
             appStateSubscription.remove();
             appStateSubscription = null;
         }
         manager = null;
         repo = null;
+        isInitializing = false;
+    },
+
+    /**
+     * Reset the Manager (for logout or dev purposes).
+     * Cleans up AppState listener, disables watchers, and nullifies references.
+     */
+    reset: (): void => {
+        // Synchronous reset for backward compat — prefer cleanup() for async
+        if (appStateSubscription) {
+            appStateSubscription.remove();
+            appStateSubscription = null;
+        }
+        manager = null;
+        repo = null;
+        isInitializing = false;
     },
 
     /**
@@ -232,43 +301,30 @@ export const initService = {
         console.log('[InitService] Starting wallet restore from seed...');
 
         if (manager) {
-            initService.reset();
+            await initService.cleanup();
         }
 
         await seedService.saveMnemonic(mnemonic);
 
         // Use a fresh restore DB to avoid conflicts
         const seed = await seedService.deriveSeed(mnemonic);
-        const db = await SQLite.openDatabaseAsync('cashu_wallet_restore.db');
+        const db = SQLite.openDatabaseSync('cashu_wallet_restore.db');
         const repositories = new ExpoSqliteRepositories({ database: db });
         await repositories.init();
 
-        manager = await initializeCoco({
-            repo: repositories,
-            seedGetter: async () => new Uint8Array(seed),
-            watchers: {
-                mintQuoteWatcher: {
-                    disabled: false,
-                    watchExistingPendingOnStart: true,
-                },
-                proofStateWatcher: {
-                    disabled: false,
-                },
-            },
-            processors: {
-                mintQuoteProcessor: {
-                    disabled: false,
-                    processIntervalMs: 5000,
-                    maxRetries: 3,
-                    baseRetryDelayMs: 1000,
-                    initialEnqueueDelayMs: 500,
-                },
-            },
-            plugins: [HistoryWatcherPlugin],
-        });
+        manager = new Manager(
+            repositories,
+            async () => new Uint8Array(seed),
+            new ConsoleLogger('Coco', { level: 'warn' }),
+            undefined,
+            [HistoryWatcherPlugin]
+        );
 
         repo = repositories;
         setupAppStateListener();
+
+        // Enable watchers
+        await enableWatchers(manager);
 
         // Trust test mints and restore from each (with timeout)
         const testMints = [
@@ -312,19 +368,10 @@ export const initService = {
     destroyWallet: async (): Promise<void> => {
         console.log('[InitService] Destroying wallet...');
 
-        // 1. Dispose manager if active
-        if (manager) {
-            try {
-                await (manager as any).dispose?.();
-            } catch (e) {
-                console.warn('[InitService] Manager dispose error (non-fatal):', e);
-            }
-        }
+        // 1. Cleanup watchers and manager
+        await initService.cleanup();
 
-        // 2. Reset singleton state
-        initService.reset();
-
-        // 3. Delete the SQLite databases (both main and restore)
+        // 2. Delete the SQLite databases (both main and restore)
         try {
             await SQLite.deleteDatabaseAsync('coco_wallet.db');
             console.log('[InitService] Main database deleted');
@@ -338,7 +385,7 @@ export const initService = {
             console.warn('[InitService] Restore DB delete error (may not exist):', e);
         }
 
-        // 4. Clear the seed from secure storage
+        // 3. Clear the seed from secure storage
         await seedService.clearWallet();
         console.log('[InitService] Seed cleared');
 
