@@ -1,103 +1,71 @@
-import * as Localization from 'expo-localization';
-
 /**
- * Formats a timestamp into a human-readable local time string.
- * @param timestamp - Unix timestamp in seconds
- * @returns Formatted date/time string
+ * @fileoverview Time and date formatting utilities
+ * Adapted to match Sovran's Intl.DateTimeFormat implementation
  */
-export function formatLocalTime(timestamp: number): string {
-    if (!timestamp || isNaN(timestamp)) return 'Unknown time';
-    const date = new Date(timestamp * 1000);
-    const now = new Date();
 
-    // Check if it's today
-    const isToday = date.getDate() === now.getDate() &&
-        date.getMonth() === now.getMonth() &&
-        date.getFullYear() === now.getFullYear();
+function normalizeToMs(ts: number): number {
+    return ts > 1e11 ? ts : ts * 1000;
+}
 
-    // Check if it's yesterday
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday = date.getDate() === yesterday.getDate() &&
-        date.getMonth() === yesterday.getMonth() &&
-        date.getFullYear() === yesterday.getFullYear();
-
-    const timeOptions: Intl.DateTimeFormatOptions = {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-    };
-
-    const dateOptions: Intl.DateTimeFormatOptions = {
-        month: 'short',
-        day: 'numeric',
-    };
-
-    const timeStr = date.toLocaleTimeString(Localization.getLocales()[0].languageTag, timeOptions);
-
-    if (isToday) {
-        return `Today, ${timeStr}`;
-    }
-
-    if (isYesterday) {
-        return `Yesterday, ${timeStr}`;
-    }
-
-    const dateStr = date.toLocaleDateString(Localization.getLocales()[0].languageTag, dateOptions);
-
-    // If it's a different year, add the year
-    if (date.getFullYear() !== now.getFullYear()) {
-        return `${dateStr} ${date.getFullYear()}, ${timeStr}`;
-    }
-
-    return `${dateStr}, ${timeStr}`;
+function normalizeToSeconds(ts: number): number {
+    return ts > 1e11 ? Math.floor(ts / 1000) : ts;
 }
 
 /**
- * Returns a full detailed local time string for the details page.
+ * Formats a timestamp into a short date-time string
+ * Modeled after Sovran's formatCustomDate but including time for History entries.
+ */
+export function formatLocalTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return 'Unknown time';
+    const date = new Date(normalizeToMs(timestamp));
+
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false // 24-hour time notation per Sovran
+    }).format(date);
+}
+
+/**
+ * Returns a full detailed local time string. 
+ * Modeled after Sovran's convertTime and formatDate.
  */
 export function formatFullLocalTime(timestamp: number): string {
     if (!timestamp || isNaN(timestamp)) return 'Unknown date';
-    const date = new Date(timestamp * 1000);
-    const options: Intl.DateTimeFormatOptions = {
-        weekday: 'long',
+    const date = new Date(normalizeToMs(timestamp));
+
+    return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: true,
-    };
-    return date.toLocaleDateString(Localization.getLocales()[0].languageTag, options);
+        hour12: false // 24-hour time notation per Sovran
+    }).format(date);
 }
 
 /**
- * Returns a relative time string (e.g. "2 min ago", "just now").
+ * Returns a relative time string (e.g. "1h", "2m", "just now").
+ * Matches Sovran's getTimeAgo behavior mentioned in comments.
  */
 export function formatRelativeTime(timestamp: number): string {
     if (!timestamp || isNaN(timestamp)) return 'recently';
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const tsSecs = normalizeToSeconds(timestamp);
+    const diff = nowSecs - tsSecs;
 
-    if (diff < 60) {
-        return 'just now';
-    }
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
 
-    if (diff < 3600) {
-        const mins = Math.floor(diff / 60);
-        return `${mins} min${mins > 1 ? 's' : ''} ago`;
-    }
-
-    if (diff < 86400) {
-        const hours = Math.floor(diff / 3600);
-        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    }
-
-    if (diff < 604800) {
-        const days = Math.floor(diff / 86400);
-        return `${days} day${days > 1 ? 's' : ''} ago`;
-    }
-
-    return formatLocalTime(timestamp);
+    // Fall back to short date for older timestamps
+    const date = new Date(normalizeToMs(timestamp));
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+    }).format(date);
 }

@@ -9,7 +9,7 @@ import { bitcoinService } from "../../../services/bitcoinService";
 import * as Haptics from 'expo-haptics';
 
 export default function Balance() {
-    const { balance, activeMintUrl, refreshCounter, mints, balances, isRestoring, nostrBalance, syncError } = useWalletStore();
+    const { balance, activeMintUrl, refreshCounter, mints, balances, isRestoring } = useWalletStore();
     const { secondaryCurrency } = useSettingsStore();
     const [showAllMints, setShowAllMints] = React.useState(false);
 
@@ -25,15 +25,9 @@ export default function Balance() {
     const activeMint = mints.find(m => activeMintUrl && normalizeUrl(m.mintUrl) === normalizeUrl(activeMintUrl));
 
     // Determine display values based on toggle state
-    // If we have a nostrBalance and our local balance is lower (and we're restoring), 
-    // we show the nostrBalance as a hint of what's coming.
-    const showNostrHint = isRestoring && nostrBalance !== null && nostrBalance > 0;
-
     const currentBalance = showAllMints
         ? Object.values(balances).reduce((acc, val) => acc + val, 0)
         : balance;
-
-    const displayBalance = (showNostrHint && currentBalance === 0) ? nostrBalance : currentBalance;
 
     const displayName = showAllMints
         ? "All Mints"
@@ -41,8 +35,8 @@ export default function Balance() {
 
     const secondaryBalance = React.useMemo(() => {
         if (!btcData?.price) return 0;
-        return currencyService.convertSatsToCurrency(displayBalance, btcData.price);
-    }, [displayBalance, btcData?.price]);
+        return currencyService.convertSatsToCurrency(currentBalance, btcData.price);
+    }, [currentBalance, btcData?.price]);
 
     return (
         <YStack py="$2" gap="$2">
@@ -76,32 +70,26 @@ export default function Balance() {
                                 opacity={0.8}
                             />
                             <Text fontSize="$2" color="$gray10" fontWeight="600">
-                                {showNostrHint && currentBalance === 0 ? 'Restoring...' : 'Syncing...'}
+                                Syncing...
                             </Text>
                         </XStack>
                     )}
                 </XStack>
-                {syncError && !isRestoring && (
-                    <Text fontSize="$1" color="$red9" fontWeight="600">Sync Issue</Text>
-                )}
             </XStack>
 
             <XStack justify="space-between" py="$2" items="flex-end">
                 <YStack>
                     <RollingNumber
-                        value={displayBalance}
+                        value={currentBalance}
                         prefix="₿"
                         trigger={refreshCounter}
                         letterSpacing={-1}
                         fontSize={30}
                         fontWeight="900"
-                        color={showNostrHint && currentBalance === 0 ? "$gray10" : "$accent3"}
+                        color="$accent3"
                         decimalOpacity={0.4}
                         showDecimals={false}
                     />
-                    {showNostrHint && currentBalance === 0 && (
-                        <Text fontSize="$1" color="$gray10" mt="$-2">Expected from Nostr</Text>
-                    )}
                 </YStack>
                 <Text color="$accent9" fontWeight="700">SATS</Text>
             </XStack>

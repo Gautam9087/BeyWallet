@@ -187,8 +187,46 @@ export const walletService = {
         // standard coco-cashu-core restore
         await m.wallet.restore(mintUrl);
 
+        // ALWAYS restore inflight proofs after a sweep to guarantee we don't accidentally
+        // leave the user's fetched proofs locked in an 'inflight' state. This exactly mirrors
+        // the Sovran approach to prevent missing balances during partial restore failures.
+        await walletService.restoreInflightProofs(mintUrl);
+
         const duration = ((Date.now() - start) / 1000).toFixed(1);
         console.log(`[WalletService] ✅ NIP-06 backup restored for ${mintUrl} in ${duration}s`);
+    },
+
+    /**
+     * Restore proofs that are stuck in an 'inflight' state back to 'ready'.
+     * Needed when a core function throws an error midway and fails to clean up reserved proofs.
+     */
+    restoreInflightProofs: async (mintUrl: string): Promise<number> => {
+        const m = mgr();
+        const unsafeManager = m as unknown as {
+            proofRepository?: {
+                getInflightProofs: (urls?: string[]) => Promise<{ mintUrl: string; secret: string }[]>;
+            };
+            proofService?: {
+                restoreProofsToReady: (mintUrl: string, secrets: string[]) => Promise<void>;
+            };
+        };
+
+        const repo = unsafeManager.proofRepository;
+        const svc = unsafeManager.proofService;
+        if (!repo?.getInflightProofs || !svc?.restoreProofsToReady) return 0;
+
+        try {
+            const inflight = await repo.getInflightProofs([mintUrl]);
+            if (inflight.length === 0) return 0;
+
+            const secrets = inflight.map((p) => p.secret);
+            await svc.restoreProofsToReady(mintUrl, secrets);
+            console.log(`[WalletService] ✅ Restored ${secrets.length} stuck inflight proofs on ${mintUrl}`);
+            return secrets.length;
+        } catch (err) {
+            console.warn('[WalletService] Failed to restore inflight proofs:', err);
+            return 0;
+        }
     },
 
     // ─── Send Operations ──────────────────────────────────────

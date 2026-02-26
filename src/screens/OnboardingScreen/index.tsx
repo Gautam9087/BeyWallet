@@ -7,7 +7,6 @@ import { ImportSeedStep } from './ImportSeedStep'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { seedService } from '../../services/seedService'
 import { initService, walletService, mintManager } from '../../services/core'
-import { nostrService } from '../../services/nostrService'
 import { useWalletStore } from '../../store/walletStore'
 import { ActivityIndicator } from 'react-native'
 import { YStack, Text } from 'tamagui'
@@ -59,45 +58,23 @@ export function OnboardingScreen() {
 
     const handleImportSeed = async (mnemonic: string) => {
         setIsImporting(true)
-        setImportStatus('Creating wallet...')
+        setImportStatus('Initializing wallet...')
         try {
             console.log('[Onboarding] Importing wallet from seed...')
 
-            // 1. Restore wallet deterministically (fresh DB + NUT-13 sweep)
-            setImportStatus('Restoring wallet from seed (NUT-13)...')
+            // 1. Initialize wallet (this starts the NPC plugin auto-sync in background)
             await initService.restoreWallet(mnemonic)
 
-            // 2. Try to restore from Nostr (mints + balance metadata)
-            setImportStatus('Searching Nostr for your wallet backup...')
-            try {
-                const nostrData = await nostrService.fetchFromNostr();
-                if (nostrData && nostrData.mints && nostrData.mints.length > 0) {
-                    setImportStatus(`Found backup with ${nostrData.mints.length} mints!`);
-
-                    // Add any additional mints from Nostr and restore
-                    for (const url of nostrData.mints) {
-                        try {
-                            setImportStatus(`Restoring ${url.substring(0, 30)}...`);
-                            await mintManager.addMint(url, { trusted: true });
-                            // Queue for background deterministic recovery
-                            useWalletStore.getState().restoreFromSeed(url);
-                        } catch (e) {
-                            console.warn(`[Onboarding] Restore failed for ${url}:`, e);
-                        }
-                    }
-                } else {
-                    setImportStatus('No extra backup found on Nostr.');
-                }
-            } catch (e) {
-                console.warn('[Onboarding] Nostr recovery failed (non-fatal):', e);
-            }
-
-            // 3. Mark onboarding as complete and enter the app
+            // 2. Mark onboarding as complete and enter the app
             setImportStatus('Welcome back! Finishing setup...')
             await completeOnboarding()
             await initialize()
 
-            console.log('[Onboarding] ✅ Import successful, restoration complete.')
+            // 3. Queue the deterministic tokens recovery for the default mint.
+            // Further mints will be added and synced automatically by the NPC plugin.
+            useWalletStore.getState().restoreFromSeed(DEFAULT_MINT);
+
+            console.log('[Onboarding] ✅ Import successful, background recovery started.')
         } catch (err) {
             console.error('[Onboarding] Import failed:', err)
             setImportStatus('Import failed. Please try again.')

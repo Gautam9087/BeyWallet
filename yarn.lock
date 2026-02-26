@@ -2140,6 +2140,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@cashu/cashu-ts@npm:^3.2.2":
+  version: 3.5.0
+  resolution: "@cashu/cashu-ts@npm:3.5.0"
+  dependencies:
+    "@noble/curves": "npm:^2.0.1"
+    "@noble/hashes": "npm:^2.0.1"
+    "@scure/base": "npm:^2.0.0"
+    "@scure/bip32": "npm:^2.0.1"
+  checksum: 10/b65a9e1407a3f5ac41c645a9285cec548a8de91ec4a0809026c5a23f9024e2df57452a0d4f0213334f5f7d99242582b4c874f349774294ab4366ccbcab342194
+  languageName: node
+  linkType: hard
+
 "@colors/colors@npm:1.5.0":
   version: 1.5.0
   resolution: "@colors/colors@npm:1.5.0"
@@ -7525,6 +7537,7 @@ __metadata:
     burnt: "npm:^0.12.2"
     coco-cashu-core: "npm:^1.1.2-rc.47"
     coco-cashu-expo-sqlite: "npm:1.1.2-rc.47"
+    coco-cashu-plugin-npc: "npm:^2.3.1"
     coco-cashu-react: "npm:1.1.2-rc.47"
     events: "npm:^3.3.0"
     expo: "npm:^54.0.23"
@@ -8215,6 +8228,18 @@ __metadata:
     expo-sqlite: "*"
     typescript: ^5
   checksum: 10/c56ad4e324f860b8f3dc8001a5c94e5a86698929374c2d592022906dc43141822ab8649896251124562fbbc443f5d5bc0951168cb75063bd553502c2735e4b77
+  languageName: node
+  linkType: hard
+
+"coco-cashu-plugin-npc@npm:^2.3.1":
+  version: 2.3.1
+  resolution: "coco-cashu-plugin-npc@npm:2.3.1"
+  dependencies:
+    npubcash-sdk: "npm:^0.3.2"
+  peerDependencies:
+    coco-cashu-core: ^1.1.2-rc.39
+    typescript: ^5.0.0
+  checksum: 10/26ca46ddf28113e3442bc9b787294025c195f277e0e38641065eba713234ebbb97fadc907973471d90b28f728135ec71f7b6d0bcadca7ab1dee082e5f9b8fe2a
   languageName: node
   linkType: hard
 
@@ -12821,6 +12846,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"nostr-tools@npm:^2.19.4":
+  version: 2.23.1
+  resolution: "nostr-tools@npm:2.23.1"
+  dependencies:
+    "@noble/ciphers": "npm:2.1.1"
+    "@noble/curves": "npm:2.0.1"
+    "@noble/hashes": "npm:2.0.1"
+    "@scure/base": "npm:2.0.0"
+    "@scure/bip32": "npm:2.0.1"
+    "@scure/bip39": "npm:2.0.1"
+    nostr-wasm: "npm:0.1.0"
+  peerDependencies:
+    typescript: ">=5.0.0"
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 10/d9f8f574157cab5cdb5fa3f102c2bf464443eef3f4eebfb35f561ffb6b191fd7733ba27d2d3683bff8752c39cbf99f568a935b3c042b7d699bc12226ded05360
+  languageName: node
+  linkType: hard
+
 "nostr-tools@npm:^2.22.1":
   version: 2.22.1
   resolution: "nostr-tools@npm:2.22.1"
@@ -12866,6 +12911,24 @@ __metadata:
   dependencies:
     path-key: "npm:^3.0.0"
   checksum: 10/5374c0cea4b0bbfdfae62da7bbdf1e1558d338335f4cacf2515c282ff358ff27b2ecb91ffa5330a8b14390ac66a1e146e10700440c1ab868208430f56b5f4d23
+  languageName: node
+  linkType: hard
+
+"npubcash-sdk@npm:^0.3.2":
+  version: 0.3.2
+  resolution: "npubcash-sdk@npm:0.3.2"
+  dependencies:
+    "@cashu/cashu-ts": "npm:^3.2.2"
+    nostr-tools: "npm:^2.19.4"
+    npubcash-types: "npm:^0.1.1"
+  checksum: 10/6286245b9317b05981a70aa574e28710456c74406f2e6052681670b68ca56c2e8d27f22d43a18c726b873bfee81fdf638d7d2f121a055535c00246a46bd0d90e
+  languageName: node
+  linkType: hard
+
+"npubcash-types@npm:^0.1.1":
+  version: 0.1.1
+  resolution: "npubcash-types@npm:0.1.1"
+  checksum: 10/f5f97b761de8ac9be9f046ad4f10d6fee008eabd2b83535769a65ea13a97a98e478a2026d48e93bb2e98e250688fe48084b59e4985f16457212f43529a85bd58
   languageName: node
   linkType: hard
 

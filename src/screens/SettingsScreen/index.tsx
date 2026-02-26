@@ -11,8 +11,6 @@ import { biometricService } from '~/services/biometricService';
 import { seedService } from '~/services/seedService';
 import { initService } from '~/services/core';
 import { useOnboardingStore } from '~/store/onboardingStore';
-import { useNostrStore } from '~/store/nostrStore';
-import { nostrService } from '~/services/nostrService';
 import { useWalletStore } from '~/store/walletStore';
 import { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 import AppBottomSheet from '~/components/UI/AppBottomSheet';
@@ -26,16 +24,10 @@ export function SettingsScreen() {
 
     const { secondaryCurrency } = useSettingsStore();
     const resetOnboarding = useOnboardingStore(state => state.resetOnboarding);
-    const { npub, nsec, relays, logs } = useNostrStore();
-    const { balance, mints, isRestoring, restoringMintUrl } = useWalletStore();
 
     const [seedWords, setSeedWords] = useState<string[]>([]);
     const [isSeedVisible, setIsSeedVisible] = useState(false);
-    const [isNsecVisible, setIsNsecVisible] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
-
-    const nostrSheetRef = useRef<AppBottomSheetRef>(null);
 
     const handleSettingPress = async (id: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -54,18 +46,6 @@ export function SettingsScreen() {
                 break;
             case 'currency':
                 currencySheetRef.current?.present();
-                break;
-            case 'nostr':
-                nostrSheetRef.current?.present();
-                break;
-            case 'sync_nostr':
-                setIsSyncing(true);
-                const mintUrls = mints.filter(m => m.trusted).map(m => m.mintUrl);
-                await nostrService.syncToNostr(mintUrls, balance);
-                setIsSyncing(false);
-                break;
-            case 'restore_nostr':
-                await useWalletStore.getState().restoreFromNostr();
                 break;
             default:
                 break;
@@ -160,53 +140,6 @@ export function SettingsScreen() {
                                 icon={<ShieldCheck size={24} />}
                                 iconAfter={<ChevronRight size={24} />}
                                 onPress={() => handleSettingPress('backup')}
-                            />
-                        </YGroup.Item>
-                    </YGroup>
-                </YStack>
-
-                {/* Nostr Section */}
-                <YStack gap="$3">
-                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Nostr Sync & Backup</Text>
-                    <YGroup>
-                        <YGroup.Item>
-                            <ListItem
-                                hoverStyle={{ bg: '$backgroundHover' }}
-                                pressStyle={{ bg: '$backgroundPress' }}
-                                bg="$gray5"
-                                fontWeight="600"
-                                title={<H6>Nostr Configuration</H6>}
-                                subTitle="Relays, keys and logs"
-                                icon={<Radio size={24} />}
-                                iconAfter={<ChevronRight size={24} />}
-                                onPress={() => handleSettingPress('nostr')}
-                            />
-                        </YGroup.Item>
-                        <YGroup.Item>
-                            <ListItem
-                                hoverStyle={{ bg: '$backgroundHover' }}
-                                pressStyle={{ bg: '$backgroundPress' }}
-                                bg="$gray5"
-                                fontWeight="600"
-                                title={<H6>Sync to Nostr</H6>}
-                                subTitle="Backup trusted mints and balance"
-                                icon={isSyncing ? <ActivityIndicator size="small" /> : <Cloud size={24} />}
-                                iconAfter={<RefreshCw size={24} />}
-                                onPress={() => handleSettingPress('sync_nostr')}
-                            />
-                        </YGroup.Item>
-                        <YGroup.Item>
-                            <ListItem
-                                hoverStyle={{ bg: '$backgroundHover' }}
-                                pressStyle={{ bg: '$backgroundPress' }}
-                                bg="$gray5"
-                                fontWeight="600"
-                                title={<H6>Restore from Nostr</H6>}
-                                subTitle={isRestoring ? `Syncing: ${restoringMintUrl?.substring(0, 30)}...` : "Import mints from your Nostr backup"}
-                                icon={isRestoring ? <ActivityIndicator size="small" /> : <RefreshCw size={24} />}
-                                iconAfter={!isRestoring ? <ChevronRight size={24} /> : undefined}
-                                onPress={() => !isRestoring && handleSettingPress('restore_nostr')}
-                                opacity={isRestoring ? 0.7 : 1}
                             />
                         </YGroup.Item>
                     </YGroup>
@@ -418,69 +351,6 @@ export function SettingsScreen() {
                                 </>
                             )}
                         </YStack>
-                    </YStack>
-                </AppBottomSheet>
-                {/* Nostr Details Sheet */}
-                <AppBottomSheet ref={nostrSheetRef} snapPoints={['90%']}>
-                    <YStack p="$4" gap="$5">
-                        <H2 fontSize="$7" fontWeight="700">Nostr Settings</H2>
-
-                        <YStack gap="$2">
-                            <Text fontWeight="700" color="$gray10">Public Key (npub)</Text>
-                            <XStack gap="$2" items="center" bg="$gray3" p="$3" rounded="$4" borderWidth={1} borderColor="$borderColor">
-                                <Text flex={1} numberOfLines={1} fontSize="$3">{npub}</Text>
-                                <Button size="$2" circular icon={<Clipboard size={14} />} onPress={() => {
-                                    ClipboardStore.setStringAsync(npub || '');
-                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                }} />
-                            </XStack>
-                        </YStack>
-
-                        <YStack gap="$2">
-                            <XStack justify="space-between">
-                                <Text fontWeight="700" color="$gray10">Private Key (nsec)</Text>
-                                <Button size="$2" chromeless onPress={() => setIsNsecVisible(!isNsecVisible)}>
-                                    {isNsecVisible ? 'Hide' : 'Show'}
-                                </Button>
-                            </XStack>
-                            <XStack gap="$2" items="center" bg="$gray3" p="$3" rounded="$4" borderWidth={1} borderColor="$borderColor">
-                                <Text flex={1} numberOfLines={1} fontSize="$3" filter={isNsecVisible ? undefined : 'blur(5px)'}>
-                                    {nsec}
-                                </Text>
-                                <Button size="$2" circular icon={<Clipboard size={14} />} onPress={() => {
-                                    ClipboardStore.setStringAsync(nsec || '');
-                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                }} />
-                            </XStack>
-                        </YStack>
-
-                        <YStack gap="$2">
-                            <Text fontWeight="700" color="$gray10">Relays</Text>
-                            <YStack gap="$2">
-                                {relays.map(r => (
-                                    <XStack key={r} justify="space-between" items="center" bg="$gray3" px="$3" py="$2" rounded="$3">
-                                        <Text fontSize="$3">{r}</Text>
-                                        <View bg="$green10" width={8} height={8} rounded="$10" />
-                                    </XStack>
-                                ))}
-                            </YStack>
-                        </YStack>
-
-                        <YStack gap="$2" flex={1}>
-                            <Text fontWeight="700" color="$gray10">Nostr Logs</Text>
-                            <ScrollView bg="$black" p="$3" rounded="$4" maxH={200}>
-                                {logs.map((log, i) => (
-                                    <Text key={i} color="$green10" fontSize="$2">
-                                        {log}
-                                    </Text>
-                                ))}
-                                {logs.length === 0 && <Text color="$gray8" fontSize="$2">No logs yet...</Text>}
-                            </ScrollView>
-                        </YStack>
-
-                        <Button size="$5" theme="accent" onPress={() => nostrSheetRef.current?.dismiss()}>
-                            Close
-                        </Button>
                     </YStack>
                 </AppBottomSheet>
             </YStack>

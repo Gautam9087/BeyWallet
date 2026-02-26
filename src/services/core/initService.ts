@@ -18,8 +18,10 @@ import { ExpoSqliteRepositories } from '../../store/test';
 import * as SQLite from 'expo-sqlite';
 import { seedService } from '../seedService';
 import { AppState, type AppStateStatus } from 'react-native';
-import { nostrService } from '../nostrService';
 import { HistoryWatcherPlugin } from './plugins/HistoryWatcherPlugin';
+import { NPCPlugin } from 'coco-cashu-plugin-npc';
+import { finalizeEvent } from 'nostr-tools/pure';
+import { Buffer } from 'buffer';
 
 // ─── Singleton State ──────────────────────────────────────────
 
@@ -27,6 +29,7 @@ let manager: Manager | null = null;
 let repo: ExpoSqliteRepositories | null = null;
 let appStateSubscription: any = null;
 let isInitializing = false;
+let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 // ─── Internal Helpers ─────────────────────────────────────────
 
@@ -136,8 +139,26 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
 
     // Open Expo SQLite database
     const db = SQLite.openDatabaseSync('coco_wallet.db');
+    dbInstance = db;
     const repositories = new ExpoSqliteRepositories({ database: db });
     await repositories.init();
+
+    // Setup NPC Plugin
+    const { privkey } = await seedService.getNostrKeys(mnemonic);
+    const privateKeyBytes = Buffer.from(privkey, 'hex');
+
+    const signerFunction = async (eventTemplate: any) => {
+        return finalizeEvent(eventTemplate, privateKeyBytes);
+    };
+
+    const npcPlugin = new NPCPlugin(
+        'https://npubx.cash',
+        signerFunction,
+        {
+            syncIntervalMs: 30000,
+            useWebsocket: true,
+        }
+    );
 
     // Initialize Manager using constructor (rc47 pattern)
     manager = new Manager(
@@ -145,7 +166,7 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
         async () => new Uint8Array(seed),
         new ConsoleLogger('Coco', { level: 'warn' }),
         undefined,
-        [HistoryWatcherPlugin]
+        [HistoryWatcherPlugin, npcPlugin]
     );
 
     repo = repositories;
@@ -155,6 +176,14 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
     await enableWatchers(manager);
 
     console.log('[InitService] Manager ready with watchers and processors');
+
+    // Trigger initial NPC sync
+    try {
+        await npcPlugin.sync();
+        console.log('[InitService] ✅ Initial NPC sync completed');
+    } catch (error) {
+        console.error('[InitService] Initial NPC sync failed:', error);
+    }
 
     // Trust testnet mints (idempotent — safe to call on every init)
     try {
@@ -207,19 +236,12 @@ export const initService = {
 
             const m = await initializeWithMnemonic(mnemonic);
 
-            // Initialize Nostr
-            await nostrService.init(mnemonic);
-
             return m;
         } finally {
             isInitializing = false;
         }
     },
 
-    /**
-     * Create a NEW wallet with the provided mnemonic.
-     * Used during onboarding.
-     */
     createWallet: async (mnemonic: string): Promise<Manager> => {
         if (manager) {
             await initService.cleanup();
@@ -227,9 +249,6 @@ export const initService = {
 
         await seedService.saveMnemonic(mnemonic);
         const m = await initializeWithMnemonic(mnemonic);
-
-        // Initialize Nostr
-        await nostrService.init(mnemonic);
 
         return m;
     },
@@ -272,6 +291,10 @@ export const initService = {
             appStateSubscription.remove();
             appStateSubscription = null;
         }
+        if (dbInstance) {
+            try { dbInstance.closeSync(); } catch (e) { }
+            dbInstance = null;
+        }
         manager = null;
         repo = null;
         isInitializing = false;
@@ -289,16 +312,15 @@ export const initService = {
         }
         manager = null;
         repo = null;
+        if (dbInstance) {
+            try { dbInstance.closeSync(); } catch (e) { }
+            dbInstance = null;
+        }
         isInitializing = false;
     },
 
-    /**
-     * Restore a wallet from a mnemonic using a fresh DB.
-     * Uses NUT-13 deterministic recovery to sweep proofs from test mints.
-     * Used during import/restore flow.
-     */
     restoreWallet: async (mnemonic: string): Promise<Manager> => {
-        console.log('[InitService] Starting wallet restore from seed...');
+        console.log('[InitService] Starting deterministic wallet restore from seed...');
 
         if (manager) {
             await initService.cleanup();
@@ -306,59 +328,11 @@ export const initService = {
 
         await seedService.saveMnemonic(mnemonic);
 
-        // Use a fresh restore DB to avoid conflicts
-        const seed = await seedService.deriveSeed(mnemonic);
-        const db = SQLite.openDatabaseSync('cashu_wallet_restore.db');
-        const repositories = new ExpoSqliteRepositories({ database: db });
-        await repositories.init();
+        // Just initialize normally — deep recovery happens asynchronously in the background queue
+        const m = await initializeWithMnemonic(mnemonic);
 
-        manager = new Manager(
-            repositories,
-            async () => new Uint8Array(seed),
-            new ConsoleLogger('Coco', { level: 'warn' }),
-            undefined,
-            [HistoryWatcherPlugin]
-        );
-
-        repo = repositories;
-        setupAppStateListener();
-
-        // Enable watchers
-        await enableWatchers(manager);
-
-        // Trust test mints and restore from each (with timeout)
-        const testMints = [
-            'https://testnut.cashu.space',
-            'https://nofee.testnut.cashu.space',
-        ];
-
-        const restoreWithTimeout = (mintUrl: string, timeoutMs: number) => {
-            return Promise.race([
-                (async () => {
-                    await manager!.mint.addMint(mintUrl, { trusted: true });
-                    console.log(`[InitService] Restoring from ${mintUrl}...`);
-                    await manager!.wallet.restore(mintUrl);
-                    console.log(`[InitService] ✅ Restored from ${mintUrl}`);
-                })(),
-                new Promise<void>((_, reject) =>
-                    setTimeout(() => reject(new Error(`Restore timed out after ${timeoutMs / 1000}s`)), timeoutMs)
-                ),
-            ]);
-        };
-
-        for (const mintUrl of testMints) {
-            try {
-                await restoreWithTimeout(mintUrl, 30_000); // 30s per mint
-            } catch (e: any) {
-                console.warn(`[InitService] Restore from ${mintUrl} failed (non-fatal):`, e?.message || e);
-            }
-        }
-
-        // Initialize Nostr
-        await nostrService.init(mnemonic);
-
-        console.log('[InitService] ✅ Wallet restored deterministically');
-        return manager;
+        console.log('[InitService] ✅ Wallet initialized for background restoration');
+        return m;
     },
 
     /**

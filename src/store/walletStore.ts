@@ -5,7 +5,6 @@ import {
     mintManager,
 } from '../services/core';
 import type { MintInfo } from '../services/core';
-import { nostrService } from '../services/nostrService';
 
 interface WalletState {
     activeMintUrl: string | null;
@@ -18,9 +17,6 @@ interface WalletState {
     isRestoring: boolean;
     restoringMintUrl: string | null;
     restoreQueue: string[];
-    nostrBalance: number | null;
-    nostrMints: string[];
-    syncError: string | null;
 
     // Actions
     initialize: () => Promise<void>;
@@ -34,7 +30,6 @@ interface WalletState {
     refreshBalance: () => Promise<void>;
     refreshMintList: () => Promise<void>;
     restoreFromSeed: (mintUrl: string) => Promise<void>;
-    restoreFromNostr: () => Promise<void>;
 }
 
 export const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
@@ -50,9 +45,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     isRestoring: false,
     restoringMintUrl: null,
     restoreQueue: [],
-    nostrBalance: null,
-    nostrMints: [],
-    syncError: null,
 
     initialize: async () => {
         set({ isInitializing: true, error: null });
@@ -169,12 +161,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
             console.log('[WalletStore] Balance:', balance);
             set({ balance, balances, refreshCounter: get().refreshCounter + 1 });
-
-            // Sync to Nostr
-            const trustedMints = await mintManager.getAllTrustedMints();
-            const mintUrls = trustedMints.map(m => m.mintUrl);
-            const totalBalance = Object.values(balances).reduce((a, b) => a + b, 0);
-            nostrService.syncToNostr(mintUrls, totalBalance);
         } catch (err) {
             console.error('[WalletStore] Error refreshing balance:', err);
         }
@@ -194,7 +180,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         while (get().restoreQueue.length > 0) {
             const nextUrl = get().restoreQueue[0];
             try {
-                set({ isRestoring: true, restoringMintUrl: nextUrl, syncError: null });
+                set({ isRestoring: true, restoringMintUrl: nextUrl });
 
                 // Yield for UI responsiveness
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -217,19 +203,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
                 console.log(`[WalletStore] ✅ Deep Restore complete for: ${nextUrl}`);
 
-                // Refresh balances for ALL mints to be sure
+            } catch (err: any) {
+                // coco-cashu-core throws if even *one* historical keyset is missing from the mint API.
+                // However, it successfully restores balances for the valid keysets!
+                // So we log it as a warning and continue, rather than hard-failing the UI.
+                console.warn(`[WalletStore] ⚠️ Deep Restore partial success/failure for ${nextUrl}:`, err);
+            } finally {
+                // Rescue any valid proofs that got stuck in 'inflight' state when the restore routine crashed
+                await walletService.restoreInflightProofs(nextUrl);
+
+                // Refresh balances to capture whatever DID successfully restore
                 await get().refreshBalance();
 
-                // Sync the new balance back to Nostr (backup the backup)
-                const currentBalances = await walletService.getBalances();
-                const total = Object.values(currentBalances).reduce((a, b) => a + b, 0);
-                const trustedMints = (await mintManager.getAllTrustedMints()).map(m => m.mintUrl);
-                nostrService.syncToNostr(trustedMints, total);
-
-            } catch (err: any) {
-                console.error(`[WalletStore] ❌ Deep Restore failed for ${nextUrl}:`, err);
-                set({ syncError: `${nextUrl}: ${err.message}` });
-            } finally {
                 set(s => ({
                     restoreQueue: s.restoreQueue.filter(u => u !== nextUrl),
                     isRestoring: false,
@@ -238,33 +223,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
                 // Yield before next mint
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
-        }
-    },
-
-    restoreFromNostr: async () => {
-        try {
-            set({ isRestoring: true, restoringMintUrl: 'Scanning Nostr...', syncError: null });
-            const data = await nostrService.fetchFromNostr();
-
-            if (data && data.mints && data.mints.length > 0) {
-                set({
-                    nostrBalance: data.totalBalance,
-                    nostrMints: data.mints
-                });
-
-                // Add all to queue and trigger processor via first one
-                for (const url of data.mints) {
-                    await mintManager.addMint(url, { trusted: true });
-                    get().restoreFromSeed(url); // Don't await, let it queue
-                }
-            } else {
-                set({ syncError: 'No wallet backup found on Nostr.' });
-            }
-        } catch (err: any) {
-            console.error('[WalletStore] Nostr fetch failed:', err);
-            set({ syncError: `Nostr fetch failed: ${err.message}` });
-        } finally {
-            set({ isRestoring: false, restoringMintUrl: null });
         }
     },
 
