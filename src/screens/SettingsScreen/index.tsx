@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { YStack, ScrollView, Text, YGroup, ListItem, H6, H2, H4, Button, XStack, View, Separator } from 'tamagui';
-import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw } from '@tamagui/lucide-icons';
+import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw, Server } from '@tamagui/lucide-icons';
 import { ThemeModal } from './components/ThemeModal';
 import { CurrencyModal } from './components/CurrencyModal';
+import { MintModal } from './components/MintModal';
 import * as Haptics from 'expo-haptics';
 import * as ClipboardStore from 'expo-clipboard';
 import { useSettingsStore } from '~/store/settingsStore';
@@ -20,9 +21,10 @@ export function SettingsScreen() {
     const router = useRouter();
     const themeSheetRef = useRef<AppBottomSheetRef>(null);
     const currencySheetRef = useRef<AppBottomSheetRef>(null);
+    const mintSheetRef = useRef<AppBottomSheetRef>(null);
     const deleteSheetRef = useRef<AppBottomSheetRef>(null);
 
-    const { secondaryCurrency } = useSettingsStore();
+    const { secondaryCurrency, defaultMintUrl } = useSettingsStore();
     const resetOnboarding = useOnboardingStore(state => state.resetOnboarding);
 
     const [seedWords, setSeedWords] = useState<string[]>([]);
@@ -46,6 +48,9 @@ export function SettingsScreen() {
                 break;
             case 'currency':
                 currencySheetRef.current?.present();
+                break;
+            case 'mint':
+                mintSheetRef.current?.present();
                 break;
             default:
                 break;
@@ -186,6 +191,19 @@ export function SettingsScreen() {
                             <ListItem
                                 bg="transparent"
                                 fontWeight="600"
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
+                                title={<H6>Default Mint</H6>}
+                                subTitle={defaultMintUrl ? new URL(defaultMintUrl).hostname : 'None selected'}
+                                icon={<Server size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
+                                onPress={() => handleSettingPress('mint')}
+                            />
+                        </YGroup.Item>
+                        <YGroup.Item>
+                            <ListItem
+                                bg="transparent"
+                                fontWeight="600"
                                 opacity={0.5}
                                 title={<H6>Notifications</H6>}
                                 subTitle="Manage alerts and updates"
@@ -246,6 +264,7 @@ export function SettingsScreen() {
                 {/* Bottom Sheets */}
                 <ThemeModal ref={themeSheetRef} />
                 <CurrencyModal ref={currencySheetRef} />
+                <MintModal ref={mintSheetRef} />
 
                 {/* Delete Wallet Sheet */}
                 <AppBottomSheet ref={deleteSheetRef} snapPoints={['85%']}>
@@ -354,6 +373,6 @@ export function SettingsScreen() {
                     </YStack>
                 </AppBottomSheet>
             </YStack>
-        </ScrollView>
+        </ScrollView >
     );
 }

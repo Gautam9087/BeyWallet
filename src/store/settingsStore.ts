@@ -1,20 +1,24 @@
 import { create } from 'zustand';
 import { initService } from '../services/core';
+import { DEFAULT_MINT } from './walletStore';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 interface SettingsState {
     theme: ThemePreference;
     secondaryCurrency: string;
+    defaultMintUrl: string;
     initialized: boolean;
     initialize: () => Promise<void>;
     setTheme: (theme: ThemePreference) => Promise<void>;
     setSecondaryCurrency: (currency: string) => Promise<void>;
+    setDefaultMintUrl: (url: string) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     theme: 'system',
     secondaryCurrency: 'USD',
+    defaultMintUrl: DEFAULT_MINT,
     initialized: false,
 
     initialize: async () => {
@@ -42,6 +46,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 if (storedCurrency) {
                     set({ secondaryCurrency: storedCurrency });
                 }
+
+                // Load default mint
+                const storedMintUrl = await repo.settingsRepository.getSetting('defaultMintUrl');
+                if (storedMintUrl) {
+                    set({ defaultMintUrl: storedMintUrl });
+                }
+
                 set({ initialized: true });
                 return;
             } catch (error) {
@@ -82,6 +93,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         } catch (error) {
             console.error('[SettingsStore] Failed to set secondary currency:', error);
             set({ secondaryCurrency: currency });
+        }
+    },
+
+    setDefaultMintUrl: async (url: string) => {
+        try {
+            const exists = await initService.walletExists();
+            if (exists) {
+                const repo = initService.getRepo();
+                await repo.settingsRepository.setSetting('defaultMintUrl', url);
+            }
+            set({ defaultMintUrl: url });
+        } catch (error) {
+            console.error('[SettingsStore] Failed to set default mint:', error);
+            set({ defaultMintUrl: url });
         }
     },
 }));

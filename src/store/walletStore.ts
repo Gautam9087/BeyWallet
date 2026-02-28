@@ -5,6 +5,7 @@ import {
     mintManager,
 } from '../services/core';
 import type { MintInfo } from '../services/core';
+import { useSettingsStore } from './settingsStore';
 
 interface WalletState {
     activeMintUrl: string | null;
@@ -59,16 +60,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
             const manager = await initService.init();
 
-            // Ensure default mint exists and is trusted
+            // Ensure the user's default mint exists and is trusted
+            const userDefaultMint = useSettingsStore.getState().defaultMintUrl || DEFAULT_MINT;
             const existingMints = await manager.mint.getAllMints();
-            const hasDefault = existingMints.some(m => m.mintUrl === DEFAULT_MINT);
+            const hasDefault = existingMints.some(m => m.mintUrl === userDefaultMint);
 
             if (!hasDefault) {
-                await mintManager.addMint(DEFAULT_MINT, { trusted: true });
+                await mintManager.addMint(userDefaultMint, { trusted: true });
             } else {
-                const isTrusted = await manager.mint.isTrustedMint(DEFAULT_MINT);
+                const isTrusted = await manager.mint.isTrustedMint(userDefaultMint);
                 if (!isTrusted) {
-                    await mintManager.trustMint(DEFAULT_MINT);
+                    await mintManager.trustMint(userDefaultMint);
                 }
             }
 
@@ -90,7 +92,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
             // Set active mint if not set
             if (!get().activeMintUrl) {
-                set({ activeMintUrl: DEFAULT_MINT });
+                const userDefaultMint = useSettingsStore.getState().defaultMintUrl || DEFAULT_MINT;
+                set({ activeMintUrl: userDefaultMint });
             }
 
             await get().refreshBalance();
@@ -241,7 +244,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             await mintManager.removeMint(url);
             await get().refreshMintList();
             if (get().activeMintUrl === url) {
-                set({ activeMintUrl: DEFAULT_MINT });
+                const userDefaultMint = useSettingsStore.getState().defaultMintUrl || DEFAULT_MINT;
+                // Don't set active if the newly removed mint WAS the default mint
+                if (url !== userDefaultMint) {
+                    set({ activeMintUrl: userDefaultMint });
+                } else {
+                    const nextActive = get().mints.find(m => m.mintUrl !== url)?.mintUrl;
+                    set({ activeMintUrl: nextActive || null });
+                }
             }
         } catch (err: any) {
             console.error('[WalletStore] Failed to remove mint:', err);

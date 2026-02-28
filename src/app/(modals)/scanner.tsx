@@ -7,6 +7,7 @@ import { X, Zap, ZapOff, RefreshCcw } from '@tamagui/lucide-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthStore } from '~/store/authStore';
 
 const { width, height } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
@@ -21,9 +22,17 @@ export default function ScannerScreen() {
     const [isUR, setIsUR] = useState(false);
     const decoderRef = useRef<URDecoder>(new URDecoder());
 
+    const { setLockDisabled } = useAuthStore();
+
     useEffect(() => {
         if (!permission) {
-            requestPermission();
+            // Prevent auto-lock from triggering when the native permission 
+            // prompt pushes the app into the background state.
+            setLockDisabled(true);
+            requestPermission().finally(() => {
+                // Short delay to allow AppState to settle back to 'active'
+                setTimeout(() => setLockDisabled(false), 1000);
+            });
         }
     }, [permission]);
 
@@ -38,10 +47,10 @@ export default function ScannerScreen() {
     if (!permission.granted) {
         return (
             <YStack flex={1} bg="black" items="center" justify="center" p="$4" gap="$4">
-                <Text color="white" fontSize="$6" fontWeight="700" ta="center">
+                <Text color="white" fontSize="$6" fontWeight="700" style={{ textAlign: 'center' }}>
                     Camera Permission Required
                 </Text>
-                <Text color="$gray10" ta="center">
+                <Text color="$gray10" style={{ textAlign: 'center' }}>
                     We need your permission to show the camera to scan QR codes.
                 </Text>
                 <Button theme="accent" onPress={requestPermission}>
@@ -78,8 +87,8 @@ export default function ScannerScreen() {
                                 decodedStr = decoded;
                             } else if (Buffer.isBuffer(decoded)) {
                                 decodedStr = decoded.toString('utf8');
-                            } else if (decoded instanceof Uint8Array || Array.isArray(decoded)) {
-                                decodedStr = Buffer.from(decoded).toString('utf8');
+                            } else if ((decoded as any) instanceof Uint8Array || Array.isArray(decoded)) {
+                                decodedStr = Buffer.from(decoded as any).toString('utf8');
                             } else {
                                 decodedStr = String(decoded);
                             }
@@ -171,7 +180,7 @@ export default function ScannerScreen() {
                                     backgroundColor: 'rgba(255,255,255,0.05)',
                                 }}
                             />
-                            <Text color="white" mt="$4" fontWeight="600" ta="center" style={{ textShadowColor: 'black', textShadowRadius: 2 }}>
+                            <Text color="white" mt="$4" fontWeight="600" style={{ textAlign: 'center', textShadowColor: 'black', textShadowRadius: 2 }}>
                                 {isUR ? 'Scanning animated QR...' : 'Align QR code within the frame'}
                             </Text>
                         </YStack>

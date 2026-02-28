@@ -24,7 +24,9 @@ export function RootLayoutNav() {
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             // Only lock if onboarded and moving from active to background
-            if (isOnboarded && appState.current === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
+            // Note: We deliberately do NOT lock on 'inactive' because native OS permission 
+            // prompts (like Camera/FaceID) push the app into 'inactive' state temporarily.
+            if (isOnboarded && appState.current === 'active' && nextAppState === 'background') {
                 markBackgrounded()
                 lock()
             }

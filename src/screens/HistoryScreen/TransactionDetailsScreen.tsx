@@ -46,9 +46,9 @@ export function TransactionDetailsScreen() {
     const { data: entry, refetch, isRefetching } = useQuery({
         queryKey: ['transaction', id],
         queryFn: async () => {
-            if (!id) return undefined;
+            if (!id) return null;
             const history = await historyService.getHistory(200, 0);
-            return history.find((e: any) => e.id === id) as HistoryEntry | undefined;
+            return (history.find((e: any) => e.id === id) as HistoryEntry) || null;
         },
         enabled: !!id,
     });
