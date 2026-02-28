@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { initService } from '../services/core';
-import { DEFAULT_MINT } from './walletStore';
+import { DEFAULT_MINT } from './constants';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 

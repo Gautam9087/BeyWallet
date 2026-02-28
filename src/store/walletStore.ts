@@ -6,6 +6,7 @@ import {
 } from '../services/core';
 import type { MintInfo } from '../services/core';
 import { useSettingsStore } from './settingsStore';
+import { DEFAULT_MINT } from './constants';
 
 interface WalletState {
     activeMintUrl: string | null;
@@ -33,7 +34,7 @@ interface WalletState {
     restoreFromSeed: (mintUrl: string) => Promise<void>;
 }
 
-export const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
+
 
 export const useWalletStore = create<WalletState>((set, get) => ({
     activeMintUrl: null,

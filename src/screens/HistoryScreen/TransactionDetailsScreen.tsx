@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spinner } from '~/components/UI/Spinner';
 import { useToastController } from '@tamagui/toast';
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
+import { notificationService } from '~/services/notificationService';
 
 // Ensure Buffer is available globally
 if (typeof global.Buffer === 'undefined') {
@@ -152,6 +153,7 @@ export function TransactionDetailsScreen() {
                 const cborBuffer = cborEncode(clean);
                 const ur = new UR(Buffer.from(cborBuffer), "cashu");
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
+                setQrCodeFragment(encoderRef.current.nextPart());
             } else {
                 setShowAnimatedQR(false);
                 setQrCodeFragment(token);
@@ -271,6 +273,11 @@ export function TransactionDetailsScreen() {
                     if (repo?.historyRepository) {
                         await (repo.historyRepository as any).updateHistoryEntryState(entry.id, newState);
                     }
+                    if (newState === 'claimed' && entry.type === 'send' && entry.state !== 'claimed') {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
+                        notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { transactionId: entry.id });
+                    }
                 }
             } catch (err) {
                 console.warn('[TransactionDetails] Failed to refresh proof states:', err);
@@ -334,11 +341,21 @@ export function TransactionDetailsScreen() {
         else setFragmentLength(100);
     };
 
-    // Auto-refresh on mount if pending
+    // Auto-refresh on mount and poll if pending
     useEffect(() => {
+        let interval: NodeJS.Timeout;
+
         if (entry && (status === 'pending' || status === 'unclaimed') && entry.type === 'send' && initService.isInitialized()) {
             handleRefresh();
+
+            interval = setInterval(() => {
+                handleRefresh();
+            }, 8000);
         }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
     }, [entry?.id, entry?.state]);
     // Status text formatting
     const formattedStatus = useMemo(() => {
@@ -489,13 +506,19 @@ export function TransactionDetailsScreen() {
                             {entry.type === 'send' ? (
                                 <YStack items="center" gap="$4">
                                     <View bg="white" p="$3" rounded="$6">
-                                        <QRCode
-                                            value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
-                                            size={280}
-                                            backgroundColor="white"
-                                            color="black"
-                                            quietZone={10}
-                                        />
+                                        {(!showAnimatedQR && token.length > 400) ? (
+                                            <YStack width={280} height={280} items="center" justify="center">
+                                                <Spinner size="large" color="$color" />
+                                            </YStack>
+                                        ) : (
+                                            <QRCode
+                                                value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
+                                                size={280}
+                                                backgroundColor="white"
+                                                color="black"
+                                                quietZone={10}
+                                            />
+                                        )}
                                     </View>
 
                                     <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">

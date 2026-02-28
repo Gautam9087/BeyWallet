@@ -10,6 +10,7 @@ import { LockOverlay } from '../LockOverlay'
 import { useAuthStore } from '../../store/authStore'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { useCocoEvents } from '../../hooks/useCocoEvents'
+import { notificationService } from '../../services/notificationService'
 
 export function RootLayoutNav() {
     const { resolvedTheme } = useAppTheme()
@@ -20,6 +21,11 @@ export function RootLayoutNav() {
 
     // Subscribe to coco events for automatic balance/history updates
     useCocoEvents();
+
+    // Request push notification permissions on app launch
+    useEffect(() => {
+        notificationService.requestPermissions();
+    }, []);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {

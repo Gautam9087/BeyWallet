@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { bitcoinService } from '../../services/bitcoinService';
 import { currencyService, CurrencyCode } from '../../services/currencyService';
 import { cleanToken, decodeToken, encodePeanut, encodeTokenV4, encodeTokenV3, eventService, proofService, initService } from '../../services/core';
+import { notificationService } from '../../services/notificationService';
 
 // Ensure Buffer is available globally
 if (typeof global.Buffer === 'undefined') {
@@ -91,6 +92,7 @@ export function ResultStage({
                 const cborBuffer = cborEncode(clean);
                 const ur = new UR(Buffer.from(cborBuffer), "cashu");
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
+                setQrCodeFragment(encoderRef.current.nextPart());
             } else {
                 setShowAnimatedQR(false);
                 setQrCodeFragment(currentToken);
@@ -126,6 +128,7 @@ export function ResultStage({
 
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
+            notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { operationId });
 
             // Invalidate queries to prevent infinite spinner on TransactionDetails
             queryClient.invalidateQueries({ queryKey: ['history'] });
@@ -269,15 +272,20 @@ export function ResultStage({
                         bg="white"
                         p="$2"
                         rounded="$5"
-
                     >
-                        <QRCode
-                            value={showAnimatedQR ? qrCodeFragment : (currentToken.startsWith('cashu:') ? currentToken : `cashu:${currentToken}`)}
-                            size={330}
-                            backgroundColor="white"
-                            color="black"
-                            quietZone={10}
-                        />
+                        {(!showAnimatedQR && currentToken && currentToken.length > 400) ? (
+                            <YStack width={330} height={330} items="center" justify="center">
+                                <Spinner size="large" color="$color" />
+                            </YStack>
+                        ) : (
+                            <QRCode
+                                value={showAnimatedQR ? qrCodeFragment : (currentToken.startsWith('cashu:') ? currentToken : `cashu:${currentToken}`)}
+                                size={330}
+                                backgroundColor="white"
+                                color="black"
+                                quietZone={10}
+                            />
+                        )}
                     </View>
 
                     <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">

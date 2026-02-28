@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { initService, eventService } from '../services/core';
 import { useWalletStore } from '../store/walletStore';
 import { useQueryClient } from '@tanstack/react-query';
+import { notificationService } from '../services/notificationService';
 
 /**
  * Hook to subscribe to coco CoreEvents and trigger wallet updates.
@@ -29,16 +30,19 @@ export function useCocoEvents() {
 
     const handleMintQuoteRedeemed = useCallback((payload: any) => {
         console.log('[useCocoEvents] Mint quote redeemed:', payload.quoteId);
+        notificationService.sendLocalNotification('Mint Completed', 'Your ecash has been minted successfully.');
         handleBalanceUpdate();
     }, [handleBalanceUpdate]);
 
     const handleReceiveCreated = useCallback((payload: any) => {
         console.log('[useCocoEvents] Receive created:', payload.mintUrl);
+        notificationService.sendLocalNotification('Ecash Received', 'You have successfully received ecash tokens via Link / QR code.');
         handleBalanceUpdate();
     }, [handleBalanceUpdate]);
 
     const handleSendCreated = useCallback((payload: any) => {
         console.log('[useCocoEvents] Send created:', payload.mintUrl);
+        notificationService.sendLocalNotification('Ecash Prepared', 'Your ecash tokens are ready to be sent.');
         handleBalanceUpdate();
     }, [handleBalanceUpdate]);
 
@@ -54,6 +58,7 @@ export function useCocoEvents() {
 
     const handleMeltQuotePaid = useCallback((payload: any) => {
         console.log('[useCocoEvents] Melt quote paid:', payload.quoteId);
+        notificationService.sendLocalNotification('Payment Sent', 'Your Lightning invoice was paid successfully.');
         handleBalanceUpdate();
     }, [handleBalanceUpdate]);
 
