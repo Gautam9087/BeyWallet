@@ -81,11 +81,11 @@ export default function ActionButtons() {
 
                         subTitle="Add funds to Mint."
                         iconAfter={<ArrowRight size={24} color="$color" />}
-                        icon={<ArrowDownLeft size={24} color="$color" />}
+
                         onPress={() => handleOptionPress("/mint")}
                         px="$4"
-                        rounded="$7"
-                        borderWidth={2}
+                        rounded="$5"
+                        borderWidth={1}
                         borderColor="$color3"
                     />
                     <ListItem
@@ -97,10 +97,9 @@ export default function ActionButtons() {
 
                         iconAfter={<ArrowRight size={24} color="$color" />}
                         subTitle="Remove funds from Mint."
-                        icon={<Flame size={24} color="$color" />}
                         onPress={() => handleOptionPress("/melt")}
-                        rounded="$7"
-                        borderWidth={2}
+                        rounded="$5"
+                        borderWidth={1}
                         borderColor="$color3"
                     />
                 </YStack>

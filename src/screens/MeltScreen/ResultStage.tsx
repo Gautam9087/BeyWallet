@@ -1,5 +1,4 @@
-import React from 'react';
-import { YStack, XStack, Text, Button, View } from 'tamagui';
+import { YStack, XStack, Text, Button, View, H2, Circle, Separator } from 'tamagui';
 import { CheckCircle, XCircle, Zap, ArrowLeft, Copy, ExternalLink } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -20,78 +19,93 @@ export function MeltResultStage({ status, amount, feeReserve, error, onClose }: 
         }
     }, [status]);
 
+    const getIcon = () => {
+        switch (status) {
+            case 'success':
+                return <CheckCircle size={40} color="white" />;
+            case 'error':
+                return <XCircle size={40} color="white" />;
+        }
+    };
+
+    const getTitle = () => {
+        switch (status) {
+            case 'success':
+                return 'Payment Sent';
+            case 'error':
+                return 'Payment Failed';
+        }
+    };
+
+    const getMessage = () => {
+        switch (status) {
+            case 'success':
+                return 'Successfully paid Lightning invoice.';
+            case 'error':
+                return error || 'The Lightning payment could not be completed.';
+        }
+    };
+
+    const getStatusColor = () => {
+        switch (status) {
+            case 'success':
+                return '$green10';
+            case 'error':
+                return '$red10';
+        }
+    };
+
     return (
-        <YStack flex={1} items="center" justify="center" gap="$6" px="$4">
-            {status === 'success' ? (
-                <>
-                    <View bg="$green4" p="$5" rounded="$12">
-                        <CheckCircle size={48} color="$green10" strokeWidth={2} />
-                    </View>
+        <YStack flex={1} bg="$background">
+            <YStack flex={1}>
+                {/* Status Header */}
+                <YStack gap="$1" mb="$6" mt="$8" items="center">
+                    <Circle size={80} bg={getStatusColor() as any} items="center" justify="center" mb="$4">
+                        {getIcon()}
+                    </Circle>
+                    <H2 text="center">{getTitle()}</H2>
+                    <Text color="$gray10" text="center" px="$4">
+                        {getMessage()}
+                    </Text>
+                </YStack>
 
-                    <YStack items="center" gap="$2">
-                        <Text fontSize="$8" fontWeight="800">Payment Sent!</Text>
-                        <Text color="$gray10" fontSize="$4" textAlign="center">
-                            Successfully paid Lightning invoice
-                        </Text>
+                {/* Details Table */}
+                {status === 'success' && (
+                    <YStack gap="$0" mx="$4" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                        <DetailItem label="Total Amount" value={`₿${amount} sats`} />
+                        <DetailItem label="Fee Reserve" value={`~${feeReserve} sats`} valueColor="$orange10" />
+                        <DetailItem label="Status" value="PAID" valueColor="$green10" />
                     </YStack>
+                )}
+            </YStack>
 
-                    <YStack
-                        width="100%"
-                        borderWidth={1}
-                        borderColor="$color4"
-                        rounded="$4"
-                        overflow="hidden"
-                    >
-                        <XStack justify="space-between" items="center" p="$4">
-                            <Text color="$gray10">Amount Paid</Text>
-                            <Text fontWeight="800" fontSize="$6">₿{amount} sats</Text>
-                        </XStack>
-
-                        <View height={1} bg="$color4" />
-
-                        <XStack justify="space-between" items="center" p="$4">
-                            <Text color="$gray10">Fee Reserve</Text>
-                            <Text fontWeight="600" color="$orange10">~{feeReserve} sats</Text>
-                        </XStack>
-
-                        <View height={1} bg="$color4" />
-
-                        <XStack justify="space-between" items="center" p="$4">
-                            <XStack gap="$2" items="center">
-                                <Zap size={16} color="$green10" />
-                                <Text color="$gray10">Status</Text>
-                            </XStack>
-                            <XStack bg="$green3" px="$3" py="$1" rounded="$3">
-                                <Text color="$green10" fontWeight="700" fontSize="$2">PAID</Text>
-                            </XStack>
-                        </XStack>
-                    </YStack>
-                </>
-            ) : (
-                <>
-                    <View bg="$red4" p="$5" rounded="$12">
-                        <XCircle size={48} color="$red10" strokeWidth={2} />
-                    </View>
-
-                    <YStack items="center" gap="$2">
-                        <Text fontSize="$8" fontWeight="800">Payment Failed</Text>
-                        <Text color="$gray10" fontSize="$4" textAlign="center" px="$4">
-                            {error || 'The Lightning payment could not be completed.'}
-                        </Text>
-                    </YStack>
-                </>
-            )}
-
-            <YStack width="100%" gap="$3" pt="$4">
+            <YStack position="absolute" b={0} l={0} r={0} p="$4" bg="$background" borderTopWidth={1} borderColor="$gray3">
                 <Button
-                    theme="accent"
+                    bg={status === 'success' ? "$green10" : "$gray3"}
                     size="$5"
+                    height={55}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        onClose();
+                    }}
                     fontWeight="800"
-                    onPress={onClose}
+                    color={status === 'success' ? "white" : "$color"}
+                    rounded="$4"
                 >
-                    Done
+                    DONE
                 </Button>
             </YStack>
         </YStack>
+    );
+}
+
+function DetailItem({ label, value, valueColor }: { label: string, value: string, valueColor?: any }) {
+    return (
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
+            <Text fontSize="$5" fontWeight="800" color={valueColor || '$color'} numberOfLines={1} textTransform={valueColor ? 'uppercase' : 'none'}>
+                {value}
+            </Text>
+        </XStack>
     );
 }

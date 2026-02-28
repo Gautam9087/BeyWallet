@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { YStack, XStack, Text, Button, View, Paragraph } from "tamagui";
-import { Copy, Check, Clock } from "@tamagui/lucide-icons";
+import { YStack, XStack, Text, Button, View, Paragraph, Separator, ScrollView } from "tamagui";
+import { Copy, Check, Clock, ShieldCheck, Sprout, Building2, Zap } from "@tamagui/lucide-icons";
 import QRCode from "react-native-qrcode-svg";
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -10,16 +10,26 @@ interface PaymentStageProps {
     amount: string;
     invoice: string;
     quoteId: string;
+    mintUrl: string;
     expiry?: number;
     onPaid: () => void;
     onCancel: () => void;
 }
 
-export function PaymentStage({ amount, invoice, quoteId, expiry, onPaid, onCancel }: PaymentStageProps) {
+export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid, onCancel }: PaymentStageProps) {
     const sats = parseInt(amount, 10);
     const toast = useToastController();
     const [copied, setCopied] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+    const getMintName = (url: string) => {
+        try {
+            const hostname = new URL(url).hostname;
+            return hostname.replace('testnut.', '').replace('.cashu.space', '');
+        } catch {
+            return url;
+        }
+    };
 
     // Calculate time remaining until expiry
     useEffect(() => {
@@ -61,66 +71,90 @@ export function PaymentStage({ amount, invoice, quoteId, expiry, onPaid, onCance
     const isExpired = timeLeft !== null && timeLeft <= 0;
 
     return (
-        <YStack flex={1} items="center" gap="$4" p="$0">
-            <YStack items="center" gap="$1">
-                <Text color="$gray10" fontSize="$6" fontWeight="700">Pay Invoice</Text>
-                <Text fontSize="$8" fontWeight="bold">{sats} SATS</Text>
-                {timeLeft !== null && (
-                    <XStack items="center" gap="$2" mt="$1">
-                        <Clock size={14} color={isExpired ? "$red10" : "$gray10"} />
-                        <Text
-                            fontSize="$3"
-                            color={isExpired ? "$red10" : "$gray10"}
-                            fontWeight={isExpired ? "bold" : "normal"}
-                        >
-                            {isExpired ? 'Invoice Expired' : `Expires in ${formatTime(timeLeft)}`}
-                        </Text>
-                    </XStack>
-                )}
-            </YStack>
-
-            <View p="$4" bg="white" rounded="$5" opacity={isExpired ? 0.5 : 1}>
-                <QRCode value={invoice} size={280} />
-            </View>
-
-            <Button
-                size="$4"
-                theme="gray"
-                icon={copied ? <Check size={16} /> : <Copy size={16} />}
-                onPress={handleCopy}
-                disabled={isExpired}
+        <YStack flex={1} bg="$background">
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 } as any}
+                px="$0"
             >
-                {copied ? 'Copied!' : 'Copy Invoice'}
-            </Button>
 
-            <Paragraph text="center" color="$gray10" fontSize="$3" px="$4">
-                Scan this QR code with a Lightning wallet or copy the invoice to complete your deposit.
-            </Paragraph>
+                <YStack items="center" gap="$4" mb="$4" >
+                    <View
+                        bg="white"
+                        p="$2"
+                        rounded="$5"
+                    >
+                        <QRCode
+                            value={invoice}
+                            size={330}
+                            backgroundColor="white"
+                            color="black"
+                            quietZone={10}
+                        />
+                    </View>
+                </YStack>
 
-            <YStack width="100%" mt="auto" gap="$3">
-                <Button
-                    theme="red"
-                    size="$5"
-                    chromeless
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        onCancel();
-                    }}
-                >
-                    Cancel Transaction
-                </Button>
-                <Button
-                    theme="accent"
-                    size="$5"
-                    disabled={isExpired}
-                    onPress={() => {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        onPaid();
-                    }}
-                >
-                    I have paid
-                </Button>
+
+                <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                    <DetailItem label="Pay Invoice" value={`${sats} SATS`} />
+                    <DetailItem label="Expires in (UTC)" value={`${formatTime(timeLeft)}`} />
+                    <DetailItem label="Mint" value={getMintName(mintUrl)} />
+                    <DetailItem label="Fee Rate" value="0 sats" />
+                    <DetailItem label="Invoice" value={`${invoice.substring(0, 10)}...${invoice.substring(invoice.length - 10)}`} isCopyable onCopy={handleCopy} />
+                </YStack>
+            </ScrollView>
+
+            <YStack position="absolute" b={0} l={0} r={0} py="$2" bg="$background" borderTopWidth={1} borderColor="$gray3">
+                <XStack width="100%" justify="space-evenly" gap="$3">
+                    <Button
+                        theme="red"
+                        size="$5"
+                        height={55}
+                        rounded="$4"
+                        fontWeight="800"
+                        bg="$red3"
+                        color="$red10"
+                        flex={1}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            onCancel();
+                        }}
+                    >
+                        CANCEL
+                    </Button>
+                    <Button
+                        theme="accent"
+                        size="$5"
+                        flex={1}
+                        height={55}
+                        rounded="$4"
+                        fontWeight="800"
+                        disabled={isExpired}
+                        onPress={() => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            onPaid();
+                        }}
+                    >
+                        I PAID
+                    </Button>
+                </XStack>
             </YStack>
         </YStack>
+    );
+}
+
+function DetailItem({ label, value, isCopyable, onCopy }: { label: string, value: string, isCopyable?: boolean, onCopy?: () => void }) {
+    return (
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
+            <XStack gap="$2" items="center">
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                    {value}
+                </Text>
+                {isCopyable && (
+                    <Button size="$2" chromeless icon={<Copy size={16} color="$gray10" />} onPress={onCopy} />
+                )}
+            </XStack>
+        </XStack>
     );
 }

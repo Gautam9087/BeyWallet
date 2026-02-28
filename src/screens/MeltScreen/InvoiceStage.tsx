@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { YStack, XStack, Text, Input, Button, View } from 'tamagui';
-import { ClipboardPaste, ScanLine, AlertCircle, Zap } from '@tamagui/lucide-icons';
+import { ClipboardPaste, ScanLine, AlertCircle } from '@tamagui/lucide-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Spinner } from '~/components/UI/Spinner';
@@ -49,14 +49,10 @@ export function InvoiceStage({ invoice, setInvoice, onContinue, isLoading, error
 
     return (
         <YStack flex={1} justify="space-between" gap="$4">
-            {/* Header */}
-            <YStack gap="$2" items="center" pt="$4">
-                <View bg="$orange4" p="$3" rounded="$10">
-                    <Zap size={28} color="$orange10" />
-                </View>
-                <Text fontSize="$6" fontWeight="800" mt="$2">Pay Lightning Invoice</Text>
-                <Text color="$gray10" fontSize="$3" textAlign="center" px="$4">
-                    Paste a Lightning invoice to pay it with your ecash balance
+            <YStack gap="$2" items="center" pt="$8" pb="$4">
+                <Text fontSize="$8" fontWeight="800">Pay Invoice</Text>
+                <Text color="$gray10" fontSize="$4" style={{ textAlign: 'center' }} px="$4">
+                    Paste a Lightning invoice or address
                 </Text>
             </YStack>
 
@@ -101,12 +97,16 @@ export function InvoiceStage({ invoice, setInvoice, onContinue, isLoading, error
                 {/* Paste Button */}
                 <Button
                     size="$5"
-                    theme="gray"
+                    height={55}
+                    rounded="$4"
+                    bg="$gray3"
+                    color="$color"
+                    fontWeight="800"
                     icon={isPasting ? <Spinner size="small" /> : <ClipboardPaste size={20} />}
                     onPress={handlePaste}
                     disabled={isPasting}
                 >
-                    Paste from Clipboard
+                    PASTE FROM CLIPBOARD
                 </Button>
 
                 {/* Error Display */}
@@ -122,12 +122,14 @@ export function InvoiceStage({ invoice, setInvoice, onContinue, isLoading, error
             <Button
                 theme="accent"
                 size="$5"
+                height={55}
+                rounded="$4"
                 fontWeight="800"
                 onPress={onContinue}
                 disabled={!isValidInvoice || isLoading}
-                icon={isLoading ? <Spinner size="small" /> : undefined}
+                icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
             >
-                {isLoading ? 'Getting Quote...' : 'Continue'}
+                {isLoading ? 'GETTING QUOTE...' : 'CONTINUE'}
             </Button>
         </YStack>
     );

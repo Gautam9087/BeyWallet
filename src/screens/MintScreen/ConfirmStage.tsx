@@ -32,39 +32,19 @@ export function ConfirmStage({ amount, mintUrl, isLoading, onConfirm, onBack }: 
                 <H1 fontWeight={400}>{sats} SATS</H1>
             </YStack>
 
-            <YStack bg="$color2" rounded="$5" p="$4" gap="$4">
-                <XStack justify="space-between" items="center">
-                    <Text color="$gray10">Mint</Text>
-                    <XStack gap="$2" items="center">
-                        <Sprout size={16} color="$green10" />
-                        <Text fontWeight="600" numberOfLines={1} maxWidth={200}>
-                            {getMintName(mintUrl)}
-                        </Text>
-                    </XStack>
-                </XStack>
-
-                <Separator />
-
-                <XStack justify="space-between" items="center">
-                    <Text color="$gray10">Network</Text>
-                    <XStack gap="$2" items="center">
-                        <Zap size={16} color="$yellow10" />
-                        <Text fontWeight="600">Lightning</Text>
-                    </XStack>
-                </XStack>
-
-                <Separator />
-
-                <XStack justify="space-between" items="center">
-                    <Text color="$gray10">Amount</Text>
-                    <Text fontWeight="600">{sats} SATS</Text>
-                </XStack>
+            <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                <DetailItem label="Mint" value={getMintName(mintUrl)} icon={<Sprout size={16} color="$green10" />} />
+                <DetailItem label="Network" value="Lightning" icon={<Zap size={16} color="$yellow10" />} />
+                <DetailItem label="Amount" value={`${sats} SATS`} />
             </YStack>
 
-            <YStack mt="auto" gap="$2">
+            <YStack mt="auto" pb="$8" gap="$3">
                 <Button
                     theme="accent"
                     size="$5"
+                    height={55}
+                    rounded="$4"
+                    fontWeight="800"
                     disabled={isLoading}
                     icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
                     onPress={() => {
@@ -72,20 +52,39 @@ export function ConfirmStage({ amount, mintUrl, isLoading, onConfirm, onBack }: 
                         onConfirm();
                     }}
                 >
-                    {isLoading ? 'Creating Invoice...' : 'Confirm and Generate Invoice'}
+                    {isLoading ? 'CREATING INVOICE...' : 'CONFIRM DEPOSIT'}
                 </Button>
                 <Button
-                    chromeless
+                    bg="$gray3"
+                    color="$color"
                     size="$5"
+                    height={55}
+                    rounded="$4"
+                    fontWeight="800"
                     disabled={isLoading}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         onBack();
                     }}
                 >
-                    Go Back
+                    GO BACK
                 </Button>
             </YStack>
         </YStack>
     );
 }
+
+function DetailItem({ label, value, icon }: { label: string, value: string, icon?: React.ReactNode }) {
+    return (
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
+            <XStack gap="$2" items="center">
+                {icon}
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                    {value}
+                </Text>
+            </XStack>
+        </XStack>
+    );
+}
+

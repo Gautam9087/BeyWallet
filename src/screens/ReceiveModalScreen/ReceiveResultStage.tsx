@@ -147,7 +147,7 @@ export function ReceiveResultStage({
                 </YStack>
 
                 {/* 3. Details Table */}
-                <YStack gap="$0" mx="$4" mb="$6" p="$3" bg="$gray2" rounded="$4">
+                <YStack gap="$0" mx="$4" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                     <DetailItem label="Total Amount" value={`₿${amount} sats`} />
                     <DetailItem label="Unit" value="SATOSHIS" />
                     <DetailItem label="Fiat" value={btcData?.price ? currencyService.formatValue(currencyService.convertSatsToCurrency(Number(amount), btcData.price), secondaryCurrency as CurrencyCode) : '...'} />
@@ -207,14 +207,14 @@ export function ReceiveResultStage({
 
 function DetailItem({ label, value, isCopyable, onCopy }: { label: string, value: string, isCopyable?: boolean, onCopy?: () => void }) {
     return (
-        <XStack justify="space-between" items="center" py="$3" borderBottomWidth={1} borderColor="$gray3">
-            <Text fontSize="$4" color="$gray10" fontWeight="500">{label}</Text>
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
             <XStack gap="$2" items="center">
-                <Text fontSize="$4" fontWeight="600" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
                     {value}
                 </Text>
                 {isCopyable && (
-                    <Button size="$2" chromeless icon={<Copy size={14} color="$gray10" />} onPress={onCopy} />
+                    <Button size="$2" chromeless icon={<Copy size={16} color="$gray10" />} onPress={onCopy} />
                 )}
             </XStack>
         </XStack>

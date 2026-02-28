@@ -149,6 +149,7 @@ export default function MintScreen() {
                     amount={amount}
                     invoice={quoteData.invoice}
                     quoteId={quoteData.quoteId}
+                    mintUrl={activeMintUrl || ''}
                     expiry={quoteData.expiry}
                     onPaid={handlePaid}
                     onCancel={handleCancel}

@@ -378,52 +378,46 @@ export default function MeltScreen() {
                         <Text fontSize="$6" fontWeight="800">Review Payment</Text>
                     </YStack>
 
-                    <YStack borderWidth={1} borderColor="$color4" rounded="$4" overflow="hidden">
+                    <YStack gap="$0" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         {/* Invoice Amount */}
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" py="$3" px="$4">
                             <XStack gap="$2" items="center">
                                 <Zap size={16} color="$orange10" />
-                                <Text color="$gray10">Invoice Amount</Text>
+                                <Text fontSize="$4" color="$gray10" fontWeight="600">Invoice Amount</Text>
                             </XStack>
                             <YStack items="flex-end">
-                                <Text fontWeight="800" fontSize="$6">₿{quoteAmount} sats</Text>
+                                <Text fontWeight="800" fontSize="$5" color="$color">₿{quoteAmount} sats</Text>
                                 <Text color="$gray10" fontSize="$3">{fiatValue}</Text>
                             </YStack>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
-
                         {/* Fee Reserve */}
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" py="$3" px="$4">
                             <XStack gap="$2" items="center">
                                 <ShieldCheck size={16} color="$gray10" />
-                                <Text color="$gray10">Fee Reserve</Text>
+                                <Text fontSize="$4" color="$gray10" fontWeight="600">Fee Reserve</Text>
                             </XStack>
-                            <Text fontWeight="600" color={feeReserve > 0 ? "$orange10" : "$green10"}>
+                            <Text fontSize="$5" fontWeight="800" color={feeReserve > 0 ? "$orange10" : "$green10"}>
                                 {feeReserve > 0 ? `~${feeReserve} sats` : '0 sats'}
                             </Text>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
-
                         {/* Total Deduction */}
-                        <XStack justify="space-between" items="center" p="$4" bg="$color2">
+                        <XStack justify="space-between" items="center" py="$3" px="$4" bg="$color3">
                             <XStack gap="$2" items="center">
                                 <ArrowDownCircle size={16} color="$gray10" />
-                                <Text color="$gray10" fontWeight="600">Total Deduction</Text>
+                                <Text fontSize="$4" color="$gray10" fontWeight="600">Total Deduction</Text>
                             </XStack>
                             <Text fontWeight="800" fontSize="$5" color="$red10">
                                 -{totalCost} sats
                             </Text>
                         </XStack>
 
-                        <Separator borderColor="$color4" />
-
                         {/* Mint */}
-                        <XStack justify="space-between" items="center" p="$4">
+                        <XStack justify="space-between" items="center" py="$3" px="$4">
                             <XStack gap="$2" items="center">
                                 <Building2 size={16} color="$gray10" />
-                                <Text color="$gray10">Mint</Text>
+                                <Text fontSize="$4" color="$gray10" fontWeight="600">Mint</Text>
                             </XStack>
                             <XStack gap="$2" items="center">
                                 {activeMint?.icon && (
@@ -431,24 +425,21 @@ export default function MeltScreen() {
                                         <Image source={{ uri: activeMint.icon }} width={20} height={20} />
                                     </View>
                                 )}
-                                <Text fontWeight="600" numberOfLines={1} style={{ maxWidth: 180 }}>{mintName}</Text>
+                                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 180 }}>{mintName}</Text>
                             </XStack>
                         </XStack>
 
                         {/* LN Address (if applicable) */}
                         {lnAddress && (
-                            <>
-                                <Separator borderColor="$color4" />
-                                <XStack justify="space-between" items="center" p="$4">
-                                    <XStack gap="$2" items="center">
-                                        <Zap size={16} color="$gray10" />
-                                        <Text color="$gray10">Recipient</Text>
-                                    </XStack>
-                                    <Text fontWeight="600" numberOfLines={1} style={{ maxWidth: 200 }}>
-                                        {lnAddress}
-                                    </Text>
+                            <XStack justify="space-between" items="center" py="$3" px="$4">
+                                <XStack gap="$2" items="center">
+                                    <Zap size={16} color="$gray10" />
+                                    <Text fontSize="$4" color="$gray10" fontWeight="600">Recipient</Text>
                                 </XStack>
-                            </>
+                                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                                    {lnAddress}
+                                </Text>
+                            </XStack>
                         )}
                     </YStack>
 

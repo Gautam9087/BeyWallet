@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { YStack, XStack, Text, Button, H2, Separator } from "tamagui";
+import { YStack, XStack, Text, Button, H2, Separator, Circle } from "tamagui";
 import { CheckCircle, XCircle, AlertCircle } from "@tamagui/lucide-icons";
 import * as Haptics from 'expo-haptics';
 
@@ -27,11 +27,11 @@ export function ResultStage({ status, amount, error, onClose }: ResultStageProps
     const getIcon = () => {
         switch (status) {
             case 'success':
-                return <CheckCircle size={80} color="$green10" />;
+                return <CheckCircle size={40} color="white" />;
             case 'error':
-                return <XCircle size={80} color="$red10" />;
+                return <XCircle size={40} color="white" />;
             case 'cancelled':
-                return <AlertCircle size={80} color="$orange10" />;
+                return <AlertCircle size={40} color="white" />;
         }
     };
 
@@ -69,43 +69,53 @@ export function ResultStage({ status, amount, error, onClose }: ResultStageProps
     };
 
     return (
-        <YStack flex={1} justify="space-between" items="center" gap="$4">
-            <YStack items="center" gap="$4" width="100%">
-                {getIcon()}
-
-                <YStack items="center" gap="$1">
+        <YStack flex={1} bg="$background">
+            <YStack flex={1}>
+                {/* Status Header */}
+                <YStack gap="$1" mb="$6" mt="$8" items="center">
+                    <Circle size={80} bg={getStatusColor() as any} items="center" justify="center" mb="$4">
+                        {getIcon()}
+                    </Circle>
                     <H2 text="center">{getTitle()}</H2>
                     <Text color="$gray10" text="center" px="$4">
                         {getMessage()}
                     </Text>
                 </YStack>
 
-                <YStack bg="$color2" rounded="$5" width="100%" p="$4" gap="$4">
-                    <XStack justify="space-between">
-                        <Text color="$gray10">Amount</Text>
-                        <Text fontWeight="600">{sats} SATS</Text>
-                    </XStack>
-                    <Separator />
-                    <XStack justify="space-between">
-                        <Text color="$gray10">Status</Text>
-                        <Text fontWeight="600" color={getStatusColor()} textTransform="capitalize">
-                            {status}
-                        </Text>
-                    </XStack>
+                {/* Details Table */}
+                <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                    <DetailItem label="Total Amount" value={`₿${sats} sats`} />
+                    <DetailItem label="Status" value={status} valueColor={getStatusColor()} />
                 </YStack>
             </YStack>
 
-            <Button
-                theme="accent"
-                width="100%"
-                size="$5"
-                onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onClose();
-                }}
-            >
-                Done
-            </Button>
+            <YStack position="absolute" b={0} l={0} r={0} bg="$background" borderTopWidth={1} borderColor="$gray3">
+                <Button
+                    bg={status === 'success' ? "$green10" : "$gray3"}
+                    size="$5"
+                    height={55}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        onClose();
+                    }}
+                    fontWeight="800"
+                    color={status === 'success' ? "white" : "$color"}
+                    rounded="$4"
+                >
+                    DONE
+                </Button>
+            </YStack>
         </YStack>
+    );
+}
+
+function DetailItem({ label, value, valueColor }: { label: string, value: string, valueColor?: any }) {
+    return (
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
+            <Text fontSize="$5" fontWeight="800" color={valueColor || '$color'} numberOfLines={1} textTransform={valueColor ? 'uppercase' : 'none'}>
+                {value}
+            </Text>
+        </XStack>
     );
 }
