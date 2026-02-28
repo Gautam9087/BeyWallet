@@ -70,18 +70,24 @@ export default function ScannerScreen() {
                 if (decoderRef.current.isComplete()) {
                     if (decoderRef.current.isSuccess()) {
                         const ur = decoderRef.current.resultUR();
-                        const decoded = ur.decodeCBOR();
-
                         // Robust string conversion for decoded UR payload
                         let decodedStr = '';
-                        if (typeof decoded === 'string') {
-                            decodedStr = decoded;
-                        } else if (Buffer.isBuffer(decoded)) {
-                            decodedStr = decoded.toString('utf8');
-                        } else if (decoded instanceof Uint8Array || Array.isArray(decoded)) {
-                            decodedStr = Buffer.from(decoded).toString('utf8');
-                        } else {
-                            decodedStr = String(decoded);
+                        try {
+                            const decoded = ur.decodeCBOR();
+                            if (typeof decoded === 'string') {
+                                decodedStr = decoded;
+                            } else if (Buffer.isBuffer(decoded)) {
+                                decodedStr = decoded.toString('utf8');
+                            } else if (decoded instanceof Uint8Array || Array.isArray(decoded)) {
+                                decodedStr = Buffer.from(decoded).toString('utf8');
+                            } else {
+                                decodedStr = String(decoded);
+                            }
+                        } catch (e) {
+                            // Fallback: the sender may have passed a raw string Buffer instead of CBOR
+                            if (ur.cbor) {
+                                decodedStr = ur.cbor.toString('utf8');
+                            }
                         }
 
                         onSuccess(decodedStr);

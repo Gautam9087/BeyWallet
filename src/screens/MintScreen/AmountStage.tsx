@@ -118,70 +118,69 @@ export function AmountStage({ amount, setAmount, onContinue }: AmountStageProps)
         sheetRef.current?.dismiss();
     };
 
+    const handlePreset = (presetSats: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setAmount(presetSats);
+        if (inputMode === 'SATS') {
+            setLocalInputValue(presetSats);
+        } else if (btcData?.price) {
+            const fiat = currencyService.convertSatsToCurrency(Number(presetSats), btcData.price);
+            setLocalInputValue(fiat > 0 ? fiat.toFixed(2) : '0');
+        }
+    };
+
     return (
         <YStack flex={1} justify="space-between">
-            <YStack px="$4" pt="$4" gap="$2">
-                <XStack>
+            <YStack width="100%" height={300} rounded="$4" borderWidth={0.5} borderColor="$borderColor" justify="space-between" bg="$color2" items="center">
+                <XStack
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+                        sheetRef.current?.present();
+                    }}
+                    width="100%"
+                    p="$3"
+                    items="center"
+                    borderBottomWidth={1}
+                    borderBottomColor="$color3"
+                    justify="space-between"
+                    hoverStyle={{ bg: "$color3" }}
+                    pressStyle={{ bg: "$color5", opacity: 0.8, rounded: "$4" }}
+                >
+                    <XStack gap="$2" items="center">
+                        <Sprout size={18} strokeWidth={2.5} color="$color" />
+                    </XStack>
+                    <Text fontWeight="800" fontSize="$4" numberOfLines={1} style={{ maxWidth: 200 }}>{mintName}</Text>
+                    <ChevronDown size={18} strokeWidth={2.5} color="$color" />
+                </XStack>
+
+                <YStack items="center" gap="$1">
+                    <Text color="$gray10" fontSize="$3">How much to deposit?</Text>
+
+                    <H1 fontWeight="400" letterSpacing={-2} py="$4" color="$color">
+                        {inputMode === 'SATS' ? `₿${localInputValue || '0'}` : `${currencySymbol}${localInputValue || '0'}`}
+                    </H1>
+
                     <Button
                         size="$2.5"
                         theme="gray"
-                        px="$1.5"
-                        rounded="$3"
-                        borderWidth={1}
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-                            sheetRef.current?.present();
-                        }}
-                        pressStyle={{ scale: 0.97, opacity: 0.9 }}
-                        icon={
-                            <Avatar rounded="$3" size="$1.5">
-                                <Avatar.Image src={activeMint?.icon} />
-                                <Avatar.Fallback backgroundColor="$color5" alignItems="center" justifyContent="center">
-                                    <Sprout size={12} color="$color10" />
-                                </Avatar.Fallback>
-                            </Avatar>
-                        }
-                        iconAfter={
-                            <Square size="$1.5" bg="$color2" rounded="$3">
-                                <ChevronDown size={12} strokeWidth={2.5} color="$color" />
-                            </Square>
-                        }
-                    >
-                        <Text fontWeight="700" fontSize="$3" numberOfLines={1} style={{ maxWidth: 120 }}>{mintName}</Text>
-                    </Button>
-                </XStack>
-
-                <YStack py="$4" items="center">
-                    <Text color="$gray10" fontSize="$4" fontWeight="700">How much to deposit?</Text>
-                    <XStack items="baseline" gap="$0">
-                        <Text fontSize={48} fontWeight="900" color="$accent4">
-                            {inputMode === 'SATS' ? '₿' : currencySymbol}
-                        </Text>
-                        <RollingNumber
-                            fontSize={48}
-                            fontWeight="900"
-                            color="$accent4"
-                            showDecimals={false}
-                            letterSpacing={-2}
-                        >
-                            {Number(localInputValue) || 0}
-                        </RollingNumber>
-                    </XStack>
-                    <Button
-                        size="$3"
-                        theme="gray"
-                        rounded="$10"
-                        bg="$gray2"
-                        px="$4"
-                        fontWeight="700"
+                        fontWeight="400"
                         color="$accent9"
+                        mt="$-2"
                         onPress={toggleMode}
                         pressStyle={{ scale: 0.95 }}
-                        mt="$2"
                     >
                         {conversionValue}
                     </Button>
                 </YStack>
+
+                <XStack width="100%" p="$3" borderTopWidth={1} borderTopColor="$color3" justify="space-between" items="center">
+                    <Text color="$gray10" fontWeight="400" fontSize="$3">Presets</Text>
+                    <XStack gap="$2" items="center">
+                        <Button size="$2" onPress={() => handlePreset('1000')}>1k</Button>
+                        <Button size="$2" onPress={() => handlePreset('5000')}>5k</Button>
+                        <Button size="$2" onPress={() => handlePreset('20000')}>20k</Button>
+                    </XStack>
+                </XStack>
             </YStack>
 
             <NumericKeypad

@@ -147,8 +147,10 @@ export function TransactionDetailsScreen() {
 
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
-                const messageBuffer = Buffer.from(clean);
-                const ur = new UR(messageBuffer, "cashu");
+                // External wallets (like cashu_pwa) expect the UR payload to be CBOR encoded
+                const { encode: cborEncode } = require('cbor-x');
+                const cborBuffer = cborEncode(clean);
+                const ur = new UR(Buffer.from(cborBuffer), "cashu");
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
                 setShowAnimatedQR(false);

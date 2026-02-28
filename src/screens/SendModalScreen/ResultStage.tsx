@@ -86,8 +86,10 @@ export function ResultStage({
 
             if (shouldAnimate) {
                 setShowAnimatedQR(true);
-                const messageBuffer = Buffer.from(clean);
-                const ur = new UR(messageBuffer, "cashu");
+                // External wallets (like cashu_pwa) expect the UR payload to be CBOR encoded
+                const { encode: cborEncode } = require('cbor-x');
+                const cborBuffer = cborEncode(clean);
+                const ur = new UR(Buffer.from(cborBuffer), "cashu");
                 encoderRef.current = new UREncoder(ur, fragmentLength, 0);
             } else {
                 setShowAnimatedQR(false);
@@ -125,9 +127,15 @@ export function ResultStage({
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
 
-            // Navigate to transaction details
-            console.log('[ResultStage] Navigating to transaction details for:', operationId);
-            router.replace(`/(modals)/transaction-details?id=${operationId}`);
+            // Invalidate queries to prevent infinite spinner on TransactionDetails
+            queryClient.invalidateQueries({ queryKey: ['history'] });
+            queryClient.invalidateQueries({ queryKey: ['transaction', operationId] });
+
+            // Navigate to transaction details after a short delay
+            setTimeout(() => {
+                console.log('[ResultStage] Navigating to transaction details for:', operationId);
+                router.replace(`/(modals)/transaction-details?id=${operationId}`);
+            }, 300);
         };
 
         // Listen for history updates
@@ -259,19 +267,13 @@ export function ResultStage({
                 <YStack items="center" gap="$4" mb="$6">
                     <View
                         bg="white"
-                        p="$3"
-                        rounded="$6"
-                        style={{
-                            elevation: 15,
-                            shadowColor: "rgba(0,0,0,0.2)",
-                            shadowOffset: { width: 0, height: 8 },
-                            shadowOpacity: 1,
-                            shadowRadius: 12
-                        }}
+                        p="$2"
+                        rounded="$5"
+
                     >
                         <QRCode
                             value={showAnimatedQR ? qrCodeFragment : (currentToken.startsWith('cashu:') ? currentToken : `cashu:${currentToken}`)}
-                            size={280}
+                            size={330}
                             backgroundColor="white"
                             color="black"
                             quietZone={10}
@@ -292,22 +294,12 @@ export function ResultStage({
                 </YStack>
 
 
-                {/* Layout Order: 1. Amount Display */}
-                <YStack gap="$1" mb="$6" mt="$6" items="center">
-                    <Circle size={40} bg="$red10" items="center" justify="center">
-                        <ArrowUpRight size={20} color="white" />
-                    </Circle>
-                    <Text fontSize="$9" fontWeight="800" color="$red10">
-                        -₿{Number(amount || 0).toLocaleString()}
-                    </Text>
-                    <Text fontSize="$5" color="$gray10">
-                        Ecash SATS
-                    </Text>
-                </YStack>
+
 
 
                 {/* 3. Details Table (matching TransactionDetails) */}
-                <YStack gap="$0" mb="$6" p="$3" bg="$gray2" rounded="$4">
+                <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                    <DetailItem label="Amount" value={`₿${amount} sats`} />
                     <DetailItem label="Fee" value={`₿${fee} sats`} />
                     <DetailItem label="Unit" value="SATOSHIS" />
                     <DetailItem label="Fiat" value={btcData?.price ? currencyService.formatValue(currencyService.convertSatsToCurrency(Number(amount), btcData.price), secondaryCurrency as CurrencyCode) : '...'} />
@@ -358,14 +350,14 @@ export function ResultStage({
 
 function DetailItem({ label, value, isCopyable, copyValue, onCopy }: { label: string, value: string, isCopyable?: boolean, copyValue?: string, onCopy?: () => void }) {
     return (
-        <XStack justify="space-between" items="center" py="$3" borderBottomWidth={1} borderColor="$gray3">
-            <Text fontSize="$4" color="$gray10" fontWeight="500">{label}</Text>
+        <XStack justify="space-between" items="center" py="$3" px="$4">
+            <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
             <XStack gap="$2" items="center">
-                <Text fontSize="$4" fontWeight="600" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
                     {value}
                 </Text>
                 {isCopyable && (
-                    <Button size="$2" chromeless icon={<Copy size={14} color="$gray10" />} onPress={onCopy} />
+                    <Button size="$2" chromeless icon={<Copy size={16} color="$gray10" />} onPress={onCopy} />
                 )}
             </XStack>
         </XStack>

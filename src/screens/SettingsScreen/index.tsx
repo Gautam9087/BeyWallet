@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { YStack, ScrollView, Text, YGroup, ListItem, H6, H2, H4, Button, XStack, View } from 'tamagui';
+import { YStack, ScrollView, Text, YGroup, ListItem, H6, H2, H4, Button, XStack, View, Separator } from 'tamagui';
 import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw } from '@tamagui/lucide-icons';
 import { ThemeModal } from './components/ThemeModal';
 import { CurrencyModal } from './components/CurrencyModal';
