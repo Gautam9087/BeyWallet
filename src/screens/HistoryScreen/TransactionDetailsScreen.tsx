@@ -276,7 +276,9 @@ export function TransactionDetailsScreen() {
                     if (newState === 'claimed' && entry.type === 'send' && entry.state !== 'claimed') {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
-                        notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { transactionId: entry.id });
+                        if (useSettingsStore.getState().notificationsEnabled) {
+                            notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { transactionId: entry.id });
+                        }
                     }
                 }
             } catch (err) {

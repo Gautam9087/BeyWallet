@@ -128,7 +128,9 @@ export function ResultStage({
 
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
-            notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { operationId });
+            if (useSettingsStore.getState().notificationsEnabled) {
+                notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { operationId });
+            }
 
             // Invalidate queries to prevent infinite spinner on TransactionDetails
             queryClient.invalidateQueries({ queryKey: ['history'] });

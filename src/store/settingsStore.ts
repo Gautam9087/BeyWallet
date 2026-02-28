@@ -13,12 +13,15 @@ interface SettingsState {
     setTheme: (theme: ThemePreference) => Promise<void>;
     setSecondaryCurrency: (currency: string) => Promise<void>;
     setDefaultMintUrl: (url: string) => Promise<void>;
+    notificationsEnabled: boolean;
+    setNotificationsEnabled: (enabled: boolean) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     theme: 'system',
     secondaryCurrency: 'USD',
     defaultMintUrl: DEFAULT_MINT,
+    notificationsEnabled: true,
     initialized: false,
 
     initialize: async () => {
@@ -51,6 +54,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 const storedMintUrl = await repo.settingsRepository.getSetting('defaultMintUrl');
                 if (storedMintUrl) {
                     set({ defaultMintUrl: storedMintUrl });
+                }
+
+                // Load notifications setting
+                const storedNotifications = await repo.settingsRepository.getSetting('notificationsEnabled');
+                if (storedNotifications !== undefined && storedNotifications !== null) {
+                    set({ notificationsEnabled: storedNotifications === 'true' });
                 }
 
                 set({ initialized: true });
@@ -107,6 +116,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         } catch (error) {
             console.error('[SettingsStore] Failed to set default mint:', error);
             set({ defaultMintUrl: url });
+        }
+    },
+
+    setNotificationsEnabled: async (enabled: boolean) => {
+        try {
+            const exists = await initService.walletExists();
+            if (exists) {
+                const repo = initService.getRepo();
+                await repo.settingsRepository.setSetting('notificationsEnabled', enabled.toString());
+            }
+            set({ notificationsEnabled: enabled });
+        } catch (error) {
+            console.error('[SettingsStore] Failed to set notifications enabled:', error);
+            set({ notificationsEnabled: enabled });
         }
     },
 }));

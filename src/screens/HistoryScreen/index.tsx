@@ -269,10 +269,10 @@ export function HistoryScreen() {
                                             <YStack items="flex-end" gap="$1">
                                                 <Text
                                                     fontWeight="800"
-                                                    fontSize="$5"
+                                                    fontSize="$7"
                                                     color={style.iconColor as any}
                                                 >
-                                                    {style.sign}{entry.amount} {entry.unit?.toUpperCase() || 'SATS'}
+                                                    {style.sign}{'₿'}{entry.amount}
                                                 </Text>
                                             </YStack>
                                         </XStack>

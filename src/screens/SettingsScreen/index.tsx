@@ -4,6 +4,7 @@ import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTri
 import { ThemeModal } from './components/ThemeModal';
 import { CurrencyModal } from './components/CurrencyModal';
 import { MintModal } from './components/MintModal';
+import { NotificationsModal } from './components/NotificationsModal';
 import * as Haptics from 'expo-haptics';
 import * as ClipboardStore from 'expo-clipboard';
 import { useSettingsStore } from '~/store/settingsStore';
@@ -22,6 +23,7 @@ export function SettingsScreen() {
     const themeSheetRef = useRef<AppBottomSheetRef>(null);
     const currencySheetRef = useRef<AppBottomSheetRef>(null);
     const mintSheetRef = useRef<AppBottomSheetRef>(null);
+    const notificationsSheetRef = useRef<AppBottomSheetRef>(null);
     const deleteSheetRef = useRef<AppBottomSheetRef>(null);
 
     const { secondaryCurrency, defaultMintUrl } = useSettingsStore();
@@ -51,6 +53,9 @@ export function SettingsScreen() {
                 break;
             case 'mint':
                 mintSheetRef.current?.present();
+                break;
+            case 'notifications':
+                notificationsSheetRef.current?.present();
                 break;
             default:
                 break;
@@ -204,11 +209,13 @@ export function SettingsScreen() {
                             <ListItem
                                 bg="transparent"
                                 fontWeight="600"
-                                opacity={0.5}
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
                                 title={<H6>Notifications</H6>}
                                 subTitle="Manage alerts and updates"
                                 icon={<Bell size={24} />}
                                 iconAfter={<ChevronRight size={24} />}
+                                onPress={() => handleSettingPress('notifications')}
                             />
                         </YGroup.Item>
                         <YGroup.Item>
@@ -265,6 +272,7 @@ export function SettingsScreen() {
                 <ThemeModal ref={themeSheetRef} />
                 <CurrencyModal ref={currencySheetRef} />
                 <MintModal ref={mintSheetRef} />
+                <NotificationsModal ref={notificationsSheetRef} />
 
                 {/* Delete Wallet Sheet */}
                 <AppBottomSheet ref={deleteSheetRef} snapPoints={['85%']}>
