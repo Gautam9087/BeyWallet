@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useRouter } from 'expo-router'
 import { useWalletStore } from '~/store/walletStore'
 import { AmountStage } from './AmountStage'
+import { P2PKAmountStage } from './P2PKAmountStage'
 import { ResultStage } from './ResultStage'
 import { biometricService } from '~/services/biometricService'
 import { walletService, mintManager } from '~/services/core'
@@ -14,6 +15,7 @@ import { bitcoinService } from '~/services/bitcoinService'
 import { currencyService, CurrencyCode, SUPPORTED_CURRENCIES } from '~/services/currencyService'
 import { Building2, Info, ArrowUpCircle, ShieldCheck, Zap, ArrowDownCircle } from '@tamagui/lucide-icons'
 import { Image } from 'tamagui'
+import { nip19 } from 'nostr-tools'
 
 type SendStep = 'amount' | 'result';
 
@@ -25,6 +27,8 @@ export function SendModalScreen() {
     const [encodedToken, setEncodedToken] = useState<string | null>(null)
     const [operationId, setOperationId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
+    const [sendMode, setSendMode] = useState<'standard' | 'p2pk'>('standard')
+    const [receiverPubkey, setReceiverPubkey] = useState('')
     const router = useRouter()
 
     const { balance, activeMintUrl, refreshBalance, mints } = useWalletStore()
@@ -87,9 +91,33 @@ export function SendModalScreen() {
 
         try {
             // Send and get encoded token for sharing
-            const result = await walletService.send(activeMintUrl, amountSats);
-            setEncodedToken(result.token);
-            setOperationId(result.id);
+            let result;
+
+            if (sendMode === 'p2pk') {
+                let targetPubkey = receiverPubkey.trim();
+
+                // Decode npub to hex if necessary
+                if (targetPubkey.startsWith('npub')) {
+                    try {
+                        const decoded = nip19.decode(targetPubkey);
+                        if (decoded.type === 'npub') {
+                            targetPubkey = decoded.data as string;
+                        } else {
+                            throw new Error('Invalid npub provided');
+                        }
+                    } catch (e: any) {
+                        throw new Error('Failed to decode npub: ' + e.message);
+                    }
+                }
+
+                result = await walletService.sendP2PK(activeMintUrl, amountSats, targetPubkey);
+                setEncodedToken(result.encoded);
+                setOperationId(''); // P2PK bypassing operation id for now
+            } else {
+                result = await walletService.send(activeMintUrl, amountSats);
+                setEncodedToken(result.token);
+                setOperationId(result.id);
+            }
 
             setStatus('success');
             refreshBalance();
@@ -140,14 +168,61 @@ export function SendModalScreen() {
     return (
         <YStack flex={1} bg="$background" p="$4">
             {step === 'amount' && (
-                <AmountStage
-                    amount={amount}
-                    setAmount={setAmount}
-                    onContinue={handleNext}
-                    balance={balance}
-                    isLoading={isProcessing}
-                    error={error}
-                />
+                <YStack flex={1}>
+                    {/* Mode Toggle */}
+                    <XStack p="$1" bg="$gray3" rounded="$4" mb="$4">
+                        <Button
+                            flex={1}
+                            size="$3"
+                            bg={sendMode === 'standard' ? '$background' : 'transparent'}
+                            color={sendMode === 'standard' ? '$color' : '$gray11'}
+                            shadowColor={sendMode === 'standard' ? '$shadowColor' : 'transparent'}
+                            shadowRadius={4}
+                            shadowOpacity={sendMode === 'standard' ? 0.2 : 0}
+                            fontWeight={sendMode === 'standard' ? '600' : '400'}
+                            onPress={() => setSendMode('standard')}
+                            borderWidth={0}
+                        >
+                            Standard Send
+                        </Button>
+                        <Button
+                            flex={1}
+                            size="$3"
+                            bg={sendMode === 'p2pk' ? '$background' : 'transparent'}
+                            color={sendMode === 'p2pk' ? '$color' : '$gray11'}
+                            shadowColor={sendMode === 'p2pk' ? '$shadowColor' : 'transparent'}
+                            shadowRadius={4}
+                            shadowOpacity={sendMode === 'p2pk' ? 0.2 : 0}
+                            fontWeight={sendMode === 'p2pk' ? '600' : '400'}
+                            onPress={() => setSendMode('p2pk')}
+                            borderWidth={0}
+                        >
+                            Pay to Public Key
+                        </Button>
+                    </XStack>
+
+                    {sendMode === 'standard' ? (
+                        <AmountStage
+                            amount={amount}
+                            setAmount={setAmount}
+                            onContinue={handleNext}
+                            balance={balance}
+                            isLoading={isProcessing}
+                            error={error}
+                        />
+                    ) : (
+                        <P2PKAmountStage
+                            amount={amount}
+                            setAmount={setAmount}
+                            receiverPubkey={receiverPubkey}
+                            setReceiverPubkey={setReceiverPubkey}
+                            onContinue={handleNext}
+                            balance={balance}
+                            isLoading={isProcessing}
+                            error={error}
+                        />
+                    )}
+                </YStack>
             )}
 
             {step === 'result' && (

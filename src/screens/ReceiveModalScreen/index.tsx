@@ -6,6 +6,8 @@ import { ConfirmStage } from './ConfirmStage'
 import { ReceiveResultStage } from './ReceiveResultStage'
 import { walletService, decodeToken, mintManager, initService } from '../../services/core';
 import { useWalletStore } from '../../store/walletStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { nip19 } from 'nostr-tools'
 
 type ReceiveStep = 'input' | 'confirm' | 'result';
 
@@ -167,7 +169,45 @@ export function ReceiveModalScreen() {
 
             // 3. Receive the token via core wallet service
             console.log('[ReceiveModal] Calling walletService.receive...');
-            await walletService.receive(token.trim());
+
+            // Check if we have Nostr keys for potential P2PK receive
+            const { nsec } = useSettingsStore.getState();
+
+            try {
+                // First try standard receive. If it's locked to our pubkey, it might fail unless we explicitly pass privkey.
+                // However, cashu-ts receive() might just fail if it needs a signature and we don't provide it in the options.
+                // Or we can just ALWAYS try receiveP2PK if standard fails with 'No signature' or similar P2PK error.
+                // For safety, let's try standard first, catch specific P2PK errors, then try receiveP2PK.
+                await walletService.receive(token.trim());
+            } catch (receiveErr: any) {
+                const errMsg = receiveErr?.message?.toLowerCase() || '';
+                const isP2PKError = errMsg.includes('signature') ||
+                    errMsg.includes('lock') ||
+                    errMsg.includes('p2pk') ||
+                    errMsg.includes('key pair not found') ||
+                    errMsg.includes('public key');
+
+                if (isP2PKError && nsec) {
+                    console.log('[ReceiveModal] Standard receive failed, attempting P2PK receive...');
+
+                    let targetPrivkey = nsec;
+                    // Decode nsec to hex if necessary
+                    if (targetPrivkey.startsWith('nsec')) {
+                        try {
+                            const decoded = nip19.decode(targetPrivkey);
+                            if (decoded.type === 'nsec') {
+                                targetPrivkey = decoded.data as string;
+                            }
+                        } catch (e: any) {
+                            console.warn('[ReceiveModal] Failed to decode nsec:', e);
+                        }
+                    }
+
+                    await walletService.receiveP2PK(token.trim(), targetPrivkey);
+                } else {
+                    throw receiveErr; // Re-throw if not P2PK related or we don't have the key
+                }
+            }
 
             setStatus('success');
             setIsReceiveLater(false);

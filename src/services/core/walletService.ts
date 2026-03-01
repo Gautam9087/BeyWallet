@@ -12,6 +12,13 @@
 import { initService } from './initService';
 import { cleanToken, encodeToken } from './tokenUtils';
 import type { Token } from '@cashu/cashu-ts';
+import { getDecodedToken, getEncodedToken } from '@cashu/cashu-ts';
+import type { CoreProof } from 'coco-cashu-core';
+
+// Helper to generate a unique ID for operations since the crypto util import is broken
+const generateSubId = (): string => {
+    return 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+};
 
 /**
  * Get the Manager or throw.
@@ -100,6 +107,102 @@ export const walletService = {
         }
     },
 
+    // ─── P2PK Sending ─────────────────────────────────────────
+
+    sendP2PK: async (mintUrl: string, amount: number, receiverPubkey: string): Promise<{ encoded: string; token: Token }> => {
+        const m = mgr();
+        const unsafeManager = m as any;
+
+        // 1. Ensure mint is trusted and get internal cashu-ts wallet + proof repository
+        if (!(await unsafeManager.mintService.isTrustedMint(mintUrl))) {
+            throw new Error(`Mint ${mintUrl} is not trusted`);
+        }
+
+        const { wallet } = await unsafeManager.walletService.getWalletWithActiveKeysetId(mintUrl);
+        const availableProofs = await unsafeManager.proofRepository.getAvailableProofs(mintUrl);
+
+        const totalAvailable = availableProofs.reduce((acc: number, p: CoreProof) => acc + p.amount, 0);
+        if (totalAvailable < amount) {
+            throw new Error(`Insufficient balance: need ${amount}, have ${totalAvailable}`);
+        }
+
+        // 2. Select proofs. Try exact match first, falling back to swap.
+        const exactProofs = wallet.selectProofsToSend(availableProofs, amount, false);
+        const needsSwap = exactProofs.send.reduce((acc: number, p: CoreProof) => acc + p.amount, 0) !== amount || exactProofs.send.length === 0;
+
+        let selectedProofsToUse = exactProofs.send;
+
+        if (needsSwap) {
+            selectedProofsToUse = wallet.selectProofsToSend(availableProofs, amount, true).send;
+            // We do a swap here using cashu-ts directly
+            console.log(`[WalletService] Need swap for P2PK send. Building swap via wallet.ops...`);
+        } else {
+            console.log(`[WalletService] Exact match for P2PK send found.`);
+        }
+
+        // 3. Build the token using cashu-ts SendBuilder natively to get P2PK outputs.
+        // `asP2PK` will lock the SENT proofs to the receiver's pubkey.
+        console.log(`[WalletService] Executing send OP to lock to: ${receiverPubkey}`);
+        let result;
+        try {
+            result = await wallet.ops
+                .send(amount, selectedProofsToUse)
+                .asP2PK({ pubkey: receiverPubkey }) // lock sent amount
+                .keepAsRandom() // keep change normally
+                .run();
+        } catch (opsErr: any) {
+            console.error('[WalletService] ops.send failed:', opsErr?.message || opsErr);
+            console.error('[WalletService] ops.send Full Error:', JSON.stringify(opsErr, Object.getOwnPropertyNames(opsErr)));
+            throw opsErr;
+        }
+
+        const sendProofs = result.send;
+        const keepProofs = result.keep;
+
+        // 4. Update Proof Repository Manually 
+        // Emulate what coco's SendOperationService does:
+        // Set inputs to SPENT, add keepProofs as READY, and theoretically sendProofs as INFLIGHT
+        const inputSecrets = selectedProofsToUse.map((p: any) => p.secret);
+        const operationId = generateSubId();
+
+        // 4a. Mark keep proofs as ready
+        if (keepProofs.length > 0) {
+            const keepCoreProofs = keepProofs.map((p: any) => ({
+                ...p,
+                mintUrl,
+                state: 'ready',
+                createdByOperationId: operationId
+            }));
+            await unsafeManager.proofService.saveProofs(mintUrl, keepCoreProofs);
+        }
+
+        // 4b. Mark sending proofs as inflight
+        const sendCoreProofs = sendProofs.map((p: any) => ({
+            ...p,
+            mintUrl,
+            state: 'inflight',
+            createdByOperationId: operationId
+        }));
+        await unsafeManager.proofService.saveProofs(mintUrl, sendCoreProofs);
+
+        // 4c. SPENT the inputs 
+        await unsafeManager.proofService.setProofState(mintUrl, inputSecrets, 'spent');
+
+        // 5. Build Token
+        const token: Token = {
+            mint: mintUrl,
+            proofs: sendProofs,
+            unit: wallet.unit
+        };
+        const encoded = encodeToken(token);
+        console.log(`[WalletService] ✅ P2PK Send execution complete! Token locked to: ${receiverPubkey}`);
+
+        // Ideally we also create an operation or history log, but coco's internals are slightly opaque
+        // For now, this effectively subtracts balance and hands off a token.
+
+        return { encoded, token };
+    },
+
     // ─── Receiving ────────────────────────────────────────────
 
     /**
@@ -125,7 +228,7 @@ export const walletService = {
             console.log('[WalletService] Token received successfully');
         } catch (err: any) {
             console.error('[WalletService] Receive failed:', err?.message || err);
-            console.error('[WalletService] Full error:', JSON.stringify(err, null, 2));
+            console.error('[WalletService] Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
 
             // If it's an "untrusted mint" error, provide helpful message
             if (err?.message?.includes('not trusted') || err?.name === 'UnknownMintError') {
@@ -142,6 +245,80 @@ export const walletService = {
                 throw new Error('Token proofs could not be verified. The token may have already been redeemed.');
             }
 
+            throw err;
+        }
+    },
+
+    /**
+     * Receive a P2PK locked ecash token.
+     * 
+     * @param token - Encoded cashu token string
+     * @param nostrPrivKey - The private key used to unlock the proofs (hex array or single hex string)
+     */
+    receiveP2PK: async (token: string, nostrPrivKey: string | string[]): Promise<void> => {
+        const cleaned = cleanToken(token);
+        console.log('[WalletService] Receiving P2PK token:', cleaned.substring(0, 50) + '...');
+        const unsafeManager = mgr() as any;
+
+        try {
+            // 1. Decode generic token
+            const decoded = getDecodedToken(cleaned);
+            let mintUrl = '';
+            let receivedProofs: any[] = [];
+
+            // @ts-ignore - Handle Both V3 / V4 token variations
+            if (decoded.token && decoded.token.length > 0) {
+                // @ts-ignore
+                const firstMintEntry = decoded.token[0];
+                mintUrl = firstMintEntry.mint;
+                receivedProofs = firstMintEntry.proofs;
+            } else if (decoded.mint && decoded.proofs && decoded.proofs.length > 0) {
+                mintUrl = decoded.mint;
+                receivedProofs = decoded.proofs;
+            } else {
+                throw new Error("Invalid or empty token");
+            }
+
+            // 3. Ensure mint is trusted / added
+            if (!(await unsafeManager.mintService.isTrustedMint(mintUrl))) {
+                throw new Error(`Mint ${mintUrl} is not trusted`);
+            }
+
+            // 4. Get active wallet
+            const { wallet } = await unsafeManager.walletService.getWalletWithActiveKeysetId(mintUrl);
+
+            // 5. Build cashu-ts receive op with the privkey
+            const receivedAmount = receivedProofs.reduce((acc: number, p: any) => acc + p.amount, 0);
+
+            console.log(`[WalletService] Received amount: ${receivedAmount}. Unlocking with P2PK and randomizing change...`);
+            const newProofs = await wallet.ops
+                .receive(cleaned)
+                .privkey(nostrPrivKey)
+                .asRandom() // Bypass deterministic counters to prevent 'outputs already signed' on retry
+                .run();
+
+            // 6. Save newly minted proofs to the DB
+            const coreProofs = newProofs.map((p: any) => ({
+                ...p,
+                mintUrl,
+                state: 'ready',
+                createdByOperationId: 'p2pk_receive_' + Date.now() // placeholder for history tracking
+            }));
+
+            await unsafeManager.proofService.saveProofs(mintUrl, coreProofs);
+
+            // 7. Fire event for UI updates
+            unsafeManager.eventBus.emit('receive:created', {
+                mintUrl,
+                amount: receivedAmount,
+                token: cleaned,
+                timestamp: Date.now()
+            });
+
+            console.log('[WalletService] P2PK Token received and proofs saved successfully');
+        } catch (err: any) {
+            console.error('[WalletService] P2PK Receive failed:', err?.message || err);
+            console.error('[WalletService] P2PK Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
             throw err;
         }
     },
@@ -286,5 +463,5 @@ export const walletService = {
      */
     finalizeSend: async (operationId: string): Promise<void> => {
         await mgr().send.finalize(operationId);
-    },
+    }
 };
