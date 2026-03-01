@@ -1,7 +1,7 @@
 import { RefreshControl } from 'react-native'
 import { Anchor, H2, Paragraph, XStack, YStack, ScrollView, Button } from 'tamagui'
 import * as Haptics from 'expo-haptics'
-import { ToastControl } from 'components/CurrentToast'
+import { useToastController } from '@tamagui/toast'
 import { ThemeSelector } from './components/ThemeSelector'
 import { LocalizationTest } from './components/LocalizationTest'
 import { BiometricUnlock } from './components/BiometricUnlock'
@@ -18,9 +18,16 @@ import StatusScreen from '../../components/StatusScreen'
 type StatusType = 'success' | 'error' | 'pending' | null;
 
 export function HomeTabScreen() {
-    const { refreshBalance } = useWalletStore()
+    const { refreshBalance, error } = useWalletStore()
     const [refreshing, setRefreshing] = React.useState(false)
     const [showStatus, setShowStatus] = React.useState<StatusType>(null)
+    const toast = useToastController()
+
+    React.useEffect(() => {
+        if (error) {
+            toast.show('Error', { message: error })
+        }
+    }, [error])
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true)
@@ -75,9 +82,10 @@ export function HomeTabScreen() {
 
                 {/* Test Status Screens */}
 
+                {/* Test Status Screens */}
+
                 {/* <MintDiscovery /> */}
                 {/* 
-                <ToastControl />
 
                 <WalletDebugInfo /> */}
             </YStack>

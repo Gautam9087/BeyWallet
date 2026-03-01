@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { ChevronRight, Loader, RefreshCcw } from "@tamagui/lucide-icons"
+import { useToastController } from '@tamagui/toast'
 import { H2, Image, Text, View, XStack, YStack, Spinner, Stack } from "tamagui"
 import { useQuery } from '@tanstack/react-query'
 import { bitcoinService } from '../../../services/bitcoinService'
@@ -10,8 +11,9 @@ import { currencyService, CurrencyCode } from '~/services/currencyService'
 
 export default function BitcoinPriceCard() {
     const { secondaryCurrency } = useSettingsStore()
+    const toast = useToastController()
 
-    const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
+    const { data, isLoading, isFetching, refetch, dataUpdatedAt, isError, error } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
         queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
         refetchInterval: 300000,
@@ -35,6 +37,12 @@ export default function BitcoinPriceCard() {
         }, 10000); // Update every 10 seconds
         return () => clearInterval(interval);
     }, []);
+
+    React.useEffect(() => {
+        if (isError && error) {
+            toast.show('Error', { message: error.message })
+        }
+    }, [isError, error])
 
     const timeAgo = useMemo(() => {
         if (!dataUpdatedAt) return ""
