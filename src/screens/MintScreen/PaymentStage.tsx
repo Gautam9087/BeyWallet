@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { YStack, XStack, Text, Button, View, Paragraph, Separator, ScrollView } from "tamagui";
+import { YStack, XStack, Text, Button, View, Paragraph, Separator, ScrollView, Spinner } from "tamagui";
 import { Copy, Check, Clock, ShieldCheck, Sprout, Building2, Zap } from "@tamagui/lucide-icons";
 import QRCode from "react-native-qrcode-svg";
 import * as Haptics from 'expo-haptics';
@@ -12,7 +12,7 @@ interface PaymentStageProps {
     quoteId: string;
     mintUrl: string;
     expiry?: number;
-    onPaid: () => void;
+    onPaid: () => Promise<void> | void;
     onCancel: () => void;
 }
 
@@ -20,6 +20,7 @@ export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid
     const sats = parseInt(amount, 10);
     const toast = useToastController();
     const [copied, setCopied] = useState(false);
+    const [isChecking, setIsChecking] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     const getMintName = (url: string) => {
@@ -82,6 +83,8 @@ export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid
                     <View
                         bg="white"
                         p="$2"
+                        borderColor="$borderColor"
+                        borderWidth={1}
                         rounded="$5"
                     >
                         <QRCode
@@ -104,7 +107,7 @@ export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid
                 </YStack>
             </ScrollView>
 
-            <YStack position="absolute" b={0} l={0} r={0} py="$2" bg="$background" borderTopWidth={1} borderColor="$gray3">
+            <YStack position="absolute" b={0} l={0} r={0} py="$2" bg="$background" >
                 <XStack width="100%" justify="space-evenly" gap="$3">
                     <Button
                         theme="red"
@@ -120,7 +123,7 @@ export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid
                             onCancel();
                         }}
                     >
-                        CANCEL
+                        Cancel
                     </Button>
                     <Button
                         theme="accent"
@@ -129,13 +132,23 @@ export function PaymentStage({ amount, invoice, quoteId, mintUrl, expiry, onPaid
                         height={55}
                         rounded="$4"
                         fontWeight="800"
-                        disabled={isExpired}
-                        onPress={() => {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            onPaid();
+                        disabled={isExpired || isChecking}
+                        icon={isChecking ? <Spinner size="small" color="white" /> : undefined}
+                        onPress={async () => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setIsChecking(true);
+                            try {
+                                await onPaid();
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            } catch (err: any) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                toast.show('Not Paid Yet', { message: 'The invoice has not been paid yet. Please wait or try again.' });
+                            } finally {
+                                setIsChecking(false);
+                            }
                         }}
                     >
-                        I PAID
+                        {isChecking ? '...' : 'I Paid'}
                     </Button>
                 </XStack>
             </YStack>

@@ -1,4 +1,4 @@
-import { Check, Loader } from '@tamagui/lucide-icons'
+import { Check, Loader, AlertCircle } from '@tamagui/lucide-icons'
 import { Toast, useToastController, useToastState } from '@tamagui/toast'
 import { Button, H4, View, XStack, YStack, Spinner } from 'tamagui'
 import * as Haptics from 'expo-haptics'
@@ -47,7 +47,8 @@ export function CurrentToast() {
 
   if (!currentToast || currentToast.isHandledNatively) return null
 
-  const isLoading = currentToast.title === 'Loading...'
+  const isLoading = currentToast.title?.includes('Loading')
+  const isError = currentToast.title && ['Error', 'Failed', 'Not Paid Yet', 'Invalid', 'Warning'].some(keyword => currentToast.title.includes(keyword))
 
   return (
     <Toast
@@ -57,7 +58,7 @@ export function CurrentToast() {
       enterStyle={{ opacity: 0, scale: 0.5, y: -25 }}
       exitStyle={{ opacity: 0, scale: 1, y: -20 }}
       width={350}
-      theme={isLoading ? "gray" : "green"}
+      theme={isLoading ? "gray" : isError ? "red" : "green"}
       rounded="$5"
       transition="quick"
       p="$3"
@@ -68,10 +69,10 @@ export function CurrentToast() {
       <XStack gap="$3" items="center" px="$2">
         {isLoading ? (
           <SpinningLoader size={18} color="$color" />
+        ) : isError ? (
+          <AlertCircle size={18} strokeWidth={3} color="$red11" />
         ) : (
-
           <Check size={18} strokeWidth={3} color="$green12" />
-
         )}
         <YStack flex={1} justify="center">
           <Toast.Title fontWeight="700" fontSize="$4">{currentToast.title}</Toast.Title>

@@ -38,7 +38,7 @@ export function ConfirmStage({ amount, mintUrl, isLoading, onConfirm, onBack }: 
                 <DetailItem label="Amount" value={`${sats} SATS`} />
             </YStack>
 
-            <YStack mt="auto" pb="$8" gap="$3">
+            <YStack mt="auto" pb="$0" gap="$3">
                 <Button
                     theme="accent"
                     size="$5"
@@ -46,13 +46,13 @@ export function ConfirmStage({ amount, mintUrl, isLoading, onConfirm, onBack }: 
                     rounded="$4"
                     fontWeight="800"
                     disabled={isLoading}
-                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
+                    icon={isLoading ? <Spinner size="small" color="$color" /> : undefined}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         onConfirm();
                     }}
                 >
-                    {isLoading ? 'CREATING INVOICE...' : 'CONFIRM DEPOSIT'}
+                    {isLoading ? 'Creating Invoice...' : 'Confirm Deposit'}
                 </Button>
                 <Button
                     bg="$gray3"
@@ -67,7 +67,7 @@ export function ConfirmStage({ amount, mintUrl, isLoading, onConfirm, onBack }: 
                         onBack();
                     }}
                 >
-                    GO BACK
+                    Go Back
                 </Button>
             </YStack>
         </YStack>

@@ -13,7 +13,7 @@ import AppBottomSheet, { AppBottomSheetRef } from '../../components/UI/AppBottom
 
 interface HistoryEntry {
     id: string;
-    type: 'send' | 'receive' | 'mint' | 'melt';
+    type: 'send' | 'receive' | 'mint' | 'melt' | 'swap';
     amount: number;
     unit: string;
     mintUrl: string;
@@ -77,7 +77,49 @@ export function HistoryScreen() {
             filtered = filtered.filter(entry => entry.createdAt >= cutoff);
         }
 
-        return filtered;
+        const sorted = [...filtered].sort((a, b) => b.createdAt - a.createdAt);
+        const merged: any[] = [];
+        const skipIds = new Set<string>();
+
+        for (let i = 0; i < sorted.length; i++) {
+            const current = sorted[i];
+            if (skipIds.has(current.id)) continue;
+
+            let isSwap = false;
+
+            if (current.type === 'receive' || current.type === 'mint') {
+                for (let j = i + 1; j < Math.min(i + 4, sorted.length); j++) {
+                    const older = sorted[j];
+                    if (skipIds.has(older.id)) continue;
+
+                    const isOut = older.type === 'send' || older.type === 'melt';
+                    const timeDiff = Math.abs(current.createdAt - older.createdAt);
+
+                    if (isOut && timeDiff < 60000) {
+                        const amountDiff = Math.abs(current.amount - older.amount);
+                        const isAmountMatch = amountDiff === 0 || (older.type === 'melt' && amountDiff <= older.amount * 0.05);
+
+                        if (isAmountMatch) {
+                            merged.push({
+                                ...current,
+                                type: 'swap',
+                                amount: older.amount,
+                                metadata: { ...current.metadata, sourceId: older.id, targetId: current.id }
+                            });
+                            skipIds.add(older.id);
+                            isSwap = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!isSwap) {
+                merged.push(current);
+            }
+        }
+
+        return merged;
     }, [history, mintFilter, timeFilter]);
 
     // Real-time updates via coco events
@@ -99,12 +141,31 @@ export function HistoryScreen() {
         };
     }, [queryClient]);
 
-    const getTransactionStyle = (type: string) => {
+    const getTransactionStyle = (type: string, status: string) => {
         const isOutgoing = type === 'send' || type === 'melt';
+        const isPending = status.toLowerCase() === 'pending' || status.toLowerCase() === 'unpaid' || status.toLowerCase() === 'unclaimed';
+
+        let iconColor = isOutgoing ? '$red10' : '$green11';
+        let bgColor = isOutgoing ? '$red2' : '$green2';
+
+        if (isPending) {
+            iconColor = '$orange10';
+            bgColor = '$orange2';
+        }
+
+        if (type === 'swap') {
+            return {
+                icon: RefreshCw,
+                iconColor: '$blue10',
+                bgColor: '$blue2',
+                sign: '',
+            };
+        }
+
         return {
-            icon: isOutgoing ? BanknoteArrowUp : BanknoteArrowDown, "Minted": Landmark,
-            iconColor: isOutgoing ? '$red10' : '$green11',
-            bgColor: isOutgoing ? '$red2' : '$green2',
+            icon: type === 'mint' ? Landmark : (isOutgoing ? BanknoteArrowUp : BanknoteArrowDown),
+            iconColor,
+            bgColor,
             sign: isOutgoing ? '-' : '+',
         };
     };
@@ -115,6 +176,7 @@ export function HistoryScreen() {
             case 'receive': return 'Received';
             case 'mint': return 'Minted';
             case 'melt': return 'Melted';
+            case 'swap': return 'Swapped';
             default: return type;
         }
     };
@@ -228,8 +290,8 @@ export function HistoryScreen() {
                     ) : (
                         <YStack gap="$4">
                             {filteredHistory.map((entry: HistoryEntry) => {
-                                const style = getTransactionStyle(entry.type);
                                 const status = entry.state || 'completed';
+                                const style = getTransactionStyle(entry.type, status);
 
                                 return (
                                     <YStack
@@ -252,7 +314,7 @@ export function HistoryScreen() {
                                                         <Text fontWeight="700" fontSize="$4">
                                                             {getTypeLabel(entry.type)}
                                                         </Text>
-                                                        {status !== 'completed' && (
+                                                        {status.toLowerCase() !== 'completed' && (
                                                             <XStack px="$1.5" py="$0.5" bg="$gray5" rounded="$2">
                                                                 <Text fontSize="$1" fontWeight="800" textTransform="uppercase" color="$gray10">
                                                                     {status}

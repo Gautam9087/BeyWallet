@@ -98,24 +98,17 @@ export default function MintScreen() {
     };
 
     const handlePaid = async () => {
-        // Manual "I have paid" - try to redeem immediately
-        // But don't block on errors - watchers will handle it if payment went through
         if (quoteData && activeMintUrl) {
             try {
                 await quotesService.redeemMintQuote(activeMintUrl, quoteData.quoteId);
                 setStatus('success');
                 refreshBalance();
                 setStep('result');
-                return;
             } catch (err: any) {
-                console.log('[MintScreen] Manual redeem attempt failed, watchers will handle:', err.message);
-                // Don't show error - watchers will handle it if payment went through
-                // Show success anyway - the event listener will update when redeemed
+                console.log('[MintScreen] Manual redeem attempt failed:', err.message);
+                throw err;
             }
         }
-        // Assume success - watchers will verify and update balance
-        setStatus('success');
-        setStep('result');
     };
 
     const handleClose = () => {
