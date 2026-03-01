@@ -36,7 +36,7 @@ export default function NostrProfileScreen() {
     const formatNpub = (str: string | null) => {
         if (!str) return '';
         if (str.length < 20) return str;
-        return `${str.slice(0, 8)}...${str.slice(-8)}`;
+        return `${str.slice(0, 8)}...${str.slice(-6)}`;
     };
 
     const theme = useTheme();
@@ -113,8 +113,8 @@ export default function NostrProfileScreen() {
             <YStack gap="$0" width="100%" mt="$0" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                 <DetailItem label="Profile Name" value="Bey Wallet User" />
                 <DetailItem label="Network" value="Nostr Protocol" />
-                <DetailItem label="Public Key" value={formatNpub(npub)} isCopyable copyValue={npub || ''} onCopy={handleCopy} />
-                <DetailItem label="Share" value={formatNpub(npub)} copyValue={npub || ''} onPress={handleShare} />
+                <DetailItem label="Public Key" value={formatNpub(npub)} isCopyable copyValue={npub || ''} onCopy={handleCopy} onPress={handleShare} />
+
             </YStack>
         </ScrollView>
     );
@@ -125,7 +125,7 @@ function DetailItem({ label, value, isCopyable, copyValue, onCopy, onPress }: { 
         <XStack justify="space-between" items="center" py="$3" px="$4">
             <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
             <XStack gap="$2" items="center">
-                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={3} style={{ maxWidth: 200 }}>
                     {value}
                 </Text>
                 {onPress && (
