@@ -109,7 +109,11 @@ export const walletService = {
 
     // ─── P2PK Sending ─────────────────────────────────────────
 
-    sendP2PK: async (mintUrl: string, amount: number, receiverPubkey: string): Promise<{ encoded: string; token: Token }> => {
+    sendP2PK: async (
+        mintUrl: string,
+        amount: number,
+        receiverPubkey: string
+    ): Promise<{ encoded: string; token: Token; id: string }> => {
         const m = mgr();
         const unsafeManager = m as any;
 
@@ -126,48 +130,61 @@ export const walletService = {
             throw new Error(`Insufficient balance: need ${amount}, have ${totalAvailable}`);
         }
 
-        // 2. Select proofs. Try exact match first, falling back to swap.
-        const exactProofs = wallet.selectProofsToSend(availableProofs, amount, false);
-        const needsSwap = exactProofs.send.reduce((acc: number, p: CoreProof) => acc + p.amount, 0) !== amount || exactProofs.send.length === 0;
-
-        let selectedProofsToUse = exactProofs.send;
-
-        if (needsSwap) {
-            selectedProofsToUse = wallet.selectProofsToSend(availableProofs, amount, true).send;
-            // We do a swap here using cashu-ts directly
-            console.log(`[WalletService] Need swap for P2PK send. Building swap via wallet.ops...`);
-        } else {
-            console.log(`[WalletService] Exact match for P2PK send found.`);
-        }
-
-        // 3. Build the token using cashu-ts SendBuilder natively to get P2PK outputs.
-        // `asP2PK` will lock the SENT proofs to the receiver's pubkey.
+        // 2. Select proofs and perform the swap.
+        // We use explicit `prepareSwapToSend` so that we can capture `txn.inputs` and mark those exact proofs as SPENT.
         console.log(`[WalletService] Executing send OP to lock to: ${receiverPubkey}`);
-        let result;
+        let keepProofs: any[] = [];
+        let sendProofs: any[] = [];
+        let inputSecrets: string[] = [];
+
         try {
-            result = await wallet.ops
-                .send(amount, selectedProofsToUse)
-                .asP2PK({ pubkey: receiverPubkey }) // lock sent amount
-                .keepAsRandom() // keep change normally
-                .run();
+            const customConfig = {
+                send: { type: 'p2pk', options: { pubkey: receiverPubkey } },
+                keep: { type: 'random' }
+            };
+
+            let txn;
+            try {
+                // Attempt 1
+                txn = await wallet.prepareSwapToSend(amount, availableProofs, { includeFees: true }, customConfig as any);
+            } catch (firstErr: any) {
+                if (firstErr?.message?.includes('already spent') || firstErr?.message?.includes('11001')) {
+                    console.log(`[WalletService] Caught "already spent" state mismatch. Auto-healing local database...`);
+                    // Force the database to drop spent proofs
+                    await unsafeManager.proofService.checkState(mintUrl);
+                    // Re-fetch clean proofs
+                    const refreshedProofs = await unsafeManager.proofRepository.getAvailableProofs(mintUrl);
+                    console.log(`[WalletService] Retrying send after healing database...`);
+                    txn = await wallet.prepareSwapToSend(amount, refreshedProofs, { includeFees: true }, customConfig as any);
+                    // Update availableProofs reference for the filter later
+                    availableProofs.splice(0, availableProofs.length, ...refreshedProofs);
+                } else {
+                    throw firstErr;
+                }
+            }
+
+            const swapResult = await wallet.completeSwap(txn);
+
+            keepProofs = swapResult.keep;
+            sendProofs = swapResult.send;
+            inputSecrets = txn.inputs.map((p: any) => p.secret);
         } catch (opsErr: any) {
             console.error('[WalletService] ops.send failed:', opsErr?.message || opsErr);
             console.error('[WalletService] ops.send Full Error:', JSON.stringify(opsErr, Object.getOwnPropertyNames(opsErr)));
             throw opsErr;
         }
 
-        const sendProofs = result.send;
-        const keepProofs = result.keep;
-
-        // 4. Update Proof Repository Manually 
+        // 3. Update Proof Repository Manually 
         // Emulate what coco's SendOperationService does:
         // Set inputs to SPENT, add keepProofs as READY, and theoretically sendProofs as INFLIGHT
-        const inputSecrets = selectedProofsToUse.map((p: any) => p.secret);
         const operationId = generateSubId();
 
-        // 4a. Mark keep proofs as ready
-        if (keepProofs.length > 0) {
-            const keepCoreProofs = keepProofs.map((p: any) => ({
+        // 4a. Mark keep proofs as ready (filter out unspent proofs we already had!)
+        const availableSecrets = new Set(availableProofs.map((p: any) => p.secret));
+        const newKeepProofs = keepProofs.filter((p: any) => !availableSecrets.has(p.secret));
+
+        if (newKeepProofs.length > 0) {
+            const keepCoreProofs = newKeepProofs.map((p: any) => ({
                 ...p,
                 mintUrl,
                 state: 'ready',
@@ -192,15 +209,30 @@ export const walletService = {
         const token: Token = {
             mint: mintUrl,
             proofs: sendProofs,
-            unit: wallet.unit
+            unit: wallet.unit || 'sat'
         };
         const encoded = encodeToken(token);
         console.log(`[WalletService] ✅ P2PK Send execution complete! Token locked to: ${receiverPubkey}`);
 
         // Ideally we also create an operation or history log, but coco's internals are slightly opaque
         // For now, this effectively subtracts balance and hands off a token.
+        try {
+            await unsafeManager.historyRepository.addHistoryEntry({
+                mintUrl,
+                unit: wallet.unit || 'sat',
+                createdAt: Date.now(),
+                type: 'send',
+                amount: amount,
+                operationId: operationId,
+                state: 'pending',
+                token: token
+            });
+            console.log(`[WalletService] Mock history tracking injected for P2PK send.`);
+        } catch (histErr) {
+            console.warn('[WalletService] Failed to inject mock history entry:', histErr);
+        }
 
-        return { encoded, token };
+        return { encoded, token, id: operationId };
     },
 
     // ─── Receiving ────────────────────────────────────────────

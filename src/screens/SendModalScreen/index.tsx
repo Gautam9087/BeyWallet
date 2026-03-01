@@ -112,7 +112,7 @@ export function SendModalScreen() {
 
                 result = await walletService.sendP2PK(activeMintUrl, amountSats, targetPubkey);
                 setEncodedToken(result.encoded);
-                setOperationId(''); // P2PK bypassing operation id for now
+                setOperationId(result.id);
             } else {
                 result = await walletService.send(activeMintUrl, amountSats);
                 setEncodedToken(result.token);
