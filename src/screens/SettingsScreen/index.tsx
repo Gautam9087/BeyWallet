@@ -3,8 +3,9 @@ import { YStack, ScrollView, Text, YGroup, ListItem, H6, H2, H4, Button, XStack,
 import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw, Server } from '@tamagui/lucide-icons';
 import { ThemeModal } from './components/ThemeModal';
 import { CurrencyModal } from './components/CurrencyModal';
-import { MintModal } from './components/MintModal';
 import { NotificationsModal } from './components/NotificationsModal';
+import { NostrModal } from './components/NostrModal';
+import { MintModal } from './components/MintModal';
 import * as Haptics from 'expo-haptics';
 import * as ClipboardStore from 'expo-clipboard';
 import { useSettingsStore } from '~/store/settingsStore';
@@ -24,6 +25,7 @@ export function SettingsScreen() {
     const currencySheetRef = useRef<AppBottomSheetRef>(null);
     const mintSheetRef = useRef<AppBottomSheetRef>(null);
     const notificationsSheetRef = useRef<AppBottomSheetRef>(null);
+    const nostrSheetRef = useRef<AppBottomSheetRef>(null);
     const deleteSheetRef = useRef<AppBottomSheetRef>(null);
 
     const { secondaryCurrency, defaultMintUrl } = useSettingsStore();
@@ -56,6 +58,9 @@ export function SettingsScreen() {
                 break;
             case 'notifications':
                 notificationsSheetRef.current?.present();
+                break;
+            case 'nostr':
+                nostrSheetRef.current?.present();
                 break;
             default:
                 break;
@@ -232,6 +237,26 @@ export function SettingsScreen() {
                     </YGroup>
                 </YStack>
 
+                {/* Nostr Section */}
+                <YStack gap="$3">
+                    <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">Nostr</Text>
+                    <YGroup rounded="$5" bg="$gray2" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                        <YGroup.Item>
+                            <ListItem
+                                bg="transparent"
+                                fontWeight="600"
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
+                                title={<H6>Nostr Settings</H6>}
+                                subTitle="Manage your npub, nsec, and relays"
+                                icon={<Server size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
+                                onPress={() => handleSettingPress('nostr')}
+                            />
+                        </YGroup.Item>
+                    </YGroup>
+                </YStack>
+
                 {/* About Section */}
                 <YStack gap="$3">
                     <Text fontSize="$4" fontWeight="600" color="$gray10" px="$2">About</Text>
@@ -273,6 +298,7 @@ export function SettingsScreen() {
                 <CurrencyModal ref={currencySheetRef} />
                 <MintModal ref={mintSheetRef} />
                 <NotificationsModal ref={notificationsSheetRef} />
+                <NostrModal ref={nostrSheetRef} />
 
                 {/* Delete Wallet Sheet */}
                 <AppBottomSheet ref={deleteSheetRef} snapPoints={['85%']}>

@@ -98,6 +98,12 @@ export default function ModalLayout() {
                     title: 'Mints',
                 }}
             />
+            <Stack.Screen
+                name="nostr-profile"
+                options={{
+                    title: 'Nostr Identity',
+                }}
+            />
         </Stack>
     )
 }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { initService } from '../services/core';
+import { seedService } from '../services/seedService';
 import { DEFAULT_MINT } from './constants';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -9,6 +10,8 @@ interface SettingsState {
     secondaryCurrency: string;
     defaultMintUrl: string;
     initialized: boolean;
+    npub: string | null;
+    nsec: string | null;
     initialize: () => Promise<void>;
     setTheme: (theme: ThemePreference) => Promise<void>;
     setSecondaryCurrency: (currency: string) => Promise<void>;
@@ -23,6 +26,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     defaultMintUrl: DEFAULT_MINT,
     notificationsEnabled: true,
     initialized: false,
+    npub: null,
+    nsec: null,
 
     initialize: async () => {
         if (get().initialized) return;
@@ -60,6 +65,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 const storedNotifications = await repo.settingsRepository.getSetting('notificationsEnabled');
                 if (storedNotifications !== undefined && storedNotifications !== null) {
                     set({ notificationsEnabled: storedNotifications === 'true' });
+                }
+
+                // Load Nostr keys
+                const storedNpub = await repo.settingsRepository.getSetting('npub');
+                const storedNsec = await repo.settingsRepository.getSetting('nsec');
+
+                if (storedNpub && storedNsec) {
+                    set({ npub: storedNpub, nsec: storedNsec });
+                } else {
+                    // Generate and cache them if they don't exist yet
+                    console.log('[SettingsStore] Nostr keys not in DB, generating and caching...');
+                    const mnemonic = await seedService.getMnemonic();
+                    if (mnemonic) {
+                        const keys = await seedService.getNostrKeys(mnemonic);
+                        await repo.settingsRepository.setSetting('npub', keys.npub);
+                        await repo.settingsRepository.setSetting('nsec', keys.nsec);
+                        set({ npub: keys.npub, nsec: keys.nsec });
+                    }
                 }
 
                 set({ initialized: true });

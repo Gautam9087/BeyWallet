@@ -1,5 +1,5 @@
 import React from 'react';
-import { YStack, XStack, Text, Button, View, Separator, Circle, ScrollView } from 'tamagui';
+import { YStack, XStack, Text, Button, View, Separator, Circle, ScrollView, YGroup } from 'tamagui';
 import { ArrowDownLeft, Check, ShieldCheck, AlertTriangle, Copy, Building2, DollarSign, Clock } from '@tamagui/lucide-icons';
 import { Spinner } from '../../components/UI/Spinner';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,10 @@ import * as Clipboard from 'expo-clipboard';
 import { useToastController } from '@tamagui/toast';
 import { useWalletStore } from '../../store/walletStore';
 import { mintManager } from '../../services/core';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useQuery } from '@tanstack/react-query';
+import { bitcoinService } from '../../services/bitcoinService';
+import { currencyService, CurrencyCode } from '../../services/currencyService';
 
 interface TokenInfo {
     mint: string;
@@ -29,9 +33,16 @@ interface ConfirmStageProps {
 
 export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceiveLater, onBack }: ConfirmStageProps) {
     const { mints } = useWalletStore();
+    const { secondaryCurrency } = useSettingsStore();
     const toast = useToastController();
     const [isSavingLater, setIsSavingLater] = React.useState(false);
     const [estimatedFee, setEstimatedFee] = React.useState(0);
+
+    const { data: btcData } = useQuery({
+        queryKey: ['bitcoinPrice', secondaryCurrency],
+        queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
+        staleTime: 30000,
+    });
 
     // Fetch fee for this mint
     React.useEffect(() => {
@@ -137,12 +148,16 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                     </YStack>
                 )}
 
-                <Text fontSize="$5" fontWeight="800" color="$color" ml="$4" mb="$-2">Details</Text>
+
                 <YStack mx="$4" bg="$gray2" rounded="$5" overflow="hidden">
-                    <YStack separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                    <YGroup separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
                         <DetailItem
                             label="Amount"
                             value={`${tokenInfo.amount} sats`}
+                        />
+                        <DetailItem
+                            label="Fiat"
+                            value={btcData?.price ? currencyService.formatValue(currencyService.convertSatsToCurrency(tokenInfo.amount, btcData.price), secondaryCurrency as CurrencyCode) : '...'}
                         />
                         <DetailItem
                             label="Proofs"
@@ -169,31 +184,12 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                                 />
                             </>
                         )}
-                    </YStack>
+                    </YGroup>
                 </YStack>
 
             </ScrollView>
 
-            <YStack position="absolute" bottom="$4" left="$4" right="$4" gap="$2">
-                <Button
-                    bg={isMintTrusted ? "$green9" : "$orange9"}
-                    color="white"
-                    height={50}
-                    rounded="$4"
-                    disabled={isLoading}
-                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
-                    fontWeight="700" fontSize="$4"
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                        onConfirm();
-                    }}
-                    pressStyle={{ opacity: 0.9, scale: 0.98 }}
-                >
-
-                    {isLoading ? 'RECEIVING...' : (isMintTrusted ? 'RECEIVE ECASH' : 'TRUST & RECEIVE')}
-
-                </Button>
-
+            <YStack position="absolute" b="$4" l="$4" r="$4" gap="$2">
                 <Button
                     bg="$gray3"
                     color="$color"
@@ -201,7 +197,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                     rounded="$4"
                     disabled={isLoading}
                     icon={isSavingLater ? <Spinner size="small" color="$color" /> : <Clock size={18} color="$gray10" />}
-                    fontWeight="700" fontSize="$4"
+                    fontWeight="700" fontSize="$5"
                     onPress={async () => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         setIsSavingLater(true);
@@ -213,18 +209,33 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                     }}
                     pressStyle={{ opacity: 0.9, scale: 0.98 }}
                 >
-                    {isSavingLater ? 'SAVING...' : 'RECEIVE LATER'}
+                    {isSavingLater ? 'Saving...' : 'Receive Later'}
                 </Button>
+
+
+
+
 
                 <Button
-                    chromeless
-                    onPress={onBack}
+                    bg={isMintTrusted ? "$green9" : "$orange9"}
+                    color="white"
+                    height={50}
+                    rounded="$4"
                     disabled={isLoading}
-                    pressStyle={{ opacity: 0.7 }}
-                    fontWeight="600" fontSize="$4" color="$gray10">
+                    icon={isLoading ? <Spinner size="small" color="white" /> : undefined}
+                    fontWeight="700" fontSize="$5"
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                        onConfirm();
+                    }}
+                    pressStyle={{ opacity: 0.9, scale: 0.98 }}
+                >
 
-                    Cancel
+                    {isLoading ? 'Receiving...' : (isMintTrusted ? 'Receive' : 'Trust & Receive')}
+
                 </Button>
+
+
             </YStack>
         </YStack >
     );
