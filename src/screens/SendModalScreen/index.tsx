@@ -4,20 +4,22 @@ import { useWalletStore } from '~/store/walletStore'
 import { AmountStage } from './AmountStage'
 import { P2PKAmountStage } from './P2PKAmountStage'
 import { ResultStage } from './ResultStage'
+import { SuccessStage } from './SuccessStage'
 import { biometricService } from '~/services/biometricService'
 import { walletService, mintManager } from '~/services/core'
 import * as Haptics from 'expo-haptics'
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet'
 import { Text, YStack, XStack, Button, Separator, View } from 'tamagui'
 import { useSettingsStore } from '~/store/settingsStore'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { bitcoinService } from '~/services/bitcoinService'
 import { currencyService, CurrencyCode, SUPPORTED_CURRENCIES } from '~/services/currencyService'
 import { Building2, Info, ArrowUpCircle, ShieldCheck, Zap, ArrowDownCircle, Lock, Unlock } from '@tamagui/lucide-icons'
 import { Image } from 'tamagui'
 import { nip19 } from 'nostr-tools'
+import { eventService, proofService } from '~/services/core'
 
-type SendStep = 'amount' | 'result';
+type SendStep = 'amount' | 'result' | 'success';
 
 export function SendModalScreen() {
     const [step, setStep] = useState<SendStep>('amount')
@@ -30,6 +32,7 @@ export function SendModalScreen() {
     const [sendMode, setSendMode] = useState<'standard' | 'p2pk'>('standard')
     const [receiverPubkey, setReceiverPubkey] = useState('')
     const router = useRouter()
+    const queryClient = useQueryClient();
 
     const { balance, activeMintUrl, refreshBalance, mints } = useWalletStore()
     const { secondaryCurrency } = useSettingsStore()
@@ -46,6 +49,63 @@ export function SendModalScreen() {
             }).catch(() => setEstimatedFee(0));
         }
     }, [activeMintUrl])
+
+    // Monitor for claim success when in 'result' stage
+    React.useEffect(() => {
+        if (step !== 'result' || !encodedToken || !operationId) return;
+
+        console.log('[SendModalScreen] Starting automated state monitoring for:', operationId);
+
+        let isDetected = false;
+
+        const handleSuccess = (source: string) => {
+            if (isDetected) return;
+            isDetected = true;
+
+            console.log(`[SendModalScreen] ✅ SUCCESS DETECTED via ${source} for:`, operationId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+            // Transition to success stage
+            setStep('success');
+
+            // Invalidate queries
+            queryClient.invalidateQueries({ queryKey: ['history'] });
+            queryClient.invalidateQueries({ queryKey: ['transaction', operationId] });
+        };
+
+        // Listen for history updates
+        const unsubHistory = eventService.on('history:updated', (payload: any) => {
+            console.log('[SendModalScreen] 📜 History update:', {
+                currentOpId: operationId,
+                payloadId: payload.id,
+                payloadState: payload.state,
+                fullPayload: payload
+            });
+            if (payload.id === operationId && payload.state === 'claimed') {
+                handleSuccess('event');
+            }
+        });
+
+        // Fallback: poll proof state
+        const interval = setInterval(async () => {
+            try {
+                const states = await proofService.checkProofStates(encodedToken);
+                const spentCount = states.filter((s: any) => s.state === 'SPENT').length;
+                console.log(`[SendModalScreen] 🔍 Polling check [${operationId}]: ${spentCount}/${states.length} proofs SPENT`);
+
+                if (states.length > 0 && spentCount === states.length) {
+                    handleSuccess('polling');
+                }
+            } catch (err) {
+                console.warn('[SendModalScreen] Polling check failed:', err);
+            }
+        }, 8000);
+
+        return () => {
+            unsubHistory();
+            clearInterval(interval);
+        };
+    }, [step, encodedToken, operationId]);
 
     const { data: btcData } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
@@ -121,6 +181,7 @@ export function SendModalScreen() {
 
             setStatus('success');
             refreshBalance();
+            console.log('[SendModalScreen] Send successful. OpId:', result.id, 'Token length:', (result.encoded || result.token || '').length);
             setStep('result');
         } catch (err: any) {
             console.error('[SendModal] Failed to send:', err);
@@ -221,7 +282,17 @@ export function SendModalScreen() {
                     token={encodedToken}
                     mintUrl={activeMintUrl || ''}
                     operationId={operationId || undefined}
+                    fee={estimatedFee}
                     error={error}
+                    onClose={handleClose}
+                />
+            )}
+
+            {step === 'success' && (
+                <SuccessStage
+                    amount={amount}
+                    mintUrl={activeMintUrl || ''}
+                    fee={estimatedFee}
                     onClose={handleClose}
                 />
             )}

@@ -57,7 +57,6 @@ export function ResultStage({
 
     const [copied, setCopied] = useState(false);
     const [isReclaiming, setIsReclaiming] = useState(false);
-    const [isClaimed, setIsClaimed] = useState(false);
 
     // Animated QR states
     const [currentToken, setCurrentToken] = useState<string>(token || '');
@@ -114,61 +113,6 @@ export function ResultStage({
         return () => clearInterval(interval);
     }, [showAnimatedQR, intervalMs]);
 
-    // 2. Automated State Monitoring
-    useEffect(() => {
-        if (!isSuccess || !currentToken || !operationId) return;
-
-        console.log('[ResultStage] Starting automated state monitoring for:', operationId);
-
-        let isNavigating = false;
-
-        const handleSuccess = () => {
-            if (isNavigating) return;
-            isNavigating = true;
-
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            toast.show('Claimed!', { message: 'The recipient has claimed your ecash' });
-            if (useSettingsStore.getState().notificationsEnabled) {
-                notificationService.sendLocalNotification('Claimed!', 'The recipient has claimed your ecash', { operationId });
-            }
-
-            // Invalidate queries to prevent infinite spinner on TransactionDetails
-            queryClient.invalidateQueries({ queryKey: ['history'] });
-            queryClient.invalidateQueries({ queryKey: ['transaction', operationId] });
-
-            // Navigate to transaction details after a short delay
-            setTimeout(() => {
-                console.log('[ResultStage] Navigating to transaction details for:', operationId);
-                router.replace(`/(modals)/transaction-details?id=${operationId}`);
-            }, 300);
-        };
-
-        // Listen for history updates
-        const unsubHistory = eventService.on('history:updated', (payload: any) => {
-            if (payload.id === operationId && payload.state === 'claimed') {
-                handleSuccess();
-            }
-        });
-
-        // Fallback: poll proof state every 8 seconds
-        const interval = setInterval(async () => {
-            try {
-                const states = await proofService.checkProofStates(currentToken);
-                const isSpent = states.some((s: any) => s.state === 'SPENT');
-                if (isSpent) {
-                    console.log('[ResultStage] Polling detected SPENT state');
-                    handleSuccess();
-                }
-            } catch (err) {
-                console.warn('[ResultStage] Polling state check failed:', err);
-            }
-        }, 8000);
-
-        return () => {
-            unsubHistory();
-            clearInterval(interval);
-        };
-    }, [isSuccess, currentToken, operationId]);
 
     const handleCopy = async () => {
         if (currentToken) {
