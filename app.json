@@ -113,6 +113,8 @@
       "expo-dev-client",
       "expo-localization",
       "expo-asset",
+      "expo-file-system",
+      "expo-sharing",
       "expo-document-picker",
       "expo-av",
       "expo-audio",
