@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { useRouter } from 'expo-router'
+import { useRouter, Stack } from 'expo-router'
 import { useWalletStore } from '~/store/walletStore'
 import { AmountStage } from './AmountStage'
 import { P2PKAmountStage } from './P2PKAmountStage'
@@ -13,7 +13,7 @@ import { useSettingsStore } from '~/store/settingsStore'
 import { useQuery } from '@tanstack/react-query'
 import { bitcoinService } from '~/services/bitcoinService'
 import { currencyService, CurrencyCode, SUPPORTED_CURRENCIES } from '~/services/currencyService'
-import { Building2, Info, ArrowUpCircle, ShieldCheck, Zap, ArrowDownCircle } from '@tamagui/lucide-icons'
+import { Building2, Info, ArrowUpCircle, ShieldCheck, Zap, ArrowDownCircle, Lock, Unlock } from '@tamagui/lucide-icons'
 import { Image } from 'tamagui'
 import { nip19 } from 'nostr-tools'
 
@@ -167,39 +167,28 @@ export function SendModalScreen() {
 
     return (
         <YStack flex={1} bg="$background" p="$4">
+            <Stack.Screen
+                options={{
+                    title: sendMode === 'p2pk' ? 'Send (P2PK)' : 'Send',
+                    headerRight: () => (
+                        <Button
+                            chromeless
+                            size="$3"
+                            color={sendMode === 'p2pk' ? "$accent9" : "$color"}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setSendMode(m => m === 'standard' ? 'p2pk' : 'standard')
+                            }}
+                            icon={sendMode === 'p2pk' ? <Lock size={18} /> : <Unlock size={18} />}
+                        >
+                            {sendMode === 'p2pk' ? "P2PK" : "Standard"}
+                        </Button>
+                    )
+                }}
+            />
             {step === 'amount' && (
                 <YStack flex={1}>
-                    {/* Mode Toggle */}
-                    <XStack p="$1" bg="$gray3" rounded="$4" mb="$4">
-                        <Button
-                            flex={1}
-                            size="$3"
-                            bg={sendMode === 'standard' ? '$background' : 'transparent'}
-                            color={sendMode === 'standard' ? '$color' : '$gray11'}
-                            shadowColor={sendMode === 'standard' ? '$shadowColor' : 'transparent'}
-                            shadowRadius={4}
-                            shadowOpacity={sendMode === 'standard' ? 0.2 : 0}
-                            fontWeight={sendMode === 'standard' ? '600' : '400'}
-                            onPress={() => setSendMode('standard')}
-                            borderWidth={0}
-                        >
-                            Standard Send
-                        </Button>
-                        <Button
-                            flex={1}
-                            size="$3"
-                            bg={sendMode === 'p2pk' ? '$background' : 'transparent'}
-                            color={sendMode === 'p2pk' ? '$color' : '$gray11'}
-                            shadowColor={sendMode === 'p2pk' ? '$shadowColor' : 'transparent'}
-                            shadowRadius={4}
-                            shadowOpacity={sendMode === 'p2pk' ? 0.2 : 0}
-                            fontWeight={sendMode === 'p2pk' ? '600' : '400'}
-                            onPress={() => setSendMode('p2pk')}
-                            borderWidth={0}
-                        >
-                            Pay to Public Key
-                        </Button>
-                    </XStack>
+
 
                     {sendMode === 'standard' ? (
                         <AmountStage

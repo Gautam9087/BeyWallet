@@ -21,6 +21,8 @@ interface WalletState {
     isRestoring: boolean;
     restoringMintUrl: string | null;
     restoreQueue: string[];
+    scannerResult: string | null;
+
 
     // Actions
     initialize: () => Promise<void>;
@@ -34,6 +36,7 @@ interface WalletState {
     refreshBalance: () => Promise<void>;
     refreshMintList: () => Promise<void>;
     restoreFromSeed: (mintUrl: string) => Promise<void>;
+    setScannerResult: (result: string | null) => void;
 }
 
 
@@ -51,6 +54,8 @@ export const useWalletStore = create<WalletState>()(
             isRestoring: false,
             restoringMintUrl: null,
             restoreQueue: [],
+            scannerResult: null,
+
 
             initialize: async () => {
                 set({ isInitializing: true, error: null });
@@ -293,6 +298,11 @@ export const useWalletStore = create<WalletState>()(
                     set({ error: err.message });
                 }
             },
+
+            setScannerResult: (result: string | null) => {
+                set({ scannerResult: result });
+            },
+
         }),
         {
             name: 'wallet-storage',

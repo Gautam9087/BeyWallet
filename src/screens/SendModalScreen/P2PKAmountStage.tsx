@@ -11,7 +11,9 @@ import { currencyService, CurrencyCode, SUPPORTED_CURRENCIES } from '~/services/
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { Clipboard as ClipboardIcon } from '@tamagui/lucide-icons';
 
 interface P2PKAmountStageProps {
     amount: string;
@@ -34,23 +36,22 @@ export function P2PKAmountStage({
     isLoading,
     error
 }: P2PKAmountStageProps) {
-    const { activeMintUrl, mints, setActiveMint } = useWalletStore();
+    const { activeMintUrl, mints, setActiveMint, scannerResult, setScannerResult } = useWalletStore();
     const { secondaryCurrency } = useSettingsStore();
     const [inputMode, setInputMode] = useState<'SATS' | 'FIAT'>('SATS');
     const sheetRef = useRef<AppBottomSheetRef>(null);
     const router = useRouter();
-    const params = useLocalSearchParams();
 
-    // Check if we just returned from the scanner
+    // Check if we just returned from the scanner via store
     useEffect(() => {
-        if (params.scannedToken && typeof params.scannedToken === 'string') {
-            const token = params.scannedToken.trim();
+        if (scannerResult) {
+            const token = scannerResult.trim();
             // A simple check could be if it starts with npub or is a long hex string
             setReceiverPubkey(token);
-            // Clear the param so it doesn't re-trigger
-            router.setParams({ scannedToken: '' });
+            // Clear the store result so it doesn't re-trigger
+            setScannerResult(null);
         }
-    }, [params.scannedToken, setReceiverPubkey, router]);
+    }, [scannerResult, setReceiverPubkey, setScannerResult]);
 
     const { data: btcData } = useQuery({
         queryKey: ['bitcoinPrice', secondaryCurrency],
@@ -149,6 +150,18 @@ export function P2PKAmountStage({
         });
     };
 
+    const handlePaste = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        try {
+            const text = await Clipboard.getStringAsync();
+            if (text) {
+                setReceiverPubkey(text.trim());
+            }
+        } catch (e) {
+            console.error('Failed to paste from clipboard:', e);
+        }
+    };
+
     return (
         <YStack flex={1} justify="space-between">
             <YStack width="100%" rounded="$4" borderWidth={0.5} borderColor="$borderColor" bg="$color2" mb="$4">
@@ -194,14 +207,22 @@ export function P2PKAmountStage({
                             color="$color"
                         />
                     </XStack>
-                    <Button
-                        size="$3"
-                        circular
-                        icon={<ScanLine size={18} />}
-                        onPress={handleOpenScanner}
-                        bg="$color3"
-                        ml="$2"
-                    />
+                    <XStack gap="$2" items="center">
+                        <Button
+                            size="$3"
+                            circular
+                            icon={<ClipboardIcon size={18} />}
+                            onPress={handlePaste}
+                            bg="$color3"
+                        />
+                        <Button
+                            size="$3"
+                            circular
+                            icon={<ScanLine size={18} />}
+                            onPress={handleOpenScanner}
+                            bg="$color3"
+                        />
+                    </XStack>
                 </XStack>
 
                 {/* Amount Display */}

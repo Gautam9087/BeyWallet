@@ -8,6 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '~/store/authStore';
+import { useWalletStore } from '~/store/walletStore';
 
 const { width, height } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
@@ -121,16 +122,9 @@ export default function ScannerScreen() {
         setScanned(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // Navigate back with the scanned data
-        // We use the 'receive' screen or whatever triggered us
-        const returnTo = (params.returnTo as any) || '/receive';
-
-        // We can't easily pass big strings via router.back() params in some expo-router versions
-        // but since ReceiveModalScreen might be listening to a store or we can use setParams
-        router.replace({
-            pathname: returnTo,
-            params: { scannedToken: data }
-        });
+        // Set result in store and go back
+        useWalletStore.getState().setScannerResult(data);
+        router.back();
     };
 
     return (
