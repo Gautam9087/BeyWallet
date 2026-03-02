@@ -199,8 +199,8 @@ export const useWalletStore = create<WalletState>()(
                     try {
                         set({ isRestoring: true, restoringMintUrl: nextUrl });
 
-                        // Yield for UI responsiveness
-                        await new Promise(resolve => setTimeout(resolve, 300));
+                        // Yield briefly for UI responsiveness
+                        await new Promise(resolve => setTimeout(resolve, 50));
 
                         console.log(`[WalletStore] 🔄 Deep Restore: ${nextUrl}`);
 
@@ -237,8 +237,8 @@ export const useWalletStore = create<WalletState>()(
                             isRestoring: false,
                             restoringMintUrl: null
                         }));
-                        // Yield before next mint
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // Yield briefly before next mint
+                        await new Promise(resolve => setTimeout(resolve, 200));
                     }
                 }
             },

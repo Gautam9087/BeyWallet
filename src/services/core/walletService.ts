@@ -405,17 +405,19 @@ export const walletService = {
                 // We need the internal cashu-ts wallet instance to pass to restoreKeyset
                 const wallet = await unsafeManager.walletService.getWallet(mintUrl);
 
-                // 2. Iterate and restore each keyset individually
-                for (const keyset of keysets) {
-                    try {
-                        console.log(`[WalletService] Restoring keyset: ${keyset.id}`);
-                        await walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
-                    } catch (err: any) {
-                        // 3. Catch and log errors, but CONTINUE processing the rest!
-                        console.warn(`[WalletService] Failed to restore keyset ${keyset.id}:`, err?.message || err);
-                        failedKeysets.push(keyset.id);
-                    }
-                }
+                // 2. Parallelize keyset restoration
+                await Promise.all(
+                    keysets.map(async (keyset) => {
+                        try {
+                            console.log(`[WalletService] Restoring keyset: ${keyset.id}`);
+                            await walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
+                        } catch (err: any) {
+                            // Catch and log errors, but don't block other keyset restorations
+                            console.warn(`[WalletService] Failed to restore keyset ${keyset.id}:`, err?.message || err);
+                            failedKeysets.push(keyset.id);
+                        }
+                    })
+                );
 
                 if (failedKeysets.length > 0) {
                     console.warn(`[WalletService] Restoration completed with errors for keysets: ${failedKeysets.join(', ')}`);
