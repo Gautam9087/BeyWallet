@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { YStack, ScrollView, Text, YGroup, ListItem, H6, H2, H4, Button, XStack, View, Separator } from 'tamagui';
-import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw, Server } from '@tamagui/lucide-icons';
+import { ShieldCheck, Palette, Bell, Globe, Info, ChevronRight, Trash2, AlertTriangle, Eye, EyeOff, Radio, Cloud, Clipboard, RefreshCw, Server, Download } from '@tamagui/lucide-icons';
 import { ThemeModal } from './components/ThemeModal';
 import { CurrencyModal } from './components/CurrencyModal';
 import { NotificationsModal } from './components/NotificationsModal';
@@ -18,6 +18,7 @@ import { useWalletStore } from '~/store/walletStore';
 import { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 import AppBottomSheet from '~/components/UI/AppBottomSheet';
 import { ActivityIndicator, Alert, DevSettings } from 'react-native';
+import { walletFileService } from '~/services/walletFileService';
 
 export function SettingsScreen() {
     const router = useRouter();
@@ -34,6 +35,7 @@ export function SettingsScreen() {
     const [seedWords, setSeedWords] = useState<string[]>([]);
     const [isSeedVisible, setIsSeedVisible] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const handleSettingPress = async (id: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -46,6 +48,9 @@ export function SettingsScreen() {
                 } else {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 }
+                break;
+            case 'export':
+                handleExportWallet();
                 break;
             case 'theme':
                 themeSheetRef.current?.present();
@@ -64,6 +69,47 @@ export function SettingsScreen() {
                 break;
             default:
                 break;
+        }
+    };
+
+    const handleExportWallet = async () => {
+        const authed = await biometricService.authenticateAsync('Authenticate to export your wallet backup');
+        if (!authed) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            return;
+        }
+        setIsExporting(true);
+        try {
+            const mnemonic = await seedService.getMnemonic();
+            if (!mnemonic) throw new Error('No mnemonic found.');
+
+            // Gather trusted mints from the repo
+            let mints: { url: string; nickname: string | null }[] = [];
+            try {
+                const repo = initService.getRepo();
+                const trustedMints = await repo.mintRepository.getAllTrustedMints();
+                mints = trustedMints.map((m: any) => ({
+                    url: m.mintUrl,
+                    nickname: m.nickname ?? null,
+                }));
+            } catch (e) {
+                console.warn('[Settings] Could not read mints for backup:', e);
+            }
+
+            // Grab current settings from the store
+            const { defaultMintUrl, secondaryCurrency, theme } = useSettingsStore.getState();
+
+            await walletFileService.exportWallet(mnemonic, {
+                mints,
+                defaultMintUrl,
+                secondaryCurrency,
+                theme,
+            });
+        } catch (err: any) {
+            console.error('[Settings] Export failed:', err);
+            Alert.alert('Export Failed', err?.message ?? 'Could not export wallet.');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -155,6 +201,20 @@ export function SettingsScreen() {
                                 icon={<ShieldCheck size={24} />}
                                 iconAfter={<ChevronRight size={24} />}
                                 onPress={() => handleSettingPress('backup')}
+                            />
+                        </YGroup.Item>
+                        <YGroup.Item>
+                            <ListItem
+                                hoverStyle={{ bg: '$backgroundHover' }}
+                                pressStyle={{ bg: '$backgroundPress' }}
+                                bg="transparent"
+                                fontWeight="600"
+                                title={<H6>Export Wallet File</H6>}
+                                subTitle={isExporting ? 'Preparing backup...' : 'Save a .bey backup to your device'}
+                                icon={isExporting ? <ActivityIndicator size="small" /> : <Download size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
+                                onPress={() => handleSettingPress('export')}
+                                disabled={isExporting}
                             />
                         </YGroup.Item>
                     </YGroup>

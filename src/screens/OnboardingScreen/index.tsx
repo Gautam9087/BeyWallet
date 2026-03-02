@@ -9,7 +9,8 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { seedService } from '../../services/seedService'
 import { initService, walletService, mintManager } from '../../services/core'
 import { useWalletStore } from '../../store/walletStore'
-import { ActivityIndicator } from 'react-native'
+import { walletFileService } from '../../services/walletFileService'
+import { ActivityIndicator, Alert } from 'react-native'
 import { YStack, Text } from 'tamagui'
 
 const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
@@ -27,6 +28,48 @@ export function OnboardingScreen() {
 
     const handleImportWallet = () => {
         setStep('import')
+    }
+
+    const handleImportFromFile = async () => {
+        try {
+            const backup = await walletFileService.importWalletFromFile()
+
+            // Run the standard seed restore (wallet init + NPC sync + default mint sweep)
+            await handleImportSeed(backup.mnemonic)
+
+            // Restore additional mints from the backup (beyond the default mint)
+            if (backup.mints && backup.mints.length > 0) {
+                for (const mint of backup.mints) {
+                    try {
+                        if (mint.url && mint.url !== DEFAULT_MINT) {
+                            await mintManager.addMint(mint.url, { trusted: true })
+                            // Kick off a balance sweep for each restored mint
+                            useWalletStore.getState().restoreFromSeed(mint.url)
+                            console.log('[Onboarding] Restored mint from backup:', mint.url)
+                        }
+                    } catch (e) {
+                        console.warn('[Onboarding] Failed to restore mint:', mint.url, e)
+                    }
+                }
+            }
+
+            // Restore settings from backup
+            const settingsStore = useSettingsStore.getState()
+            if (backup.secondaryCurrency) {
+                await settingsStore.setSecondaryCurrency(backup.secondaryCurrency)
+            }
+            if (backup.theme) {
+                await settingsStore.setTheme(backup.theme)
+            }
+            if (backup.defaultMintUrl) {
+                await settingsStore.setDefaultMintUrl(backup.defaultMintUrl)
+            }
+        } catch (err: any) {
+            const message = err?.message ?? 'Failed to import wallet from file.'
+            if (message !== 'File selection was cancelled.') {
+                Alert.alert('Import Failed', message)
+            }
+        }
     }
 
     const handleCreatingComplete = (mnemonic: string) => {
@@ -123,6 +166,7 @@ export function OnboardingScreen() {
                 <WelcomeStep
                     onCreateWallet={handleCreateWallet}
                     onImportWallet={handleImportWallet}
+                    onImportFromFile={handleImportFromFile}
                 />
             )
 
@@ -162,6 +206,7 @@ export function OnboardingScreen() {
                 <WelcomeStep
                     onCreateWallet={handleCreateWallet}
                     onImportWallet={handleImportWallet}
+                    onImportFromFile={handleImportFromFile}
                 />
             )
     }

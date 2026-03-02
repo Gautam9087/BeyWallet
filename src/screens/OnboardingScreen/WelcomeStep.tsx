@@ -1,15 +1,16 @@
 import React from 'react'
 import { YStack, Text, Button, H1, Image, View } from 'tamagui'
-import { Wallet, KeyRound } from '@tamagui/lucide-icons'
+import { Wallet, KeyRound, FolderOpen } from '@tamagui/lucide-icons'
 import * as Haptics from 'expo-haptics'
 import { useAppTheme } from '../../context/ThemeContext'
 
 interface WelcomeStepProps {
     onCreateWallet: () => void
     onImportWallet: () => void
+    onImportFromFile: () => void
 }
 
-export function WelcomeStep({ onCreateWallet, onImportWallet }: WelcomeStepProps) {
+export function WelcomeStep({ onCreateWallet, onImportWallet, onImportFromFile }: WelcomeStepProps) {
     const { resolvedTheme } = useAppTheme()
 
     const handleCreate = () => {
@@ -20,6 +21,11 @@ export function WelcomeStep({ onCreateWallet, onImportWallet }: WelcomeStepProps
     const handleImport = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
         onImportWallet()
+    }
+
+    const handleImportFromFile = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        onImportFromFile()
     }
 
     return (
@@ -86,7 +92,21 @@ export function WelcomeStep({ onCreateWallet, onImportWallet }: WelcomeStepProps
                     rounded="$4"
                     pressStyle={{ scale: 0.98, opacity: 0.9 }}
                 >
-                    Import Existing Wallet
+                    Import via Seed Phrase
+                </Button>
+
+                <Button
+                    size="$5"
+                    theme="gray"
+                    width="100%"
+                    onPress={handleImportFromFile}
+                    icon={<FolderOpen size={24} />}
+                    fontSize="$5"
+                    fontWeight="700"
+                    rounded="$4"
+                    pressStyle={{ scale: 0.98, opacity: 0.9 }}
+                >
+                    Import from Backup File
                 </Button>
 
                 <Text color="$gray9" fontSize="$2" text="center">
