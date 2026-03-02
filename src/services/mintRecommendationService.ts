@@ -8,6 +8,7 @@ export type MintRecommendation = {
     description?: string;
     icon?: string;
     error?: boolean;
+    isTestnet?: boolean;
 };
 
 const DEFAULT_RELAYS = [
@@ -21,7 +22,6 @@ const MINT_INFO_KIND = 38172;
 const RECOMMENDATION_KIND = 38000;
 
 const FEATURED_MINTS = [
-    "https://nofee.testnut.cashu.space",
     "https://8333.space:3338",
     "https://mint.minibits.cash/Bitcoin",
     "https://legend.lnbits.com/cashu/api/v1/4gr93mame836988",
@@ -32,7 +32,7 @@ export const mintRecommendationService = {
     /**
      * Discovers mints by fetching recommendations and info from Nostr relays.
      */
-    discoverMints: async (): Promise<MintRecommendation[]> => {
+    discoverMints: async (limit = 20): Promise<MintRecommendation[]> => {
         const pool = new SimplePool();
         const recommendationsMap = new Map<string, MintRecommendation>();
 
@@ -129,7 +129,7 @@ export const mintRecommendationService = {
             // Convert to array and sort by review count
             return Array.from(recommendationsMap.values())
                 .sort((a, b) => b.reviewsCount - a.reviewsCount)
-                .slice(0, 20);
+                .slice(0, limit);
 
         } catch (error) {
             console.error('Error discovering mints:', error);

@@ -1,1 +1,1 @@
-export const DEFAULT_MINT = "https://nofee.testnut.cashu.space";
+export const DEFAULT_MINT = "https://mint.minibits.cash/Bitcoin";

@@ -179,22 +179,13 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
 
     console.log('[InitService] Manager ready with watchers and processors');
 
-    // Trigger initial NPC sync and mint adding (NON-BLOCKING)
+    // Trigger initial NPC sync (NON-BLOCKING)
     (async () => {
         try {
             await npcPlugin.sync();
             console.log('[InitService] ✅ Initial NPC sync completed');
         } catch (error) {
             console.error('[InitService] Initial NPC sync failed:', error);
-        }
-
-        // Trust testnet mints (idempotent — safe to call on every init)
-        try {
-            await manager?.mint.addMint('https://testnut.cashu.space', { trusted: true });
-            await manager?.mint.addMint('https://nofee.testnut.cashu.space', { trusted: true });
-            console.log('[InitService] ✅ Test mints trusted');
-        } catch (e) {
-            console.warn('[InitService] Test mint trust error (non-fatal):', e);
         }
     })();
 

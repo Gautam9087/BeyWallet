@@ -104,6 +104,12 @@ export default function ModalLayout() {
                     title: 'Nostr Identity',
                 }}
             />
+            <Stack.Screen
+                name="about"
+                options={{
+                    title: 'About',
+                }}
+            />
         </Stack>
     )
 }

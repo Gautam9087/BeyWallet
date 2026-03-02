@@ -19,6 +19,9 @@ import { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 import AppBottomSheet from '~/components/UI/AppBottomSheet';
 import { ActivityIndicator, Alert, DevSettings } from 'react-native';
 import { walletFileService } from '~/services/walletFileService';
+import Constants from 'expo-constants';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.1.0';
 
 export function SettingsScreen() {
     const router = useRouter();
@@ -326,8 +329,14 @@ export function SettingsScreen() {
                                 bg="transparent"
                                 fontWeight="600"
                                 title="Version"
-                                subTitle="1.0.0 (Alpha)"
+                                subTitle={`${APP_VERSION}`}
                                 icon={<Info size={24} />}
+                                iconAfter={<ChevronRight size={24} />}
+                                pressStyle={{ bg: '$gray3' }}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    router.push('/(modals)/about');
+                                }}
                             />
                         </YGroup.Item>
                     </YGroup>
