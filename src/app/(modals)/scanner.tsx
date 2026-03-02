@@ -9,6 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '~/store/authStore';
 import { useWalletStore } from '~/store/walletStore';
+import * as Clipboard from 'expo-clipboard';
+import { Clipboard as ClipboardIcon } from '@tamagui/lucide-icons';
 
 const { width, height } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
@@ -122,9 +124,50 @@ export default function ScannerScreen() {
         setScanned(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // Set result in store and go back
+        const lowerData = data.toLowerCase();
+        const isCashu = lowerData.includes('cashu') || lowerData.includes('creq');
+
+        // If explicitly asked to return to a path (e.g. from P2PK Send flow)
+        // We PRIORITIZE this because the user is already in a specific flow.
+        if (params.returnTo) {
+            console.log('[Scanner] returnTo detected:', params.returnTo);
+
+            // Special case: if we want to go TO receive flow, redirect there with token
+            if (params.returnTo === '/receive' || params.returnTo === '/(modals)/receive') {
+                router.replace({
+                    pathname: '/(modals)/receive',
+                    params: { scannedToken: data }
+                });
+                return;
+            }
+
+            console.log('[Scanner] Returning result to store for:', params.returnTo);
+            useWalletStore.getState().setScannerResult(data);
+            router.back();
+            return;
+        }
+
+        // Global Smart Redirection (only if not returning to a specific flow)
+        if (isCashu) {
+            console.log('[Scanner] Cashu token detected, redirecting to receive...');
+            router.replace({
+                pathname: '/(modals)/receive',
+                params: { scannedToken: data }
+            });
+            return;
+        }
+
+        // Fallback: Set result in store and go back
+        console.log('[Scanner] Non-cashu data, returning to previous screen...');
         useWalletStore.getState().setScannerResult(data);
         router.back();
+    };
+
+    const handlePaste = async () => {
+        const text = await Clipboard.getStringAsync();
+        if (text) {
+            onSuccess(text);
+        }
     };
 
     return (
@@ -152,13 +195,22 @@ export default function ScannerScreen() {
                                 icon={<X size={24} color="white" />}
                                 onPress={() => router.back()}
                             />
-                            <Button
-                                circular
-                                size="$4"
-                                bg="rgba(0,0,0,0.5)"
-                                icon={flash === 'on' ? <Zap size={24} color="#FFD700" /> : <ZapOff size={24} color="white" />}
-                                onPress={() => setFlash(f => f === 'on' ? 'off' : 'on')}
-                            />
+                            <XStack gap="$2">
+                                <Button
+                                    circular
+                                    size="$4"
+                                    bg="rgba(0,0,0,0.5)"
+                                    icon={<ClipboardIcon size={20} color="white" />}
+                                    onPress={handlePaste}
+                                />
+                                <Button
+                                    circular
+                                    size="$4"
+                                    bg="rgba(0,0,0,0.5)"
+                                    icon={flash === 'on' ? <Zap size={24} color="#FFD700" /> : <ZapOff size={24} color="white" />}
+                                    onPress={() => setFlash(f => f === 'on' ? 'off' : 'on')}
+                                />
+                            </XStack>
                         </XStack>
 
                         {/* Middle - Scan Frame */}
