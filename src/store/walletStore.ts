@@ -86,15 +86,15 @@ export const useWalletStore = create<WalletState>()(
                         }
                     }
 
-                    // Repair corrupted keysets for all mints
+                    // Repair corrupted keysets for all mints in PARALLEL
                     const allMints = await manager.mint.getAllMints();
-                    let anyRepaired = false;
-                    for (const mint of allMints) {
-                        const repaired = await mintManager.repairMintKeysets(mint.mintUrl, 'sat');
-                        if (repaired) anyRepaired = true;
-                    }
+                    const repairResults = await Promise.all(
+                        allMints.map(mint => mintManager.repairMintKeysets(mint.mintUrl, 'sat'))
+                    );
 
-                    // Reinit if keysets were repaired
+                    const anyRepaired = repairResults.some(r => r === true);
+
+                    // Reinit if keysets were repaired (rare but necessary)
                     if (anyRepaired) {
                         console.log('[WalletStore] Reinitializing after keyset repair...');
                         await manager.dispose?.();

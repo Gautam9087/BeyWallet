@@ -73,10 +73,12 @@ async function enableWatchers(mgr: Manager): Promise<void> {
             watchExistingPendingOnStart: true,
         });
         console.log('[InitService] ✅ Mint quote watcher enabled');
-        await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
         console.warn('[InitService] Mint quote watcher failed:', error);
     }
+
+    // Small delay between watchers to avoid DB contention
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Enable mint quote processor
     try {
@@ -84,23 +86,23 @@ async function enableWatchers(mgr: Manager): Promise<void> {
             processIntervalMs: 5000,
             maxRetries: 3,
             baseRetryDelayMs: 1000,
-            initialEnqueueDelayMs: 2000,
+            initialEnqueueDelayMs: 500, // Reduced from 2000
         });
         console.log('[InitService] ✅ Mint quote processor enabled');
-        await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
         console.warn('[InitService] Mint quote processor failed:', error);
     }
 
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     // Enable proof state watcher (with retry)
     try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
         await mgr.enableProofStateWatcher();
         console.log('[InitService] ✅ Proof state watcher enabled');
     } catch (error) {
-        console.warn('[InitService] Proof state watcher failed, retrying...', error);
+        console.warn('[InitService] Proof state watcher failed, retrying once...', error);
         try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             await mgr.enableProofStateWatcher();
             console.log('[InitService] ✅ Proof state watcher enabled on retry');
         } catch (retryError) {
@@ -177,22 +179,24 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
 
     console.log('[InitService] Manager ready with watchers and processors');
 
-    // Trigger initial NPC sync
-    try {
-        await npcPlugin.sync();
-        console.log('[InitService] ✅ Initial NPC sync completed');
-    } catch (error) {
-        console.error('[InitService] Initial NPC sync failed:', error);
-    }
+    // Trigger initial NPC sync and mint adding (NON-BLOCKING)
+    (async () => {
+        try {
+            await npcPlugin.sync();
+            console.log('[InitService] ✅ Initial NPC sync completed');
+        } catch (error) {
+            console.error('[InitService] Initial NPC sync failed:', error);
+        }
 
-    // Trust testnet mints (idempotent — safe to call on every init)
-    try {
-        await manager.mint.addMint('https://testnut.cashu.space', { trusted: true });
-        await manager.mint.addMint('https://nofee.testnut.cashu.space', { trusted: true });
-        console.log('[InitService] ✅ Test mints trusted');
-    } catch (e) {
-        console.warn('[InitService] Test mint trust error (non-fatal):', e);
-    }
+        // Trust testnet mints (idempotent — safe to call on every init)
+        try {
+            await manager?.mint.addMint('https://testnut.cashu.space', { trusted: true });
+            await manager?.mint.addMint('https://nofee.testnut.cashu.space', { trusted: true });
+            console.log('[InitService] ✅ Test mints trusted');
+        } catch (e) {
+            console.warn('[InitService] Test mint trust error (non-fatal):', e);
+        }
+    })();
 
     return manager;
 }

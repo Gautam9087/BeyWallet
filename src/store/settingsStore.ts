@@ -12,7 +12,7 @@ interface SettingsState {
     initialized: boolean;
     npub: string | null;
     nsec: string | null;
-    initialize: () => Promise<void>;
+    initialize: (force?: boolean) => Promise<void>;
     setTheme: (theme: ThemePreference) => Promise<void>;
     setSecondaryCurrency: (currency: string) => Promise<void>;
     setDefaultMintUrl: (url: string) => Promise<void>;
@@ -29,8 +29,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     npub: null,
     nsec: null,
 
-    initialize: async () => {
-        if (get().initialized) return;
+    initialize: async (force = false) => {
+        if (get().initialized && !force) return;
 
         const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
