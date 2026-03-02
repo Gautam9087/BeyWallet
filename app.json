@@ -119,7 +119,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./src/assets/images/icon.png",
+          "icon": "./src/assets/icons/Bey-light-logo.png",
           "color": "#ffffff"
         }
       ]
