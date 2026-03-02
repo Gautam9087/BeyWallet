@@ -8,9 +8,11 @@ import AppBottomSheet, { AppBottomSheetRef } from "./UI/AppBottomSheet";
 import AddMintModal, { AddMintModalRef } from "./AddMintModal";
 import EditNicknameModal, { EditNicknameModalRef } from "./EditNicknameModal";
 import { initService } from "../services/core";
+import { Spinner } from "./UI/Spinner";
 
 export default function HomeHeaderMintSelector() {
-    const { activeMintUrl, balance, mints, setActiveMint, refreshMintList } = useWalletStore();
+    const { activeMintUrl, balance, mints, setActiveMint, refreshMintList, isInitializing, isRefreshing } = useWalletStore();
+    const isLoading = isInitializing || isRefreshing;
     const sheetRef = useRef<AppBottomSheetRef>(null);
     const addMintRef = useRef<AddMintModalRef>(null);
     const editNicknameRef = useRef<EditNicknameModalRef>(null);
@@ -66,8 +68,9 @@ export default function HomeHeaderMintSelector() {
             <Button
                 size="$2.5"
                 theme="gray"
-                px="$1.5"
+                px={isLoading ? "$3" : "$1.5"}
                 borderWidth={1}
+                disabled={isLoading}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
                     refreshMintList();
@@ -76,17 +79,23 @@ export default function HomeHeaderMintSelector() {
                 maxW={170}
                 pressStyle={{ scale: 0.97, opacity: 0.9 }}
                 icon={
-                    <Avatar rounded="$3" size="$1.5">
-                        <Avatar.Image src={activeMint?.icon} />
-                        <Avatar.Fallback backgroundColor="$gray5" alignItems="center" justifyContent="center">
-                            <Building2 size={12} color="$gray10" />
-                        </Avatar.Fallback>
-                    </Avatar>
+                    isLoading ? (
+                        <Spinner size={14} color="$gray10" />
+                    ) : (
+                        <Avatar rounded="$3" size="$1.5">
+                            <Avatar.Image src={activeMint?.icon} />
+                            <Avatar.Fallback backgroundColor="$gray5" alignItems="center" justifyContent="center">
+                                <Building2 size={12} color="$gray10" />
+                            </Avatar.Fallback>
+                        </Avatar>
+                    )
                 }
                 iconAfter={
-                    <Square size="$1.5" borderWidth={0.5} borderColor="$borderColor" bg="$gray2" rounded="$3">
-                        <ChevronDown size={12} strokeWidth={2.5} color="$color" />
-                    </Square>
+                    isLoading ? undefined : (
+                        <Square size="$1.5" borderWidth={0.5} borderColor="$borderColor" bg="$gray2" rounded="$3">
+                            <ChevronDown size={12} strokeWidth={2.5} color="$color" />
+                        </Square>
+                    )
                 }
                 textProps={{
                     fontSize: "$3",
@@ -96,7 +105,7 @@ export default function HomeHeaderMintSelector() {
                 }}
                 ellipse
             >
-                {displayName}
+                {isLoading ? "Loading..." : displayName}
             </Button>
 
             <AppBottomSheet ref={sheetRef} snapPoints={["50%", "85%"]}>

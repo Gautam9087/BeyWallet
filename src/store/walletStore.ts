@@ -22,6 +22,7 @@ interface WalletState {
     restoringMintUrl: string | null;
     restoreQueue: string[];
     scannerResult: string | null;
+    isRefreshing: boolean;
 
 
     // Actions
@@ -55,6 +56,7 @@ export const useWalletStore = create<WalletState>()(
             restoringMintUrl: null,
             restoreQueue: [],
             scannerResult: null,
+            isRefreshing: false,
 
 
             initialize: async () => {
@@ -158,7 +160,7 @@ export const useWalletStore = create<WalletState>()(
 
             refreshBalance: async () => {
                 try {
-                    set({ error: null });
+                    set({ isRefreshing: true, error: null });
                     if (!initService.isInitialized()) {
                         set({ balance: 0 });
                         return;
@@ -174,10 +176,10 @@ export const useWalletStore = create<WalletState>()(
                     const balance = await walletService.getBalanceForMint(activeUrl);
 
                     console.log('[WalletStore] Balance:', balance);
-                    set({ balance, balances, refreshCounter: get().refreshCounter + 1 });
+                    set({ balance, balances, refreshCounter: get().refreshCounter + 1, isRefreshing: false });
                 } catch (err: any) {
                     console.error('[WalletStore] Error refreshing balance:', err);
-                    set({ error: err.message });
+                    set({ error: err.message, isRefreshing: false });
                 }
             },
 
@@ -282,10 +284,12 @@ export const useWalletStore = create<WalletState>()(
 
             refreshMintList: async () => {
                 try {
+                    set({ isRefreshing: true });
                     const mintInfos = await mintManager.getMintInfoList();
-                    set({ mints: mintInfos });
+                    set({ mints: mintInfos, isRefreshing: false });
                 } catch (err: any) {
                     console.error('[WalletStore] Failed to refresh mint list:', err);
+                    set({ isRefreshing: false });
                 }
             },
 

@@ -58,11 +58,27 @@ export function SendModalScreen() {
 
         let isDetected = false;
 
-        const handleSuccess = (source: string) => {
+        const handleSuccess = async (source: string) => {
             if (isDetected) return;
-            isDetected = true;
 
-            console.log(`[SendModalScreen] ✅ SUCCESS DETECTED via ${source} for:`, operationId);
+            // Double confirmation for events: check proof states before transitioning
+            if (source === 'event') {
+                try {
+                    console.log(`[SendModalScreen] 🛡️ Verifying event success for:`, operationId);
+                    const states = await proofService.checkProofStates(encodedToken);
+                    const allSpent = states.length > 0 && states.every((s: any) => s.state === 'SPENT');
+                    if (!allSpent) {
+                        console.warn('[SendModalScreen] ⚠️ Event claimed but proofs still UNSPENT. Ignoring premature event.');
+                        return;
+                    }
+                } catch (err) {
+                    console.error('[SendModalScreen] Verification check failed:', err);
+                    return;
+                }
+            }
+
+            isDetected = true;
+            console.log(`[SendModalScreen] ✅ SUCCESS CONFIRMED via ${source} for:`, operationId);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
             // Transition to success stage
