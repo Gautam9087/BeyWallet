@@ -248,6 +248,11 @@ export const useWalletStore = create<WalletState>()(
                         // Refresh balances to capture whatever DID successfully restore
                         await get().refreshBalance();
 
+                        // Re-initialize the core Manager to pick up all restored counters and proofs
+                        console.log('[WalletStore] Re-initializing Manager to sync counters...');
+                        await initService.cleanup();
+                        await initService.init();
+
                         set(s => ({
                             restoreQueue: s.restoreQueue.filter(u => u !== nextUrl),
                             isRestoring: false,
@@ -390,6 +395,11 @@ export const useWalletStore = create<WalletState>()(
                         }));
                     }
                 }
+
+                // Re-initialize the core Manager to pick up all restored counters and proofs
+                console.log('[WalletStore] Batch restore complete. Re-initializing Manager...');
+                await initService.cleanup();
+                await initService.init();
 
                 // Final refresh
                 await get().refreshBalance();
