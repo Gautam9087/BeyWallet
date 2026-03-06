@@ -19,6 +19,7 @@ interface TokenInfo {
         name?: string;
         description?: string;
     };
+    p2pkNpub?: string;
 }
 
 export function ReceiveModalScreen() {
@@ -76,11 +77,32 @@ export function ReceiveModalScreen() {
                 }
             }
 
+            // Check for P2PK pubkey in the first proof secret
+            let p2pkNpub: string | undefined;
+            try {
+                if (decoded.proofs && decoded.proofs.length > 0) {
+                    const firstSecret = decoded.proofs[0]?.secret;
+                    if (typeof firstSecret === 'string') {
+                        // V3 format: '["P2PK",{"data":"02..."}]'
+                        if (firstSecret.startsWith('["P2PK"')) {
+                            const parsed = JSON.parse(firstSecret);
+                            const hexPubkey = parsed[1]?.data;
+                            if (hexPubkey) {
+                                p2pkNpub = nip19.npubEncode(hexPubkey);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[ReceiveModal] Failed to parse P2PK secret:', e);
+            }
+
             setTokenInfo({
                 mint: mintUrl || 'Unknown mint',
                 amount: amount,
                 proofCount: decoded.proofs?.length || 0,
-                preview: previewInfo
+                preview: previewInfo,
+                p2pkNpub
             });
             setStep('confirm');
         } catch (err: any) {
@@ -119,11 +141,15 @@ export function ReceiveModalScreen() {
             await (repo.historyRepository as any).addHistoryEntry({
                 mintUrl,
                 type: 'receive',
-                unit: 'sat', // default for now, could be dynamic
+                unit: 'sat',
                 amount: tokenInfo.amount,
                 createdAt: Date.now(),
                 state: 'unclaimed',
-                token: decoded
+                token: decoded,
+                metadata: {
+                    type: tokenInfo.p2pkNpub ? 'p2pk' : 'standard',
+                    p2pkPubkey: tokenInfo.p2pkNpub ? nip19.decode(tokenInfo.p2pkNpub).data : undefined
+                }
             });
 
             setStatus('success');
@@ -196,7 +222,7 @@ export function ReceiveModalScreen() {
                         try {
                             const decoded = nip19.decode(targetPrivkey);
                             if (decoded.type === 'nsec') {
-                                targetPrivkey = decoded.data as string;
+                                targetPrivkey = Buffer.from(decoded.data as Uint8Array).toString('hex');
                             }
                         } catch (e: any) {
                             console.warn('[ReceiveModal] Failed to decode nsec:', e);

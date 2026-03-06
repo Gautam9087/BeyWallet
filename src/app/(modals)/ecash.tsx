@@ -9,12 +9,23 @@ import { useWalletStore } from '~/store/walletStore';
 import { formatLocalTime } from '~/utils/time';
 import { RollingNumber } from '~/components/UI/RollingNumber';
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
+import { PendingTokenLayout } from '~/components/UI/PendingTokenLayout';
+import { useSettingsStore } from '~/store/settingsStore';
+import { currencyService, CurrencyCode } from '~/services/currencyService';
+import { bitcoinService } from '~/services/bitcoinService';
 
 export default function EcashModal() {
     const router = useRouter();
     const { mints } = useWalletStore();
+    const { secondaryCurrency } = useSettingsStore();
     const [selectedMint, setSelectedMint] = useState('all');
     const sheetRef = useRef<AppBottomSheetRef>(null);
+
+    const { data: btcData } = useQuery({
+        queryKey: ['bitcoinPrice', secondaryCurrency],
+        queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
+        staleTime: 30000,
+    });
 
     const { data: history = [], isFetching, refetch } = useQuery({
         queryKey: ['history', 'pending'],
@@ -36,11 +47,16 @@ export default function EcashModal() {
         return filteredHistory.reduce((sum, entry) => sum + (entry.amount || 0), 0);
     }, [filteredHistory]);
 
-    const handleItemPress = (id: string) => {
+    const fiatPending = useMemo(() => {
+        if (!btcData?.price) return 0;
+        return currencyService.convertSatsToCurrency(totalPending, btcData.price);
+    }, [totalPending, btcData?.price]);
+
+    const handleItemPress = (entry: any) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
-            pathname: '/(modals)/transaction-details',
-            params: { id }
+            pathname: '/(modals)/txn-details',
+            params: { id: entry.id }
         });
     };
 
@@ -133,21 +149,32 @@ export default function EcashModal() {
                             {getMintLabel(selectedMint)}
                         </Button>
                     </XStack>
-                    <XStack items="baseline" gap="$0" py="$2">
-                        <Text fontSize={30} fontWeight="900" color="$accent4">₿</Text>
-                        <RollingNumber
-                            fontSize={30}
-                            fontWeight="900"
-                            color="$accent4"
-                            showDecimals={false}
-                            letterSpacing={-2}
-                        >
-                            {totalPending}
-                        </RollingNumber>
+                    <XStack justify="space-between" py="$2" items="flex-end">
+                        <YStack>
+                            <RollingNumber
+                                value={totalPending}
+                                prefix="₿"
+                                letterSpacing={-1}
+                                fontSize={30}
+                                fontWeight="900"
+                                color="$accent3"
+                                decimalOpacity={0.4}
+                                showDecimals={false}
+                            />
+                        </YStack>
+                        <Text color="$accent9" fontWeight="700">SATS</Text>
                     </XStack>
-                    <Text fontSize="$3" color="$gray10">
-                        {filteredHistory.length} tokens ready to be claimed
-                    </Text>
+                    <RollingNumber
+                        value={fiatPending}
+                        letterSpacing={-1}
+                        fontSize={16}
+                        fontWeight="900"
+                        color="$accent8"
+                        decimalOpacity={0.4}
+                        showDecimals={false}
+                    >
+                        {currencyService.formatValue(fiatPending, secondaryCurrency as CurrencyCode)}
+                    </RollingNumber>
 
                     <YStack pt="$4">
                         <XStack justify="space-between" themeInverse pb="$4" items="center">
@@ -180,7 +207,7 @@ export default function EcashModal() {
                                     return (
                                         <React.Fragment key={entry.id}>
                                             <YStack
-                                                onPress={() => handleItemPress(entry.id)}
+                                                onPress={() => handleItemPress(entry)}
                                                 pressStyle={{ opacity: 0.7, scale: 0.98 }}
                                                 py="$2"
                                                 px="$2"

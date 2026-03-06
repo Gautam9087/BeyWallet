@@ -81,7 +81,7 @@ export default function ModalLayout() {
                 }}
             />
             <Stack.Screen
-                name="transaction-details"
+                name="txn-details"
                 options={{
                     title: 'Transaction Details',
                 }}

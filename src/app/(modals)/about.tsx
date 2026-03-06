@@ -213,7 +213,7 @@ export default function AboutModal() {
                 <YStack items="center" pt="$8" pb="$4" gap="$2">
                     <XStack gap="$1" items="center">
                         <Text fontSize="$2" color="$gray9">Made with</Text>
-                        <Heart size={12} color="$red9" fill="$red9" />
+                        <Heart size={12} color="#ef4444" fill="#ef4444" />
                         <Text fontSize="$2" color="$gray9">for Bitcoin & Nostr</Text>
                     </XStack>
                     <Text fontSize="$1" color="$gray8">MIT License © Bey Wallet</Text>

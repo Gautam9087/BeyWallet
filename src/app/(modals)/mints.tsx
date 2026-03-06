@@ -11,10 +11,21 @@ import { RollingNumber } from '~/components/UI/RollingNumber';
 import AppBottomSheet, { AppBottomSheetRef } from '~/components/UI/AppBottomSheet';
 import AddMintModal, { AddMintModalRef } from '~/components/AddMintModal';
 import { mintService } from '~/services/mintService';
+import { useSettingsStore } from '~/store/settingsStore';
+import { currencyService, CurrencyCode } from '~/services/currencyService';
+import { useQuery } from '@tanstack/react-query';
+import { bitcoinService } from '~/services/bitcoinService';
 
 export default function MintsModal() {
     const router = useRouter();
     const { mints, balances, refreshBalance, isInitializing, activeMintUrl, setActiveMint, untrustMint, removeMint, refreshMintList, trustMint } = useWalletStore();
+    const { secondaryCurrency } = useSettingsStore();
+
+    const { data: btcData } = useQuery({
+        queryKey: ['bitcoinPrice', secondaryCurrency],
+        queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
+        staleTime: 30000,
+    });
 
     const [selectedMintForSheet, setSelectedMintForSheet] = useState<any>(null);
     const [amount, setAmount] = useState("1000");
@@ -29,6 +40,11 @@ export default function MintsModal() {
     const totalBalance = useMemo(() => {
         return Object.values(balances).reduce((a, b) => a + b, 0);
     }, [balances]);
+
+    const fiatBalance = useMemo(() => {
+        if (!btcData?.price) return 0;
+        return currencyService.convertSatsToCurrency(totalBalance, btcData.price);
+    }, [totalBalance, btcData?.price]);
 
     const handleRefresh = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -194,9 +210,16 @@ export default function MintsModal() {
                                 {totalBalance}
                             </RollingNumber>
                         </XStack>
-                        <Text fontSize="$3" color="$gray10">
-                            Across {mints.filter(m => m.trusted).length} trusted mints
-                        </Text>
+                        <RollingNumber
+                            value={fiatBalance}
+                            fontSize={16}
+                            fontWeight="900"
+                            color="$accent8"
+                            decimalOpacity={0.4}
+                            showDecimals={false}
+                        >
+                            {currencyService.formatValue(fiatBalance, secondaryCurrency as CurrencyCode)}
+                        </RollingNumber>
                     </YStack>
 
                     <YStack pt="$4">

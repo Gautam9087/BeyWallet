@@ -217,7 +217,7 @@ export const walletService = {
         // Ideally we also create an operation or history log, but coco's internals are slightly opaque
         // For now, this effectively subtracts balance and hands off a token.
         try {
-            await unsafeManager.historyRepository.addHistoryEntry({
+            await initService.getRepo().historyRepository.addHistoryEntry({
                 mintUrl,
                 unit: wallet.unit || 'sat',
                 createdAt: Date.now(),
@@ -225,11 +225,15 @@ export const walletService = {
                 amount: amount,
                 operationId: operationId,
                 state: 'pending',
-                token: token
+                token: token,
+                metadata: {
+                    p2pkPubkey: receiverPubkey,
+                    type: 'p2pk'
+                }
             });
-            console.log(`[WalletService] Mock history tracking injected for P2PK send.`);
+            console.log(`[WalletService] History tracking injected for P2PK send.`);
         } catch (histErr) {
-            console.warn('[WalletService] Failed to inject mock history entry:', histErr);
+            console.warn('[WalletService] Failed to inject history entry:', histErr);
         }
 
         return { encoded, token, id: operationId };
@@ -347,6 +351,26 @@ export const walletService = {
                 timestamp: Date.now()
             });
 
+            // 8. Record in history
+            try {
+                const tokenObj = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+                await initService.getRepo().historyRepository.addHistoryEntry({
+                    mintUrl,
+                    unit: wallet.unit || 'sat',
+                    createdAt: Date.now(),
+                    type: 'receive',
+                    amount: receivedAmount,
+                    state: 'success',
+                    token: tokenObj,
+                    metadata: {
+                        type: 'p2pk'
+                    }
+                } as any);
+                console.log(`[WalletService] History tracking injected for P2PK receive.`);
+            } catch (histErr) {
+                console.warn('[WalletService] Failed to inject history entry for receive:', histErr);
+            }
+
             console.log('[WalletService] P2PK Token received and proofs saved successfully');
         } catch (err: any) {
             console.error('[WalletService] P2PK Receive failed:', err?.message || err);
@@ -385,60 +409,36 @@ export const walletService = {
 
     // ─── Restore ──────────────────────────────────────────────
 
+    /**
+     * Restore all deterministic proofs for a mint from the BIP-39 seed.
+     *
+     * Uses the public WalletApi.restore() which:
+     *  1. Fetches ALL keyset keys fresh from the network (fixes "Keyset has no keys loaded"
+     *     for old inactive keysets that only have their ID stored in the DB)
+     *  2. Iterates keysets sequentially (no counter corruption)
+     *  3. Saves restored proofs and updates counters correctly
+     *
+     * After restore, we rescue any proofs that got stuck in 'inflight' state.
+     */
     restore: async (mintUrl: string): Promise<void> => {
         const start = Date.now();
         const m = mgr();
-        console.log(`[WalletService] 🔄 Starting deterministic NIP-06 restoration for: ${mintUrl}`);
+        console.log(`[WalletService] 🔄 Starting deterministic restore for: ${mintUrl}`);
 
-        // Ensure the manager knows about the mint and its keysets
-        await m.mint.addMint(mintUrl);
-
-        const unsafeManager = m as any;
-        const walletRestoreService = unsafeManager.walletRestoreService;
-
-        if (walletRestoreService && typeof walletRestoreService.restoreKeyset === 'function') {
-            try {
-                // 1. Fetch all historical keysets for this mint
-                const { keysets } = await unsafeManager.mintService.ensureUpdatedMint(mintUrl);
-                const failedKeysets: string[] = [];
-
-                // We need the internal cashu-ts wallet instance to pass to restoreKeyset
-                const wallet = await unsafeManager.walletService.getWallet(mintUrl);
-
-                // 2. Parallelize keyset restoration
-                await Promise.all(
-                    keysets.map(async (keyset) => {
-                        try {
-                            console.log(`[WalletService] Restoring keyset: ${keyset.id}`);
-                            await walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
-                        } catch (err: any) {
-                            // Catch and log errors, but don't block other keyset restorations
-                            console.warn(`[WalletService] Failed to restore keyset ${keyset.id}:`, err?.message || err);
-                            failedKeysets.push(keyset.id);
-                        }
-                    })
-                );
-
-                if (failedKeysets.length > 0) {
-                    console.warn(`[WalletService] Restoration completed with errors for keysets: ${failedKeysets.join(', ')}`);
-                }
-            } catch (err: any) {
-                console.error(`[WalletService] Failed to fetch keysets for restore:`, err?.message || err);
-                console.log(`[WalletService] Falling back to standard restore...`);
-                await m.wallet.restore(mintUrl);
-            }
-        } else {
-            console.log(`[WalletService] Falling back to standard restore (internal APIs unavailable)...`);
+        try {
+            // Public API handles: addMintByUrl({ trusted: true }), fresh keyset fetch,
+            // sequential per-keyset restore, counter updates, proof saving.
             await m.wallet.restore(mintUrl);
+        } catch (err: any) {
+            // Log but don't throw — inflight rescue below may still recover partial results
+            console.warn(`[WalletService] Restore completed with error for ${mintUrl}:`, err?.message || err);
         }
 
-        // ALWAYS restore inflight proofs after a sweep to guarantee we don't accidentally
-        // leave the user's fetched proofs locked in an 'inflight' state. This exactly mirrors
-        // the Sovran approach to prevent missing balances during partial restore failures.
+        // Rescue any proofs stuck in 'inflight' state from partial restore failures
         await walletService.restoreInflightProofs(mintUrl);
 
         const duration = ((Date.now() - start) / 1000).toFixed(1);
-        console.log(`[WalletService] ✅ NIP-06 backup restored for ${mintUrl} in ${duration}s`);
+        console.log(`[WalletService] ✅ Restore done for ${mintUrl} in ${duration}s`);
     },
 
     /**

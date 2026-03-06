@@ -184,7 +184,7 @@ export function HistoryScreen() {
     const handleTransactionPress = (id: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
-            pathname: '/(modals)/transaction-details',
+            pathname: '/(modals)/txn-details',
             params: { id }
         });
     };

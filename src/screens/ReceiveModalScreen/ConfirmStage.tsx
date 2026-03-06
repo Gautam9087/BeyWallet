@@ -20,6 +20,7 @@ interface TokenInfo {
         name?: string;
         description?: string;
     };
+    p2pkNpub?: string;
 }
 
 interface ConfirmStageProps {
@@ -79,7 +80,7 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
 
     return (
         <YStack flex={1} bg="$background">
-            <ScrollView contentContainerStyle={{ paddingBottom: 250 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 250 } as any} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <YStack items="center" py="$6" gap="$4">
 
@@ -163,6 +164,14 @@ export function ConfirmStage({ token, tokenInfo, isLoading, onConfirm, onReceive
                             label="Proofs"
                             value={tokenInfo.proofCount.toString()}
                         />
+                        {tokenInfo.p2pkNpub && (
+                            <DetailItem
+                                label="Locked To"
+                                value={tokenInfo.p2pkNpub === useSettingsStore.getState().npub ? "You (Safe)" : `${tokenInfo.p2pkNpub.substring(0, 10)}...${tokenInfo.p2pkNpub.substring(tokenInfo.p2pkNpub.length - 6)}`}
+                                isCopyable={tokenInfo.p2pkNpub !== useSettingsStore.getState().npub}
+                                onCopy={() => handleCopy(tokenInfo.p2pkNpub!, "NPUB")}
+                            />
+                        )}
                         <DetailItem
                             label="Mint"
                             value={getMintDisplayName(tokenInfo.mint)}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { YStack, XStack, Text, Button, ScrollView, View, Separator, Circle, Popover, ListItem, Adapt, Sheet, Square } from 'tamagui';
-import { ChevronLeft, RefreshCw, Copy, Share2, ArrowUpRight, ArrowDownLeft, Calendar, Coins, Zap, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2, Check, RotateCcw, MoreHorizontal, Link, Contact2, Scan, Trash2, Gauge, ZoomIn, Hexagon, History, X, Ban, CheckCircle } from '@tamagui/lucide-icons';
+import { ChevronLeft, RefreshCw, Copy, Share2, ArrowUpRight, ArrowDownLeft, Calendar, Coins, Zap, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2, Check, RotateCcw, MoreHorizontal, Link, Contact2, Scan, Trash2, Gauge, ZoomIn, Hexagon, History, X, Ban, CheckCircle, ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -11,8 +11,12 @@ import { UR, UREncoder } from "@gandlaf21/bc-ur";
 import { Buffer } from 'buffer';
 import { formatFullLocalTime, formatRelativeTime } from '~/utils/time';
 import { historyService, initService, proofService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3, walletService, mintManager } from '~/services/core';
+import { nip19 } from 'nostr-tools';
+import { PendingTokenLayout } from '~/components/UI/PendingTokenLayout';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettingsStore } from '~/store/settingsStore';
+import { currencyService, CurrencyCode } from '~/services/currencyService';
+import { bitcoinService } from '~/services/bitcoinService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spinner } from '~/components/UI/Spinner';
 import { useToastController } from '@tamagui/toast';
@@ -54,7 +58,19 @@ export function TransactionDetailsScreen() {
         enabled: !!id,
     });
 
+    const { data: btcData } = useQuery({
+        queryKey: ['bitcoinPrice', secondaryCurrency],
+        queryFn: () => bitcoinService.fetchPrice(secondaryCurrency),
+        staleTime: 30000,
+    });
+
+    const fiatAmount = useMemo(() => {
+        if (!btcData?.price || !entry?.amount) return 0;
+        return currencyService.convertSatsToCurrency(entry.amount, btcData.price);
+    }, [entry?.amount, btcData?.price]);
+
     const [token, setToken] = useState<string>('');
+    const [isStatusExpanded, setIsStatusExpanded] = useState(false);
 
     useEffect(() => {
         if (!entry) return;
@@ -129,6 +145,8 @@ export function TransactionDetailsScreen() {
         }
     }, [token, showAnimatedQR]);
 
+    const [lockedToNpub, setLockedToNpub] = useState<string | null>(null);
+
     useEffect(() => {
         if (!token) return;
 
@@ -137,11 +155,37 @@ export function TransactionDetailsScreen() {
             if (!clean || typeof clean !== 'string') {
                 setShowAnimatedQR(false);
                 setQrCodeFragment(typeof token === 'string' ? token : '');
+                setLockedToNpub(null);
                 return;
             }
 
             const decoded = decodeToken(clean);
             const proofs = decoded.proofs || [];
+
+            // Check for P2PK pubkey in the first proof secret
+            try {
+                if (proofs.length > 0) {
+                    const firstSecret = proofs[0]?.secret;
+                    if (typeof firstSecret === 'string') {
+                        if (firstSecret.startsWith('["P2PK"')) {
+                            const parsed = JSON.parse(firstSecret);
+                            const hexPubkey = parsed[1]?.data;
+                            if (hexPubkey) {
+                                setLockedToNpub(nip19.npubEncode(hexPubkey));
+                            } else {
+                                setLockedToNpub(null);
+                            }
+                        } else {
+                            setLockedToNpub(null);
+                        }
+                    } else {
+                        setLockedToNpub(null);
+                    }
+                }
+            } catch (e) {
+                console.warn('[TransactionDetails] Failed to parse P2PK secret:', e);
+                setLockedToNpub(null);
+            }
 
             // Animate if the token is large (>400 chars) or has more than 2 proofs
             const shouldAnimate = proofs.length > 2 || clean.length > 400;
@@ -177,7 +221,7 @@ export function TransactionDetailsScreen() {
 
     const statusConfig = useMemo(() => {
         if (status === 'claimed' || status === 'completed' || entry?.type === 'receive' || entry?.type === 'mint') {
-            return { color: '$green10', bg: '$green3', headerBg: '$green9', icon: CheckCircle2, label: 'Success' };
+            return { color: '$green11', bg: '$green3', headerBg: '$green9', icon: CheckCircle2, label: 'Success' };
         }
         if (status === 'pending' || status === 'unclaimed') {
             return { color: '$orange10', bg: '$orange3', headerBg: '$orange9', icon: RefreshCw, label: 'Pending' };
@@ -398,11 +442,87 @@ export function TransactionDetailsScreen() {
         }
     };
 
-    try {
-        const isOutgoing = entry.type === 'send' || entry.type === 'melt';
-        const amountColor = isOutgoing ? '$red10' : '$green11';
-        const amountSign = isOutgoing ? '-' : '+';
 
+    const isOutgoing = entry.type === 'send' || entry.type === 'melt';
+    const amountColor = isOutgoing ? '$red10' : '$green11';
+    const amountSign = isOutgoing ? '-' : '+';
+
+    if (token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed')) {
+        return (
+            <>
+                <Stack.Screen
+                    options={{
+                        title: 'Pending Ecash',
+                        headerRight: () => (
+                            <XStack gap="$2">
+                                <Button
+                                    circular
+                                    size="$3"
+                                    icon={isRefetching ? <Spinner /> : <RefreshCw size={22} color="$color" />}
+                                    chromeless
+                                    onPress={handleRefresh}
+                                    disabled={isRefetching}
+                                />
+                                <Button
+                                    circular
+                                    size="$3"
+                                    icon={<Trash2 size={20} color="$red10" />}
+                                    chromeless
+                                    onPress={() => deleteSheetRef.current?.present()}
+                                />
+                            </XStack>
+                        ),
+                    }}
+                />
+                <ScrollView p="$4" pb="$8" bg="$background" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 } as any}>
+                    <PendingTokenLayout
+                        token={token}
+                        amount={entry.amount}
+                        fee={mintFee}
+                        mintUrl={entry.mintUrl}
+                        lockedToNpub={lockedToNpub}
+                        onClaim={entry.type === 'receive' ? handleClaimNow : undefined}
+                        isClaiming={isClaiming}
+                    />
+
+                    <AppBottomSheet ref={deleteSheetRef}>
+                        <YStack p="$4" gap="$5">
+                            <YStack gap="$2" items="center">
+                                <View p="$4" bg="$red2" rounded="$10">
+                                    <Trash2 size={32} color="$red10" />
+                                </View>
+                                <Text fontSize="$6" fontWeight="800">Delete Record?</Text>
+                                <Text color="$gray10" text="center" px="$4">
+                                    This will remove this transaction from your local history. It cannot be undone.
+                                </Text>
+                            </YStack>
+
+                            <YStack gap="$3">
+                                <Button
+                                    theme="red"
+                                    size="$5"
+                                    fontWeight="800"
+                                    onPress={handleDelete}
+                                >
+                                    Confirm Delete
+                                </Button>
+                                <Button
+                                    chromeless
+                                    size="$5"
+                                    fontWeight="800"
+                                    onPress={() => deleteSheetRef.current?.dismiss()}
+                                >
+                                    Cancel
+                                </Button>
+                            </YStack>
+                        </YStack>
+                    </AppBottomSheet>
+                </ScrollView>
+            </>
+        );
+    }
+
+    try {
         return (
             <>
                 <Stack.Screen
@@ -429,112 +549,118 @@ export function TransactionDetailsScreen() {
                     }}
                 />
                 <ScrollView p="$4" pb="$8" bg="$background" showsVerticalScrollIndicator={false}>
-                    {/* Amount Display */}
-                    <YStack gap="$1" mb="$6" >
-                        <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
-                            {isOutgoing ? <ArrowUpRight size={20} color="white" /> : <ArrowDownLeft size={20} color="white" />}
-                        </Circle>
-                        <Text fontSize="$9" fontWeight="800" color={amountColor}>
-                            {amountSign}₿{entry.amount?.toLocaleString() ?? '0'}
-                        </Text>
-                        <Text fontSize="$5" color="$gray10" >
-                            Ecash {entry.unit?.toUpperCase() || 'SATS'}
-                        </Text>
-                    </YStack>
-
-                    {/* Timeline / Status Card */}
-                    <YStack bg="$gray2" rounded="$4" p="$4" mb="$6">
-                        <Text fontSize="$1" color="$gray10" fontWeight="700" mb="$2" textTransform='uppercase' letterSpacing={1}>
-                            {(entry.type || 'unknown').toUpperCase()} • {formattedStatus}
-                        </Text>
-                        <XStack justify="space-between" items="center" mb="$4">
-                            <Text fontSize="$5" fontWeight="800" color={statusConfig.color as any}>
-                                {formattedStatus.toUpperCase()}
+                    <YStack bg="$background" p="$4" mx="$-4" mt="$-4" pt="$4">
+                        {/* Amount Display */}
+                        <YStack gap="$1" mb="$6" >
+                            <Circle size={40} bg={amountColor} opacity={1} mr="$3" items="center" justify="center">
+                                {isOutgoing ? <ArrowUpRight size={20} color="white" /> : <ArrowDownLeft size={20} color="white" />}
+                            </Circle>
+                            <Text fontSize="$9" fontWeight="800" color={amountColor}>
+                                {amountSign}₿{entry.amount?.toLocaleString() ?? '0'}
                             </Text>
-                            {status === 'pending' && (
-                                <View bg="$orange3" px="$2" py="$1" rounded="$2">
-                                    <Text fontSize="$1" fontWeight="800" color="$orange10">ACTION REQUIRED</Text>
-                                </View>
-                            )}
-                        </XStack>
+                            <Text fontSize="$5" color="$gray10" >
+                                {currencyService.formatValue(fiatAmount, secondaryCurrency as CurrencyCode)}
+                            </Text>
+                        </YStack>
 
-                        <YStack>
-                            {/* Step 1: Prepared */}
-                            <XStack gap="$3">
-                                <YStack items="center">
-                                    <Circle size={24} bg="$green10">
-                                        <Check size={14} color="black" />
-                                    </Circle>
-                                    <View width={2} flex={1} bg={status === 'completed' || status === 'claimed' ? "$green10" : "$gray8"} my="$1" />
-                                </YStack>
-                                <YStack pb="$4">
-                                    <Text fontSize="$4" fontWeight="700" color="$color">Prepared</Text>
-                                    <Text fontSize="$3" color="$gray10">{formatFullLocalTime(entry.createdAt)}</Text>
-                                </YStack>
-                            </XStack>
-
-                            {/* Step 2: Current Status */}
-                            <XStack gap="$3">
-                                <Circle size={24} bg={statusConfig.color as any} items="center" justify="center">
-                                    <statusConfig.icon size={14} color={status === 'completed' || status === 'claimed' ? "black" : "$color"} />
-                                </Circle>
+                        {/* Timeline / Status Card */}
+                        <YStack bg="$gray2" rounded="$4" p="$4" mb="$6">
+                            <XStack
+                                justify="space-between"
+                                items="center"
+                                pressStyle={{ opacity: 0.7 }}
+                                onPress={() => setIsStatusExpanded(!isStatusExpanded)}
+                            >
                                 <YStack>
-                                    <Text fontSize="$4" fontWeight="700" color="$color">{formattedStatus}</Text>
-                                    <Text fontSize="$3" color="$gray10">
-                                        {status === 'pending' ? 'Waiting for recipient...' :
-                                            status === 'claimed' ? 'Tokens claimed by recipient' :
-                                                status === 'completed' ? 'Transaction completed' :
-                                                    'Funds processed successfully'}
+                                    <Text fontSize="$4" color="$gray10" fontWeight="700" mb="$0" textTransform='uppercase' letterSpacing={1}>
+                                        STATUS
                                     </Text>
                                 </YStack>
+                                <XStack items="center" gap="$2">
+                                    <Text fontSize="$5" fontWeight="800" color={statusConfig.color as any}>
+                                        {formattedStatus.toUpperCase()}
+                                    </Text>
+                                    {status === 'pending' && (
+                                        <View bg="$orange3" px="$2" py="$1" rounded="$2">
+                                            <Text fontSize="$1" fontWeight="800" color="$orange10">ACTION REQUIRED</Text>
+                                        </View>
+                                    )}
+                                    {isStatusExpanded ? <ChevronUp size={20} color="$gray10" /> : <ChevronDown size={20} color="$gray10" />}
+                                </XStack>
                             </XStack>
+
+                            {isStatusExpanded && (
+                                <YStack mt="$4" pt="$4" borderTopWidth={1} borderColor="$borderColor">
+                                    {/* Step 1: Prepared */}
+                                    <XStack gap="$3">
+                                        <YStack items="center">
+                                            <Circle size={24} bg="$green10">
+                                                <Check size={14} color="black" />
+                                            </Circle>
+                                            <View width={2} flex={1} bg={status === 'completed' || status === 'claimed' ? "$green10" : "$gray8"} my="$1" />
+                                        </YStack>
+                                        <YStack pb="$4">
+                                            <Text fontSize="$4" fontWeight="700" color="$color">Prepared</Text>
+                                            <Text fontSize="$3" color="$gray10">{formatFullLocalTime(entry.createdAt)}</Text>
+                                        </YStack>
+                                    </XStack>
+
+                                    {/* Step 2: Current Status */}
+                                    <XStack gap="$3">
+                                        <Circle size={24} bg={statusConfig.color as any} items="center" justify="center">
+                                            <statusConfig.icon size={14} color={status === 'completed' || status === 'claimed' ? "black" : "$color"} />
+                                        </Circle>
+                                        <YStack>
+                                            <Text fontSize="$4" fontWeight="700" color="$color">{formattedStatus}</Text>
+                                            <Text fontSize="$3" color="$gray10">
+                                                {status === 'pending' ? 'Waiting for recipient...' :
+                                                    status === 'claimed' ? 'Tokens claimed by recipient' :
+                                                        status === 'completed' ? 'Transaction completed' :
+                                                            'Funds processed successfully'}
+                                            </Text>
+                                        </YStack>
+                                    </XStack>
+                                </YStack>
+                            )}
+                        </YStack>
+
+                        <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
+                            <DetailItem label="Amount" value={`${entry.amount || 0} ${entry.unit || 'sats'}`} />
+                            <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
+                            <DetailItem label="Type" value={`${title} • ${entry.type === 'send' ? 'Outgoing' : 'Incoming'}`} />
+                            <DetailItem label="Status" value={formattedStatus} />
+                            {lockedToNpub && (
+                                <DetailItem
+                                    label="Locked To"
+                                    value={lockedToNpub === useSettingsStore.getState().npub ? "You (Safe)" : `${lockedToNpub.substring(0, 10)}...${lockedToNpub.substring(lockedToNpub.length - 6)}`}
+                                    isCopyable={lockedToNpub !== useSettingsStore.getState().npub}
+                                    onCopy={async () => {
+                                        await Clipboard.setStringAsync(lockedToNpub);
+                                        Haptics.selectionAsync();
+                                        toast.show('Copied!', { message: 'NPUB copied to clipboard' });
+                                    }}
+                                />
+                            )}
+                            <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
+                            <DetailItem label="Mint" value={(entry.mintUrl || 'Unknown').replace(/^https?:\/\//, '').split('/')[0]} />
+                            {mintFee > 0 && (
+                                <DetailItem label="Fee Rate" value={`${mintFee} ppk (${(mintFee / 10).toFixed(1)}%)`} />
+                            )}
                         </YStack>
                     </YStack>
 
-                    <YStack gap="$0" mb="$6" bg="$gray2" rounded="$5" overflow="hidden" separator={<Separator borderColor="$borderColor" opacity={0.5} />}>
-                        <DetailItem label="Amount" value={`${entry.amount || 0} ${entry.unit || 'sats'}`} />
-                        <DetailItem label="Date" value={formatFullLocalTime(entry.createdAt)} />
-                        <DetailItem label="Type" value={`${title} • ${entry.type === 'send' ? 'Outgoing' : 'Incoming'}`} />
-                        <DetailItem label="Status" value={formattedStatus} />
-                        <DetailItem label="Token" value={token && typeof token === 'string' ? `${token.substring(0, 10)}...${token.substring(token.length - 6)}` : 'N/A'} isCopyable copyValue={token} onCopy={handleCopyToken} />
-                        <DetailItem label="Mint" value={(entry.mintUrl || 'Unknown').replace(/^https?:\/\//, '').split('/')[0]} />
-                        {mintFee > 0 && (
-                            <DetailItem label="Fee Rate" value={`${mintFee} ppk (${(mintFee / 10).toFixed(1)}%)`} />
-                        )}
-                    </YStack>
 
                     {token && typeof token === 'string' && (status === 'pending' || status === 'unclaimed') && (
                         <YStack gap="$4" pb="$4" mt="$4">
                             {entry.type === 'send' ? (
-                                <YStack items="center" gap="$4">
-                                    <View bg="white" p="$3" rounded="$6">
-                                        {(!showAnimatedQR && token.length > 400) ? (
-                                            <YStack width={280} height={280} items="center" justify="center">
-                                                <Spinner size="large" color="$color" />
-                                            </YStack>
-                                        ) : (
-                                            <QRCode
-                                                value={(showAnimatedQR ? qrCodeFragment : token) || 'cashu:'}
-                                                size={280}
-                                                backgroundColor="white"
-                                                color="black"
-                                                quietZone={10}
-                                            />
-                                        )}
-                                    </View>
-
-                                    <XStack gap="$1.5" bg="$color3" px="$4" py="$2" rounded="$10" flexWrap="wrap" justify="center">
-                                        {showAnimatedQR && (
-                                            <>
-                                                <Button size="$2.5" chromeless icon={<Gauge size={16} />} onPress={changeSpeed} color="$color" fontWeight="700">{speedLabel}</Button>
-                                                <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                                <Button size="$2.5" chromeless icon={<ZoomIn size={16} />} onPress={changeSize} color="$color" fontWeight="700">{sizeLabel}</Button>
-                                                <Separator vertical height={15} style={{ alignSelf: 'center' }} borderColor="$gray8" />
-                                            </>
-                                        )}
-                                        <Button size="$2.5" chromeless icon={<Hexagon size={16} />} onPress={handleToggleVersion} color="$color" fontWeight="700">{tokenVersion}</Button>
-                                    </XStack>
-                                </YStack>
+                                <PendingTokenLayout
+                                    token={token}
+                                    amount={entry.amount}
+                                    fee={mintFee}
+                                    mintUrl={entry.mintUrl}
+                                    lockedToNpub={lockedToNpub}
+                                    hideDetails={true}
+                                />
                             ) : entry.type === 'receive' && status === 'unclaimed' ? (
                                 <YStack gap="$2">
                                     <Button
@@ -638,7 +764,7 @@ function DetailItem({ label, value, isCopyable, copyValue, onCopy }: { label: st
         <XStack justify="space-between" items="center" py="$3" px="$4">
             <Text fontSize="$4" color="$gray10" fontWeight="600">{label}</Text>
             <XStack gap="$2" items="center">
-                <Text fontSize="$5" fontWeight="800" color="$color" numberOfLines={1} style={{ maxWidth: 200 }}>
+                <Text fontSize="$5" text="right" fontWeight="800" color="$color" numberOfLines={2} style={{ maxWidth: 200 }}>
                     {value}
                 </Text>
                 {isCopyable && (

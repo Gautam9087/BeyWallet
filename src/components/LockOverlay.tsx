@@ -39,7 +39,7 @@ export function LockOverlay({ onUnlock }: { onUnlock: () => void }) {
         // Small delay to ensure the native side is ready after app transitions
         const timer = setTimeout(() => {
             handleAuthenticate()
-        }, 500)
+        }, 1200)
 
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {

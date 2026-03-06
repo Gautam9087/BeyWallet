@@ -5,6 +5,7 @@ import { SeedStep } from './SeedStep'
 import { BiometricStep } from './BiometricStep'
 import { ImportSeedStep } from './ImportSeedStep'
 import { MintPickerStep } from './MintPickerStep'
+import { RestoreProgressStep } from './RestoreProgressStep'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { seedService } from '../../services/seedService'
@@ -18,9 +19,15 @@ import { DEFAULT_MINT } from '../../store/constants'
 export function OnboardingScreen() {
     const { currentStep, setStep, setGeneratedMnemonic, generatedMnemonic, completeOnboarding } = useOnboardingStore()
     const initialize = useWalletStore(state => state.initialize)
+    const restoreAllMints = useWalletStore(state => state.restoreAllMints)
+    const mintRestoreStatuses = useWalletStore(state => state.mintRestoreStatuses)
+    const isRestoring = useWalletStore(state => state.isRestoring)
+
     const [isImporting, setIsImporting] = useState(false)
     const [isFinishing, setIsFinishing] = useState(false)
     const [importStatus, setImportStatus] = useState('')
+    // Extra mints from a backup file
+    const [extraRestoreMints, setExtraRestoreMints] = useState<string[]>([])
 
     // ── Navigation ──────────────────────────────────────────────
 
@@ -57,18 +64,14 @@ export function OnboardingScreen() {
         setStep('mintpicker')
     }
 
-    // Called when user picks a mint (or skips)
+    // Called when user picks a mint (or skips) on new wallet
     const handleMintPickerComplete = async (selectedMintUrl: string) => {
         setIsFinishing(true)
         try {
-            // Trust the chosen mint and kick off an initial restore sweep
             await mintManager.addMint(selectedMintUrl, { trusted: true })
             useWalletStore.getState().restoreFromSeed(selectedMintUrl)
 
-            // Save it as the default mint in settings
             await useSettingsStore.getState().setDefaultMintUrl(selectedMintUrl)
-
-            // Mark onboarding complete → app navigates to home
             await completeOnboarding()
         } catch (err) {
             console.error('[Onboarding] mint picker complete failed:', err)
@@ -77,7 +80,6 @@ export function OnboardingScreen() {
         }
     }
 
-    // Skip: complete without trusting any mint
     const handleMintPickerSkip = async () => {
         setIsFinishing(true)
         try {
@@ -89,23 +91,25 @@ export function OnboardingScreen() {
 
     // ── Seed import (restore flow) ──────────────────────────────
 
-    const handleImportSeed = async (mnemonic: string) => {
+    const handleImportSeed = async (mnemonic: string, additionalMints: string[] = []) => {
         setIsImporting(true)
-        setImportStatus('Initializing wallet...')
+        setImportStatus('Initializing wallet…')
         try {
             console.log('[Onboarding] Importing wallet from seed...')
 
             await initService.restoreWallet(mnemonic)
 
-            setImportStatus('Welcome back! Finishing setup...')
+            setImportStatus('Welcome back! Starting restore…')
             await completeOnboarding()
             await useSettingsStore.getState().initialize(true)
             await initialize()
 
-            // Kick off deterministic recovery against the default mint
-            useWalletStore.getState().restoreFromSeed(DEFAULT_MINT)
+            // Store extra mints (from backup file) for the restore step
+            setExtraRestoreMints(additionalMints)
 
-            console.log('[Onboarding] ✅ Import successful, background recovery started.')
+            // Navigate to restore progress screen — restoreAllMints fires there
+            console.log('[Onboarding] Navigating to restore progress step...')
+            setStep('restoring')
         } catch (err) {
             console.error('[Onboarding] Import failed:', err)
             setImportStatus('Import failed. Please try again.')
@@ -114,30 +118,33 @@ export function OnboardingScreen() {
         }
     }
 
+    // Called when RestoreProgressStep mounts — start the actual multi-mint restore
+    const handleRestoreStart = () => {
+        restoreAllMints(extraRestoreMints)
+    }
+
+    // Called when user taps "Go to Wallet" on the progress screen
+    const handleRestoreDone = () => {
+        // Onboarding is already complete — app navigates home automatically
+        // Just ensure we push to home tab
+        console.log('[Onboarding] Restore done, going home')
+    }
+
     // ── File import (restore from .bey backup file) ─────────────
 
     const handleImportFromFile = async () => {
         try {
             const backup = await walletFileService.importWalletFromFile()
 
-            // Standard seed restore
-            await handleImportSeed(backup.mnemonic)
+            // Collect extra mints from backup (excluding DEFAULT_MINT)
+            const extraMints = (backup.mints ?? [])
+                .map((m: any) => m.url)
+                .filter((url: string) => url && url !== DEFAULT_MINT)
 
-            // Restore additional mints from the backup
-            if (backup.mints && backup.mints.length > 0) {
-                for (const mint of backup.mints) {
-                    try {
-                        if (mint.url && mint.url !== DEFAULT_MINT) {
-                            await mintManager.addMint(mint.url, { trusted: true })
-                            useWalletStore.getState().restoreFromSeed(mint.url)
-                        }
-                    } catch (e) {
-                        console.warn('[Onboarding] Failed to restore mint:', mint.url, e)
-                    }
-                }
-            }
+            // Standard seed restore — passes extra mints for the progress screen
+            await handleImportSeed(backup.mnemonic, extraMints)
 
-            // Restore settings
+            // Restore settings from backup
             const settingsStore = useSettingsStore.getState()
             if (backup.secondaryCurrency) await settingsStore.setSecondaryCurrency(backup.secondaryCurrency)
             if (backup.theme) await settingsStore.setTheme(backup.theme)
@@ -211,10 +218,27 @@ export function OnboardingScreen() {
         case 'import':
             return (
                 <ImportSeedStep
-                    onImport={handleImportSeed}
+                    onImport={(mnemonic) => handleImportSeed(mnemonic)}
                     onBack={() => setStep('welcome')}
                 />
             )
+
+        case 'restoring': {
+            const totalRestoredSats = mintRestoreStatuses
+                .filter(e => e.status === 'done')
+                .reduce((sum, e) => sum + e.restoredBalance, 0)
+
+            // Fire restore on first render of this step
+            return (
+                <RestoreProgressStepWrapper
+                    entries={mintRestoreStatuses}
+                    isRestoring={isRestoring}
+                    totalRestoredSats={totalRestoredSats}
+                    onStart={handleRestoreStart}
+                    onDone={handleRestoreDone}
+                />
+            )
+        }
 
         default:
             return (
@@ -226,3 +250,38 @@ export function OnboardingScreen() {
             )
     }
 }
+
+// ── Wrapper that fires restoreAllMints on mount ──────────────────────────────
+
+function RestoreProgressStepWrapper({
+    entries,
+    isRestoring,
+    totalRestoredSats,
+    onStart,
+    onDone,
+}: {
+    entries: ReturnType<typeof useWalletStore.getState>['mintRestoreStatuses']
+    isRestoring: boolean
+    totalRestoredSats: number
+    onStart: () => void
+    onDone: () => void
+}) {
+    const [started, setStarted] = React.useState(false)
+
+    React.useEffect(() => {
+        if (!started) {
+            setStarted(true)
+            onStart()
+        }
+    }, [])
+
+    return (
+        <RestoreProgressStep
+            entries={entries}
+            isRestoring={isRestoring}
+            totalRestoredSats={totalRestoredSats}
+            onDone={onDone}
+        />
+    )
+}
+

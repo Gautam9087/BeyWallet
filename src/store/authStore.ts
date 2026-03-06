@@ -11,7 +11,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-    isAuthenticated: true, // Start authenticated (no lock on cold start)
+    isAuthenticated: false, // Lock on cold start
     hasBackgrounded: false, // Track if we've gone to background
     isLockDisabled: false,
     setAuthenticated: (value) => set({ isAuthenticated: value }),

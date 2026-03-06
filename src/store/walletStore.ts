@@ -10,6 +10,15 @@ import type { MintInfo } from '../services/core';
 import { useSettingsStore } from './settingsStore';
 import { DEFAULT_MINT } from './constants';
 
+export type MintRestoreStatus = 'pending' | 'scanning' | 'done' | 'error';
+
+export interface MintRestoreEntry {
+    mintUrl: string;
+    status: MintRestoreStatus;
+    restoredBalance: number;
+    error?: string;
+}
+
 interface WalletState {
     activeMintUrl: string | null;
     balance: number;
@@ -23,7 +32,7 @@ interface WalletState {
     restoreQueue: string[];
     scannerResult: string | null;
     isRefreshing: boolean;
-
+    mintRestoreStatuses: MintRestoreEntry[];
 
     // Actions
     initialize: () => Promise<void>;
@@ -37,6 +46,7 @@ interface WalletState {
     refreshBalance: () => Promise<void>;
     refreshMintList: () => Promise<void>;
     restoreFromSeed: (mintUrl: string) => Promise<void>;
+    restoreAllMints: (extraMintUrls?: string[]) => Promise<void>;
     setScannerResult: (result: string | null) => void;
 }
 
@@ -57,6 +67,7 @@ export const useWalletStore = create<WalletState>()(
             restoreQueue: [],
             scannerResult: null,
             isRefreshing: false,
+            mintRestoreStatuses: [],
 
 
             initialize: async () => {
@@ -301,6 +312,77 @@ export const useWalletStore = create<WalletState>()(
                     console.error('[WalletStore] Failed to set mint nickname:', err);
                     set({ error: err.message });
                 }
+            },
+
+            /**
+             * Restore all mints: DEFAULT_MINT + all trusted mints already in DB
+             * + any extra mint URLs passed in (e.g. from a backup file).
+             * Populates mintRestoreStatuses for progress UI.
+             */
+            restoreAllMints: async (extraMintUrls: string[] = []) => {
+                // Build deduplicated list of mints to restore
+                const urlSet = new Set<string>([DEFAULT_MINT, ...extraMintUrls]);
+                try {
+                    const trustedMints = await mintManager.getAllTrustedMints();
+                    for (const m of trustedMints) urlSet.add(m.mintUrl);
+                } catch (e) {
+                    console.warn('[WalletStore] Could not fetch trusted mints for restore:', e);
+                }
+
+                const mintUrls = Array.from(urlSet);
+
+                // Initialise status entries
+                set({
+                    mintRestoreStatuses: mintUrls.map(url => ({
+                        mintUrl: url,
+                        status: 'pending',
+                        restoredBalance: 0,
+                    })),
+                    isRestoring: true,
+                });
+
+                for (const mintUrl of mintUrls) {
+                    // Mark as scanning
+                    set(s => ({
+                        mintRestoreStatuses: s.mintRestoreStatuses.map(e =>
+                            e.mintUrl === mintUrl ? { ...e, status: 'scanning' } : e
+                        ),
+                        restoringMintUrl: mintUrl,
+                    }));
+
+                    try {
+                        // Ensure mint is added and trusted before restoring
+                        await mintManager.addMint(mintUrl, { trusted: true });
+                        await walletService.restore(mintUrl);
+
+                        // Get restored balance for this mint
+                        const allBalances = await walletService.getBalances();
+                        const restoredBalance = allBalances[mintUrl] ?? 0;
+
+                        set(s => ({
+                            mintRestoreStatuses: s.mintRestoreStatuses.map(e =>
+                                e.mintUrl === mintUrl
+                                    ? { ...e, status: 'done', restoredBalance }
+                                    : e
+                            ),
+                        }));
+                    } catch (err: any) {
+                        console.warn(`[WalletStore] Restore failed for ${mintUrl}:`, err?.message);
+                        set(s => ({
+                            mintRestoreStatuses: s.mintRestoreStatuses.map(e =>
+                                e.mintUrl === mintUrl
+                                    ? { ...e, status: 'error', error: err?.message }
+                                    : e
+                            ),
+                        }));
+                    }
+                }
+
+                // Final refresh
+                await get().refreshBalance();
+                const mintInfos = await mintManager.getMintInfoList();
+                set({ isRestoring: false, restoringMintUrl: null, mints: mintInfos });
+                console.log('[WalletStore] ✅ All mints restored');
             },
 
             setScannerResult: (result: string | null) => {

@@ -160,17 +160,18 @@ export function AmountStage({ amount, setAmount, onContinue }: AmountStageProps)
                         {inputMode === 'SATS' ? `₿${localInputValue || '0'}` : `${currencySymbol}${localInputValue || '0'}`}
                     </H1>
 
-                    <Button
-                        size="$2.5"
-                        theme="gray"
-                        fontWeight="400"
-                        color="$accent9"
-                        mt="$-2"
+                    <RollingNumber
+                        value={Number(inputMode === 'SATS' ? (btcData?.price ? currencyService.convertSatsToCurrency(Number(amount), btcData.price) : 0) : amount)}
+                        letterSpacing={-1}
+                        fontSize={16}
+                        fontWeight="900"
+                        color="$accent8"
+                        decimalOpacity={0.4}
+                        showDecimals={false}
                         onPress={toggleMode}
-                        pressStyle={{ scale: 0.95 }}
                     >
                         {conversionValue}
-                    </Button>
+                    </RollingNumber>
                 </YStack>
 
                 <XStack width="100%" p="$3" borderTopWidth={1} borderTopColor="$color3" justify="space-between" items="center">
