@@ -33,6 +33,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
                 isOnboarded: status === 'true',
                 isCheckingOnboarding: false
             })
+            console.log(`[OnboardingStore] Checked status: ${status === 'true'}`)
         } catch (err) {
             console.error('[OnboardingStore] Error checking status:', err)
             set({ isOnboarded: false, isCheckingOnboarding: false })

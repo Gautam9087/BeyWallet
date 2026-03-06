@@ -151,6 +151,11 @@ export const useWalletStore = create<WalletState>()(
                         activeMintUrl: url,
                         mints: mintInfos,
                     });
+
+                    // Trigger deterministic restoration in the background
+                    console.log(`[WalletStore] Triggering automatic deterministic restore for: ${url}`);
+                    get().restoreFromSeed(url);
+
                     get().refreshBalance();
                 } catch (err: any) {
                     console.error('[WalletStore] Failed to add mint:', err);
@@ -213,7 +218,7 @@ export const useWalletStore = create<WalletState>()(
                         // Yield briefly for UI responsiveness
                         await new Promise(resolve => setTimeout(resolve, 50));
 
-                        console.log(`[WalletStore] 🔄 Deep Restore: ${nextUrl}`);
+                        console.log(`[WalletStore] 🔄 Deterministic Restore (Sync): ${nextUrl}`);
 
                         // Strategy: Multi-unit discovery + standard restore
                         // 1. Ensure we have all current keysets for this mint
@@ -221,7 +226,7 @@ export const useWalletStore = create<WalletState>()(
 
                         // 2. Perform NIP-06 deterministic restore
                         const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Deep restore timed out after 3 minutes')), 180000)
+                            setTimeout(() => reject(new Error('Deep restore timed out after 10 minutes')), 600000)
                         );
 
                         await Promise.race([
@@ -320,8 +325,16 @@ export const useWalletStore = create<WalletState>()(
              * Populates mintRestoreStatuses for progress UI.
              */
             restoreAllMints: async (extraMintUrls: string[] = []) => {
+                // Feature/Popular mints to check by default to aid discovery
+                const FEATURED_MINTS = [
+                    "https://8333.space:3338",
+                    "https://mint.minibits.cash/Bitcoin",
+                    "https://legend.lnbits.com/cashu/api/v1/4gr93mame836988",
+                    "https://mint.probatio.money:3338"
+                ];
+
                 // Build deduplicated list of mints to restore
-                const urlSet = new Set<string>([DEFAULT_MINT, ...extraMintUrls]);
+                const urlSet = new Set<string>([DEFAULT_MINT, ...FEATURED_MINTS, ...extraMintUrls]);
                 try {
                     const trustedMints = await mintManager.getAllTrustedMints();
                     for (const m of trustedMints) urlSet.add(m.mintUrl);

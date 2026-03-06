@@ -32,6 +32,9 @@ export function RootLayout() {
             const exists = await initService.walletExists()
             setWalletExists(exists)
             console.log(`[RootLayout] Startup check — onboarded: ${isOnboarded}, walletExists: ${exists}`)
+            if (exists && !isOnboarded) {
+                console.log('[RootLayout] ⚠️ Wallet found but marked as not onboarded. User may see welcome screen.');
+            }
         }
         checkStatus()
     }, [isOnboarded]) // Re-check when onboarding status changes

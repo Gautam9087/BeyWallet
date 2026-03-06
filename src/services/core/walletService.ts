@@ -12,8 +12,9 @@
 import { initService } from './initService';
 import { cleanToken, encodeToken } from './tokenUtils';
 import type { Token } from '@cashu/cashu-ts';
-import { getDecodedToken, getEncodedToken } from '@cashu/cashu-ts';
+import { getDecodedToken, getEncodedToken, Wallet, Mint } from '@cashu/cashu-ts';
 import type { CoreProof } from 'coco-cashu-core';
+import { seedService } from '../seedService';
 
 // Helper to generate a unique ID for operations since the crypto util import is broken
 const generateSubId = (): string => {
@@ -423,15 +424,104 @@ export const walletService = {
     restore: async (mintUrl: string): Promise<void> => {
         const start = Date.now();
         const m = mgr();
-        console.log(`[WalletService] 🔄 Starting deterministic restore for: ${mintUrl}`);
+        const unsafeManager = m as any;
+        console.log(`[WalletService] 🔄 Starting robust deterministic restore for: ${mintUrl}`);
 
         try {
-            // Public API handles: addMintByUrl({ trusted: true }), fresh keyset fetch,
-            // sequential per-keyset restore, counter updates, proof saving.
-            await m.wallet.restore(mintUrl);
+            // 1. Ensure we have the seed
+            const mnemonic = await seedService.getMnemonic();
+            if (!mnemonic) throw new Error('No mnemonic found for restore');
+            const seed = await seedService.deriveSeed(mnemonic);
+
+            // 2. Add/Trust mint and get fresh keysets
+            // ensureUpdatedMint is an internal Coco method that returns cached or fresh keysets
+            const { mint, keysets } = await unsafeManager.mintService.ensureUpdatedMint(mintUrl);
+
+            // Sort keysets: active first, then by ID descending (usually newer first)
+            const sortedKeysets = [...keysets].sort((a, b) => {
+                if (a.active && !b.active) return -1;
+                if (!a.active && b.active) return 1;
+                return b.id.localeCompare(a.id);
+            });
+
+            let totalRestored = 0;
+
+            // 3. Iterate through EACH keyset (prioritizing active) to search for signatures
+            for (const keyset of sortedKeysets) {
+                console.log(`[WalletService] Scanning keyset: ${keyset.id} (${keyset.unit})`);
+
+                const wallet = new Wallet(new Mint(mintUrl), {
+                    unit: keyset.unit,
+                    bip39seed: seed,
+                });
+
+                // Load the specific keyset into the wallet so cashu-ts knows about its unit and keypairs
+                if (!keyset.keypairs || Object.keys(keyset.keypairs).length === 0) {
+                    console.warn(`[WalletService] Keyset ${keyset.id} has no keys loaded. Attempting to fetch...`);
+                    try {
+                        const keys = await new Mint(mintUrl).getKeys(keyset.id);
+                        keyset.keypairs = keys;
+                    } catch (e) {
+                        console.error(`[WalletService] Failed to fetch keys for keyset ${keyset.id}:`, e);
+                        continue; // Skip this keyset if we can't get keys
+                    }
+                }
+
+                wallet.loadMintFromCache(mint.mintInfo, {
+                    mintUrl,
+                    unit: keyset.unit,
+                    keysets: [{
+                        id: keyset.id,
+                        unit: keyset.unit,
+                        active: keyset.active,
+                        input_fee_ppk: keyset.feePpk || 0,
+                        keys: keyset.keypairs,
+                    }]
+                });
+
+                // Perform the scan (NUT-13/NUT-09)
+                // gapLimit=500 and batchSize=100 as per requested "brute force" logic
+                const { proofs, lastCounterWithSignature } = await wallet.batchRestore(500, 100, 0, keyset.id);
+
+                if (proofs.length > 0) {
+                    console.log(`[WalletService] ✅ Found ${proofs.length} proofs for keyset ${keyset.id} (${keyset.unit})`);
+
+                    // Save discovered proofs to the local database
+                    const coreProofs = proofs.map((p: any) => ({
+                        ...p,
+                        mintUrl,
+                        unit: keyset.unit, // REQUIRED for Coco to see the balance correctly!
+                        state: 'ready',
+                        createdByOperationId: 'restore_' + Date.now()
+                    }));
+
+                    await unsafeManager.proofService.saveProofs(mintUrl, coreProofs);
+                    console.log(`[WalletService] 💾 Successfully saved ${proofs.length} proofs to local database`);
+
+                    // Update the counter in the DB so next time it starts from where it left off
+                    if (lastCounterWithSignature !== undefined) {
+                        try {
+                            console.log(`[WalletService] Advancing counter for keyset ${keyset.id} to ${lastCounterWithSignature + 1}`);
+                            await unsafeManager.counterService.overwriteCounter(mintUrl, keyset.id, lastCounterWithSignature + 1);
+                        } catch (e) {
+                            console.warn(`[WalletService] Failed to advance counter for keyset ${keyset.id}:`, e);
+                        }
+                    }
+
+                    totalRestored += proofs.length;
+                }
+            }
+
+            console.log(`[WalletService] Robust restore complete. Total proofs recovered: ${totalRestored}`);
         } catch (err: any) {
-            // Log but don't throw — inflight rescue below may still recover partial results
-            console.warn(`[WalletService] Restore completed with error for ${mintUrl}:`, err?.message || err);
+            console.error(`[WalletService] Robust restore failed for ${mintUrl}:`, err?.message || err);
+            // Fallback to Coco's default restore if my manual one fails
+            try {
+                console.log('[WalletService] Attempting fallback to standard restore...');
+                await m.wallet.restore(mintUrl);
+            } catch (fallbackErr) {
+                console.warn('[WalletService] Fallback restore also failed');
+            }
         }
 
         // Rescue any proofs stuck in 'inflight' state from partial restore failures
