@@ -1,3 +1,4 @@
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { ToastProvider, ToastViewport } from '@tamagui/toast'
 import { ManagerProvider, MintProvider, BalanceProvider } from 'coco-cashu-react'
@@ -13,11 +14,13 @@ export function Provider({
   ...rest
 }: any) {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <InnerProvider cocoManager={cocoManager} {...rest}>{children}</InnerProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <InnerProvider cocoManager={cocoManager} {...rest}>{children}</InnerProvider>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   )
 }
 

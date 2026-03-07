@@ -3,6 +3,7 @@ import { YStack, XStack, Text, Button, H2, View, ScrollView } from 'tamagui'
 import { Copy, Check, AlertTriangle, ChevronRight } from '@tamagui/lucide-icons'
 import * as Haptics from 'expo-haptics'
 import * as Clipboard from 'expo-clipboard'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 interface SeedStepProps {
     mnemonic: string
@@ -12,6 +13,7 @@ interface SeedStepProps {
 export function SeedStep({ mnemonic, onContinue }: SeedStepProps) {
     const [copied, setCopied] = useState(false)
     const [confirmed, setConfirmed] = useState(false)
+    const insets = useSafeAreaInsets()
     const words = mnemonic.split(' ')
 
     const handleCopy = async () => {
@@ -27,7 +29,13 @@ export function SeedStep({ mnemonic, onContinue }: SeedStepProps) {
     }
 
     return (
-        <YStack flex={1} bg="$background" px="$4" py="$6">
+        <YStack
+            flex={1}
+            bg="$background"
+            px="$4"
+            pt={insets.top + 24}
+            pb={insets.bottom + 24}
+        >
             <ScrollView flex={1} showsVerticalScrollIndicator={false}>
                 <YStack gap="$6">
                     {/* Header */}

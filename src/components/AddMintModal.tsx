@@ -4,6 +4,7 @@ import { Plus, Check, AlertCircle, Sprout, X } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
 import AppBottomSheet, { AppBottomSheetRef } from './UI/AppBottomSheet';
 import { useWalletStore } from '../store/walletStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToastController } from '@tamagui/toast';
 
 type Stage = 'input' | 'preview' | 'loading';
@@ -40,6 +41,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
     const [previewInfo, setPreviewInfo] = useState<MintPreviewInfo | null>(null);
 
     const { fetchMintInfo, addMint, refreshMintList, mints, trustMint } = useWalletStore();
+    const insets = useSafeAreaInsets();
     const toast = useToastController();
     const [isExistingUntrusted, setIsExistingUntrusted] = useState(false);
 
@@ -329,7 +331,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
 
     return (
         <AppBottomSheet ref={sheetRef}>
-            <BottomSheetScrollView contentContainerStyle={{ padding: 16 }}>
+            <BottomSheetScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}>
                 {stage === 'input' && renderInputStage()}
                 {stage === 'preview' && renderPreviewStage()}
                 {stage === 'loading' && renderLoadingStage()}

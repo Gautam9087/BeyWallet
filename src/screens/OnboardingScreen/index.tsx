@@ -4,7 +4,7 @@ import { CreatingStep } from './CreatingStep'
 import { SeedStep } from './SeedStep'
 import { BiometricStep } from './BiometricStep'
 import { ImportSeedStep } from './ImportSeedStep'
-import { MintPickerStep } from './MintPickerStep'
+import { MintConfirmationStep } from './MintConfirmationStep'
 import { RestoreProgressStep } from './RestoreProgressStep'
 import { useOnboardingStore } from '../../store/onboardingStore'
 import { useSettingsStore } from '../../store/settingsStore'
@@ -64,17 +64,23 @@ export function OnboardingScreen() {
         setStep('mintpicker')
     }
 
-    // Called when user picks a mint (or skips) on new wallet
-    const handleMintPickerComplete = async (selectedMintUrl: string) => {
+    // Called when user confirms default mints on new wallet
+    const handleMintPickerComplete = async (selectedMintUrls: string[]) => {
         setIsFinishing(true)
         try {
-            await mintManager.addMint(selectedMintUrl, { trusted: true })
-            useWalletStore.getState().restoreFromSeed(selectedMintUrl)
+            // Add all selected mints
+            for (const url of selectedMintUrls) {
+                await mintManager.addMint(url, { trusted: true })
+            }
 
-            await useSettingsStore.getState().setDefaultMintUrl(selectedMintUrl)
+            // Restore from the first one as a baseline (minibits)
+            if (selectedMintUrls.length > 0) {
+                await useSettingsStore.getState().setDefaultMintUrl(selectedMintUrls[0])
+            }
+
             await completeOnboarding()
         } catch (err) {
-            console.error('[Onboarding] mint picker complete failed:', err)
+            console.error('[Onboarding] mint confirmation failed:', err)
         } finally {
             setIsFinishing(false)
         }
@@ -252,7 +258,7 @@ export function OnboardingScreen() {
 
         case 'mintpicker':
             return (
-                <MintPickerStep
+                <MintConfirmationStep
                     onComplete={handleMintPickerComplete}
                     onSkip={handleMintPickerSkip}
                 />

@@ -1,5 +1,6 @@
 import { router, Tabs } from 'expo-router'
 import { Button, XStack, Text, useTheme, Image } from 'tamagui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   History,
   Settings,
@@ -24,6 +25,7 @@ import * as Haptics from 'expo-haptics'
 
 export default function TabLayout() {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
   const { resolvedTheme } = useAppTheme()
   const { lock } = useAuthStore()
 
@@ -58,9 +60,9 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: theme.background.val,
           borderTopColor: theme.borderColor.val,
-          height: 85,
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 20),
           paddingTop: 12,
-          paddingBottom: 25,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 16,
         },
         headerStyle: {
           backgroundColor: theme.background.val,

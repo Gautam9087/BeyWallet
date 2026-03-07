@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronDown, RefreshCw, ArrowUpRight, ArrowDownLeft, Check
 import { useRouter, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { historyService } from '~/services/core';
 import { useWalletStore } from '~/store/walletStore';
 import { formatLocalTime } from '~/utils/time';
@@ -17,6 +18,7 @@ import { bitcoinService } from '~/services/bitcoinService';
 export default function EcashModal() {
     const router = useRouter();
     const { mints } = useWalletStore();
+    const insets = useSafeAreaInsets();
     const { secondaryCurrency } = useSettingsStore();
     const [selectedMint, setSelectedMint] = useState('all');
     const sheetRef = useRef<AppBottomSheetRef>(null);
@@ -114,7 +116,11 @@ export default function EcashModal() {
                 }}
             />
 
-            <ScrollView flex={1} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                flex={1}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            >
                 <YStack px="$4" pt="$4" gap="$2" >
                     <XStack>
 
@@ -260,7 +266,7 @@ export default function EcashModal() {
             </ScrollView>
 
             <AppBottomSheet ref={sheetRef} snapPoints={["50%", "85%"]}>
-                <YStack p="$4" gap="$4">
+                <YStack p="$4" gap="$4" pb={insets.bottom + 40}>
                     <Text fontSize="$6" fontWeight="700">Filter by Mint</Text>
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <YStack gap="$2" pb="$4">

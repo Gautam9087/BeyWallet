@@ -2,6 +2,7 @@ import React from 'react'
 import { YStack, Text, Button, H1, Image, View } from 'tamagui'
 import { Wallet, KeyRound, FolderOpen } from '@tamagui/lucide-icons'
 import * as Haptics from 'expo-haptics'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppTheme } from '../../context/ThemeContext'
 
 interface WelcomeStepProps {
@@ -12,6 +13,7 @@ interface WelcomeStepProps {
 
 export function WelcomeStep({ onCreateWallet, onImportWallet, onImportFromFile }: WelcomeStepProps) {
     const { resolvedTheme } = useAppTheme()
+    const insets = useSafeAreaInsets()
 
     const handleCreate = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
@@ -29,7 +31,14 @@ export function WelcomeStep({ onCreateWallet, onImportWallet, onImportFromFile }
     }
 
     return (
-        <YStack flex={1} bg="$background" px="$4" py="$6" justify="space-between">
+        <YStack
+            flex={1}
+            bg="$background"
+            px="$4"
+            pt={insets.top + 24}
+            pb={insets.bottom + 24}
+            justify="space-between"
+        >
             {/* Top spacer */}
             <View />
 

@@ -14,11 +14,13 @@ import { mintService } from '~/services/mintService';
 import { useSettingsStore } from '~/store/settingsStore';
 import { currencyService, CurrencyCode } from '~/services/currencyService';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bitcoinService } from '~/services/bitcoinService';
 
 export default function MintsModal() {
     const router = useRouter();
     const { mints, balances, refreshBalance, isInitializing, activeMintUrl, setActiveMint, untrustMint, removeMint, refreshMintList, trustMint } = useWalletStore();
+    const insets = useSafeAreaInsets();
     const { secondaryCurrency } = useSettingsStore();
 
     const { data: btcData } = useQuery({
@@ -174,7 +176,11 @@ export default function MintsModal() {
                 }}
             />
 
-            <ScrollView flex={1} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                flex={1}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            >
                 <YStack px="$4" pt="$4" gap="$2">
                     <XStack>
                         <Button
@@ -303,7 +309,10 @@ export default function MintsModal() {
             </ScrollView>
 
             <AppBottomSheet ref={sheetRef} snapPoints={["85%"]}>
-                <BottomSheetScrollView showsVerticalScrollIndicator={false}>
+                <BottomSheetScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+                >
                     <YStack p="$4" gap="$5">
                         {/* Mint Profile Header */}
                         <XStack gap="$4" items="center">

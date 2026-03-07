@@ -12,6 +12,7 @@ import { Buffer } from 'buffer';
 import { UR, UREncoder } from "@gandlaf21/bc-ur";
 import { useSettingsStore } from '../../store/settingsStore';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bitcoinService } from '../../services/bitcoinService';
 import { currencyService, CurrencyCode } from '../../services/currencyService';
 import { historyService, cleanToken, decodeToken, encodeToken, encodePeanut, encodeTokenV4, encodeTokenV3 } from '../../services/core';
@@ -37,6 +38,7 @@ export default function TokenDetailsModal() {
     const router = useRouter();
     const { id, token: paramToken } = useLocalSearchParams<{ id: string, token: string }>();
     const toast = useToastController();
+    const insets = useSafeAreaInsets();
     const { secondaryCurrency } = useSettingsStore();
 
     const [copied, setCopied] = useState(false);
@@ -430,7 +432,7 @@ export default function TokenDetailsModal() {
             </YStack>
 
             {/* Action Buttons */}
-            <XStack mt="auto" pb="$8" gap="$2" width="100%" px="$4">
+            <XStack mt="auto" pb={insets.bottom + 20} gap="$2" width="100%" px="$4">
                 <Button
                     flex={1}
                     onPress={handleShare}

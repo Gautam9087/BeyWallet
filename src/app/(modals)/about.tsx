@@ -9,6 +9,7 @@ import {
 } from '@tamagui/lucide-icons'
 import { useRouter } from 'expo-router'
 import { Linking } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants'
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.1.0'
@@ -71,10 +72,12 @@ function LinkRow({ label, url, icon }: LinkRowProps) {
 }
 
 export default function AboutModal() {
+    const insets = useSafeAreaInsets();
+
     return (
         <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 48 }}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
             showsVerticalScrollIndicator={false}
         >
             <YStack gap="$0">

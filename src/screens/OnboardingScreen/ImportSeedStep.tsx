@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics'
 import * as Clipboard from 'expo-clipboard'
 import * as bip39 from 'bip39'
 import { TextInput, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 interface ImportSeedStepProps {
     onImport: (mnemonic: string) => void
@@ -15,6 +16,7 @@ export function ImportSeedStep({ onImport, onBack }: ImportSeedStepProps) {
     const [words, setWords] = useState<string[]>(Array(12).fill(''))
     const [error, setError] = useState<string | null>(null)
     const [isValid, setIsValid] = useState(false)
+    const insets = useSafeAreaInsets()
     const inputRefs = useRef<(TextInput | null)[]>([])
 
     const validateMnemonic = (wordArray: string[]) => {
@@ -96,7 +98,13 @@ export function ImportSeedStep({ onImport, onBack }: ImportSeedStepProps) {
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <YStack flex={1} bg="$background" px="$4" py="$6">
+            <YStack
+                flex={1}
+                bg="$background"
+                px="$4"
+                pt={insets.top + 24}
+                pb={insets.bottom + 24}
+            >
                 <ScrollView flex={1} showsVerticalScrollIndicator={false}>
                     {/* Header */}
                     <XStack items="center" gap="$3" mb="$4">
