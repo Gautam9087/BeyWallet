@@ -66,7 +66,9 @@ function setupAppStateListener(): void {
  * Enable watchers and processors with staggered delays to prevent
  * transaction conflicts. Matches Sovran's pattern.
  */
-async function enableWatchers(mgr: Manager): Promise<void> {
+async function enableWatchers(mgr: Manager, options: { fast?: boolean } = {}): Promise<void> {
+    const delay = options.fast ? 0 : 300;
+
     // Enable mint quote watcher
     try {
         await mgr.enableMintQuoteWatcher({
@@ -77,8 +79,8 @@ async function enableWatchers(mgr: Manager): Promise<void> {
         console.warn('[InitService] Mint quote watcher failed:', error);
     }
 
-    // Small delay between watchers to avoid DB contention
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Delay between watchers to avoid DB contention
+    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
 
     // Enable mint quote processor
     try {
@@ -86,14 +88,14 @@ async function enableWatchers(mgr: Manager): Promise<void> {
             processIntervalMs: 5000,
             maxRetries: 3,
             baseRetryDelayMs: 1000,
-            initialEnqueueDelayMs: 500, // Reduced from 2000
+            initialEnqueueDelayMs: 500,
         });
         console.log('[InitService] ✅ Mint quote processor enabled');
     } catch (error) {
         console.warn('[InitService] Mint quote processor failed:', error);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 300));
+    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
 
     // Enable proof state watcher (with retry)
     try {
@@ -102,7 +104,7 @@ async function enableWatchers(mgr: Manager): Promise<void> {
     } catch (error) {
         console.warn('[InitService] Proof state watcher failed, retrying once...', error);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (delay > 0) await new Promise(resolve => setTimeout(resolve, 1000));
             await mgr.enableProofStateWatcher();
             console.log('[InitService] ✅ Proof state watcher enabled on retry');
         } catch (retryError) {
@@ -136,7 +138,7 @@ async function disableWatchers(mgr: Manager): Promise<void> {
  * Core initialization with a mnemonic. Opens DB, creates repos,
  * creates Manager with explicit watcher enabling.
  */
-async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
+async function initializeWithMnemonic(mnemonic: string, options: { quiet?: boolean } = {}): Promise<Manager> {
     const seed = await seedService.deriveSeed(mnemonic);
 
     // Open Expo SQLite database
@@ -174,20 +176,24 @@ async function initializeWithMnemonic(mnemonic: string): Promise<Manager> {
     repo = repositories;
     setupAppStateListener();
 
-    // Enable watchers with staggered delays
-    await enableWatchers(manager);
+    if (!options.quiet) {
+        // Enable watchers with staggered delays to prevent DB contention on start
+        await enableWatchers(manager);
 
-    console.log('[InitService] Manager ready with watchers and processors');
+        console.log('[InitService] Manager ready with watchers and processors');
 
-    // Trigger initial NPC sync (NON-BLOCKING)
-    (async () => {
-        try {
-            await npcPlugin.sync();
-            console.log('[InitService] ✅ Initial NPC sync completed');
-        } catch (error) {
-            console.error('[InitService] Initial NPC sync failed:', error);
-        }
-    })();
+        // Trigger initial NPC sync (NON-BLOCKING)
+        (async () => {
+            try {
+                await npcPlugin.sync();
+                console.log('[InitService] ✅ Initial NPC sync completed');
+            } catch (error) {
+                console.error('[InitService] Initial NPC sync failed:', error);
+            }
+        })();
+    } else {
+        console.log('[InitService] Manager ready (quiet mode)');
+    }
 
     return manager;
 }
@@ -237,15 +243,67 @@ export const initService = {
         }
     },
 
+    /**
+     * Fast re-initialization. Skips staggered delays in enableWatchers.
+     * Useful for background syncs where we just need to refresh proof/counter state.
+     */
+    reinitFast: async (): Promise<Manager> => {
+        console.log('[InitService] Performing fast-path re-initialization...');
+        const mnemonic = await seedService.getMnemonic();
+        if (!mnemonic) throw new Error('No mnemonic found');
+
+        const seed = await seedService.deriveSeed(mnemonic);
+
+        // If a manager already exists, we must disable its watchers first
+        if (manager) {
+            try { await disableWatchers(manager); } catch (e) { }
+        }
+
+        // Expo SQLite: Best to close and reopen or reuse the sync instance
+        if (dbInstance) {
+            try { dbInstance.closeSync(); } catch (e) { }
+            dbInstance = null;
+        }
+
+        const db = SQLite.openDatabaseSync('coco_wallet.db');
+        dbInstance = db;
+        const repositories = new ExpoSqliteRepositories({ database: db });
+        await repositories.init();
+
+        const { privkey } = await seedService.getNostrKeys(mnemonic);
+        const privateKeyBytes = Buffer.from(privkey, 'hex');
+        const signerFunction = async (eventTemplate: any) => finalizeEvent(eventTemplate, privateKeyBytes);
+        const npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, { syncIntervalMs: 30000, useWebsocket: true });
+
+        manager = new Manager(
+            repositories,
+            async () => new Uint8Array(seed),
+            new ConsoleLogger('Coco', { level: 'warn' }),
+            undefined,
+            [HistoryWatcherPlugin, npcPlugin]
+        );
+
+        repo = repositories;
+        setupAppStateListener();
+
+        // Enable watchers WITHOUT staggered delays
+        await enableWatchers(manager, { fast: true });
+        return manager;
+    },
+
     createWallet: async (mnemonic: string): Promise<Manager> => {
         if (manager) {
             await initService.cleanup();
         }
 
-        await seedService.saveMnemonic(mnemonic);
-        const m = await initializeWithMnemonic(mnemonic);
-
-        return m;
+        isInitializing = true;
+        try {
+            await seedService.saveMnemonic(mnemonic);
+            const m = await initializeWithMnemonic(mnemonic);
+            return m;
+        } finally {
+            isInitializing = false;
+        }
     },
 
     /**
@@ -300,7 +358,6 @@ export const initService = {
      * Cleans up AppState listener, disables watchers, and nullifies references.
      */
     reset: (): void => {
-        // Synchronous reset for backward compat — prefer cleanup() for async
         if (appStateSubscription) {
             appStateSubscription.remove();
             appStateSubscription = null;
@@ -314,7 +371,7 @@ export const initService = {
         isInitializing = false;
     },
 
-    restoreWallet: async (mnemonic: string): Promise<Manager> => {
+    restoreWallet: async (mnemonic: string, options: { quiet?: boolean } = {}): Promise<Manager> => {
         console.log('[InitService] Starting deterministic wallet restore from seed...');
 
         if (manager) {
@@ -324,9 +381,9 @@ export const initService = {
         await seedService.saveMnemonic(mnemonic);
 
         // Just initialize normally — deep recovery happens asynchronously in the background queue
-        const m = await initializeWithMnemonic(mnemonic);
+        const m = await initializeWithMnemonic(mnemonic, options);
 
-        console.log('[InitService] ✅ Wallet initialized for background restoration');
+        console.log(`[InitService] ✅ Wallet initialized (quiet=${options.quiet})`);
         return m;
     },
 

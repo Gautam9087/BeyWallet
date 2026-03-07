@@ -479,36 +479,63 @@ export const walletService = {
                     }]
                 });
 
-                // Perform the scan (NUT-13/NUT-09)
-                // gapLimit=500 and batchSize=100 as per requested "brute force" logic
-                const { proofs, lastCounterWithSignature } = await wallet.batchRestore(500, 100, 0, keyset.id);
+                // Perform the scan (NUT-13/NUT-09) with manual yielding loop
+                // gapLimit=200 (faster discovery)
+                // We scan in smaller chunks and yield control to the main thread
+                const gapLimit = 200;
+                const batchSize = 25;
+                let currentCounter = 0;
+                let keysetProofs: any[] = [];
+                let finished = false;
+                let lastFoundAt = 0;
 
-                if (proofs.length > 0) {
-                    console.log(`[WalletService] ✅ Found ${proofs.length} proofs for keyset ${keyset.id} (${keyset.unit})`);
+                console.log(`[WalletService] Scanning ${keyset.id} in batches of ${batchSize}...`);
+
+                while (!finished) {
+                    // Yield to UI
+                    await new Promise(resolve => setTimeout(resolve, 0));
+
+                    console.log(`[WalletService] ${keyset.id} batch: ${currentCounter} -> ${currentCounter + batchSize}`);
+                    const { proofs, lastCounterWithSignature } = await wallet.batchRestore(gapLimit, batchSize, currentCounter, keyset.id);
+
+                    if (proofs.length > 0) {
+                        keysetProofs.push(...proofs);
+                        lastFoundAt = lastCounterWithSignature ?? lastFoundAt;
+                    }
+
+                    // Discovery logic: if we've scanned gapLimit beyond the last signature, stop
+                    if (currentCounter - lastFoundAt >= gapLimit && proofs.length === 0) {
+                        finished = true;
+                    } else if (currentCounter > 50000) { // Safety break
+                        console.warn('[WalletService] Safety break hit at 50,000 proofs');
+                        finished = true;
+                    }
+
+                    currentCounter += batchSize;
+                }
+
+                if (keysetProofs.length > 0) {
+                    console.log(`[WalletService] ✅ Found ${keysetProofs.length} proofs total for keyset ${keyset.id}`);
 
                     // Save discovered proofs to the local database
-                    const coreProofs = proofs.map((p: any) => ({
+                    const coreProofs = keysetProofs.map((p: any) => ({
                         ...p,
                         mintUrl,
-                        unit: keyset.unit, // REQUIRED for Coco to see the balance correctly!
+                        unit: keyset.unit,
                         state: 'ready',
                         createdByOperationId: 'restore_' + Date.now()
                     }));
 
                     await unsafeManager.proofService.saveProofs(mintUrl, coreProofs);
-                    console.log(`[WalletService] 💾 Successfully saved ${proofs.length} proofs to local database`);
 
-                    // Update the counter in the DB so next time it starts from where it left off
-                    if (lastCounterWithSignature !== undefined) {
-                        try {
-                            console.log(`[WalletService] Advancing counter for keyset ${keyset.id} to ${lastCounterWithSignature + 1}`);
-                            await unsafeManager.counterService.overwriteCounter(mintUrl, keyset.id, lastCounterWithSignature + 1);
-                        } catch (e) {
-                            console.warn(`[WalletService] Failed to advance counter for keyset ${keyset.id}:`, e);
-                        }
+                    // Update the counter in the DB
+                    try {
+                        await unsafeManager.counterService.overwriteCounter(mintUrl, keyset.id, lastFoundAt + 1);
+                    } catch (e) {
+                        console.warn(`[WalletService] Failed to advance counter:`, e);
                     }
 
-                    totalRestored += proofs.length;
+                    totalRestored += keysetProofs.length;
                 }
             }
 

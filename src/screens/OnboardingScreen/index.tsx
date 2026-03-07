@@ -91,25 +91,51 @@ export function OnboardingScreen() {
 
     // ── Seed import (restore flow) ──────────────────────────────
 
-    const handleImportSeed = async (mnemonic: string, additionalMints: string[] = []) => {
+    const handleImportSeed = async (mnemonic: string, options: {
+        additionalMints?: string[],
+        backupState?: any
+    } = {}) => {
+        const { additionalMints = [], backupState } = options
         setIsImporting(true)
         setImportStatus('Initializing wallet…')
         try {
             console.log('[Onboarding] Importing wallet from seed...')
 
-            await initService.restoreWallet(mnemonic)
+            // 1. Setup the wallet and repositories
+            // Use quiet mode if we have a backupState to avoid DB locks during insertion
+            await initService.restoreWallet(mnemonic, { quiet: !!backupState })
 
-            setImportStatus('Welcome back! Starting restore…')
+            // 2. If we have full backup state (v3), import it into the DB now
+            if (backupState) {
+                setImportStatus('Restoring balance and history…')
+                const { backupService } = require('~/services/backupService')
+                await backupService.importState(backupState)
+
+                // IMPORTANT: Re-initialize to pick up the imported state (mints, keysets, etc.)
+                console.log('[Onboarding] Refreshing wallet state after import...')
+                await initService.reinitFast()
+                console.log('[Onboarding] Full state imported and synced successfully')
+            }
+
+            setImportStatus('Welcome back! Finalizing…')
             await completeOnboarding()
             await useSettingsStore.getState().initialize(true)
             await initialize()
 
-            // Store extra mints (from backup file) for the restore step
+            // 3. Store extra mints (from backup file) for the restore step
             setExtraRestoreMints(additionalMints)
 
-            // Navigate to restore progress screen — restoreAllMints fires there
-            console.log('[Onboarding] Navigating to restore progress step...')
-            setStep('restoring')
+            // 4. Decide if we need the slow "restoring" step or can go home
+            // If we have proofs (money) already in the DB from backup, skip the scan
+            const hasFunds = backupState && backupState.proofs && backupState.proofs.length > 0
+
+            if (hasFunds) {
+                console.log('[Onboarding] Found funds in backup, skipping deterministic scan.')
+                // No need to setStep('restoring'), the app will auto-navigate home because completeOnboarding() was called
+            } else {
+                console.log('[Onboarding] Navigating to restore progress step...')
+                setStep('restoring')
+            }
         } catch (err) {
             console.error('[Onboarding] Import failed:', err)
             setImportStatus('Import failed. Please try again.')
@@ -136,13 +162,30 @@ export function OnboardingScreen() {
         try {
             const backup = await walletFileService.importWalletFromFile()
 
-            // Collect extra mints from backup (excluding DEFAULT_MINT)
+            // Collect extra mints for the restore screen (v1/v2 compatibility)
+            // In v3, backup.mints is already the full database records.
             const extraMints = (backup.mints ?? [])
-                .map((m: any) => m.url)
+                .map((m: any) => typeof m === 'string' ? m : (m.url || m.mintUrl))
                 .filter((url: string) => url && url !== DEFAULT_MINT)
 
+            // Package up the state if version >= 3
+            let backupState: any = undefined
+            if (backup.version && backup.version >= 3) {
+                backupState = {
+                    mints: backup.mints,
+                    keysets: backup.keysets,
+                    proofs: backup.proofs,
+                    counters: backup.counters,
+                    history: backup.history,
+                    mintQuotes: backup.mintQuotes,
+                }
+            }
+
             // Standard seed restore — passes extra mints for the progress screen
-            await handleImportSeed(backup.mnemonic, extraMints)
+            await handleImportSeed(backup.mnemonic, {
+                additionalMints: extraMints,
+                backupState
+            })
 
             // Restore settings from backup
             const settingsStore = useSettingsStore.getState()
@@ -218,7 +261,7 @@ export function OnboardingScreen() {
         case 'import':
             return (
                 <ImportSeedStep
-                    onImport={(mnemonic) => handleImportSeed(mnemonic)}
+                    onImport={(mnemonic) => handleImportSeed(mnemonic, {})}
                     onBack={() => setStep('welcome')}
                 />
             )

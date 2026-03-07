@@ -249,9 +249,9 @@ export const useWalletStore = create<WalletState>()(
                         await get().refreshBalance();
 
                         // Re-initialize the core Manager to pick up all restored counters and proofs
-                        console.log('[WalletStore] Re-initializing Manager to sync counters...');
-                        await initService.cleanup();
-                        await initService.init();
+                        // We use the new FAST path to avoid staggering delays
+                        console.log('[WalletStore] Syncing Manager state (Fast Reinit)...');
+                        await initService.reinitFast();
 
                         set(s => ({
                             restoreQueue: s.restoreQueue.filter(u => u !== nextUrl),
@@ -259,7 +259,7 @@ export const useWalletStore = create<WalletState>()(
                             restoringMintUrl: null
                         }));
                         // Yield briefly before next mint
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
                 }
             },
@@ -397,9 +397,9 @@ export const useWalletStore = create<WalletState>()(
                 }
 
                 // Re-initialize the core Manager to pick up all restored counters and proofs
-                console.log('[WalletStore] Batch restore complete. Re-initializing Manager...');
-                await initService.cleanup();
-                await initService.init();
+                // FAST path to keep UI alive
+                console.log('[WalletStore] Batch restore complete. Syncing Manager...');
+                await initService.reinitFast();
 
                 // Final refresh
                 await get().refreshBalance();

@@ -86,24 +86,20 @@ export function SettingsScreen() {
             const mnemonic = await seedService.getMnemonic();
             if (!mnemonic) throw new Error('No mnemonic found.');
 
-            // Gather trusted mints from the repo
-            let mints: { url: string; nickname: string | null }[] = [];
-            try {
-                const repo = initService.getRepo();
-                const trustedMints = await repo.mintRepository.getAllTrustedMints();
-                mints = trustedMints.map((m: any) => ({
-                    url: m.mintUrl,
-                    nickname: m.nickname ?? null,
-                }));
-            } catch (e) {
-                console.warn('[Settings] Could not read mints for backup:', e);
-            }
+            // NEW: Fetch all low-level data via backupService
+            const { backupService } = require('~/services/backupService');
+            const state = await backupService.exportState();
 
             // Grab current settings from the store
-            const { defaultMintUrl, secondaryCurrency, theme } = useSettingsStore.getState();
+            const { theme } = useSettingsStore.getState();
 
             await walletFileService.exportWallet(mnemonic, {
-                mints,
+                mints: state.mints,
+                keysets: state.keysets,
+                proofs: state.proofs,
+                counters: state.counters,
+                history: state.history,
+                mintQuotes: state.mintQuotes,
                 defaultMintUrl,
                 secondaryCurrency,
                 theme,

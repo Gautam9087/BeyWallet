@@ -3,13 +3,20 @@
  *
  * Backup JSON shape (v2):
  * {
- *   version: 2,
+ *   version: 3,
  *   mnemonic: "...",
- *   mints: [{ url: "...", nickname: "..." | null }],
+ *   mints: [...], // Full coco_cashu_mints records
+ *   keysets: [...], // Full coco_cashu_keysets records
+ *   proofs: [...],
+ *   counters: [...],
+ *   history: [...],
+ *   mintQuotes: [...],
  *   defaultMintUrl: "...",
  *   secondaryCurrency: "USD",
  *   theme: "system" | "light" | "dark",
  *   exportedAt: "ISO date"
+ * }
+ * }
  * }
  *
  * Export flow:
@@ -39,7 +46,12 @@ export interface MintEntry {
 export interface WalletBackup {
     version: number;
     mnemonic: string;
-    mints: MintEntry[];
+    mints: any[]; // Changed from MintEntry[] to any[] for full records in v3
+    keysets?: any[];
+    proofs?: any[];
+    counters?: any[];
+    history?: any[];
+    mintQuotes?: any[];
     defaultMintUrl: string;
     secondaryCurrency: string;
     theme: 'system' | 'light' | 'dark';
@@ -54,7 +66,12 @@ export const walletFileService = {
     exportWallet: async (
         mnemonic: string,
         opts: {
-            mints: MintEntry[];
+            mints: any[];
+            keysets: any[];
+            proofs: any[];
+            counters: any[];
+            history: any[];
+            mintQuotes: any[];
             defaultMintUrl: string;
             secondaryCurrency: string;
             theme: 'system' | 'light' | 'dark';
@@ -67,9 +84,14 @@ export const walletFileService = {
         }
 
         const backup: WalletBackup = {
-            version: BACKUP_VERSION,
+            version: 3,
             mnemonic,
             mints: opts.mints,
+            keysets: opts.keysets,
+            proofs: opts.proofs,
+            counters: opts.counters,
+            history: opts.history,
+            mintQuotes: opts.mintQuotes,
             defaultMintUrl: opts.defaultMintUrl,
             secondaryCurrency: opts.secondaryCurrency,
             theme: opts.theme,
@@ -139,11 +161,16 @@ export const walletFileService = {
 
         console.log('[WalletFileService] ✅ Valid wallet backup parsed successfully.');
 
-        // Return with safe defaults for fields that may be missing in older v1 backups
+        // Return with safe defaults for fields that may be missing in older v1/v2 backups
         return {
             version: backup.version ?? 1,
             mnemonic: backup.mnemonic.trim(),
             mints: backup.mints ?? [],
+            keysets: backup.keysets ?? [],
+            proofs: backup.proofs ?? [],
+            counters: backup.counters ?? [],
+            history: backup.history ?? [],
+            mintQuotes: backup.mintQuotes ?? [],
             defaultMintUrl: backup.defaultMintUrl ?? '',
             secondaryCurrency: backup.secondaryCurrency ?? 'USD',
             theme: backup.theme ?? 'system',
