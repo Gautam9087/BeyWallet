@@ -31,4 +31,4 @@ First off, thank you for considering contributing to Bey Wallet! It's people lik
 *   Focus on constructive feedback and collaboration.
 
 ---
-MIT © Bey Wallet
+Apache 2.0 © Bey Wallet

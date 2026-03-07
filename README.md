@@ -1,6 +1,6 @@
 # Bey Wallet ⚡️
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Expo](https://img.shields.io/badge/Made%20with-Expo-000020.svg?logo=expo&logoColor=white)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-000000?logo=react&logoColor=61DAFB)](https://reactnative.dev)
 [![Cashu](https://img.shields.io/badge/Protocol-Cashu-FFD700.svg)](https://cashu.space)
@@ -92,7 +92,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## ⚖️ License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the Apache License, Version 2.0. See `LICENSE` for more information.
 
 ---
 
