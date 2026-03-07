@@ -46,6 +46,5 @@ node_modules
 .expo
 ios
 android
-%%TEMP/cashu_pwa
-%%TEMP/coco
-%%TEMP
+/%%TEMP/
+/%%TEMP/**
