@@ -1,97 +1,99 @@
 # Bey Wallet ⚡️
 
-> Modular, Local-First Cashu & Nostr Wallet.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Expo](https://img.shields.io/badge/Made%20with-Expo-000020.svg?logo=expo&logoColor=white)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-000000?logo=react&logoColor=61DAFB)](https://reactnative.dev)
+[![Cashu](https://img.shields.io/badge/Protocol-Cashu-FFD700.svg)](https://cashu.space)
 
-Bey Wallet is a high-performance, privacy-centric ecash wallet built on the **Cashu** protocol with deep **Nostr** identity integration. It focuses on speed, security, and a premium user experience.
+> **Modular, Local-First Ecash Wallet for Bitcoin & Nostr.**
+
+Bey Wallet is a premium, privacy-centric ecash wallet built on the **Cashu** protocol. It brings together high-speed Bitcoin payments and the censorship-resistant identity of **Nostr** in a fluid, modern interface.
+
+---
+
+## 📸 Preview
+
+<div align="center">
+  <p><i>Add a banner or screenshots here to showcase the premium UI</i></p>
+  <!-- <img src="./assets/banner.png" width="800" alt="Bey Wallet Banner" /> -->
+</div>
 
 ---
 
 ## ✨ Features
 
-### 💰 Cashu (Ecash)
-- [x] **V3 & V4 Support**: Full support for the latest Cashu token standards.
-- [x] **Multi-Mint Management**: Add, trust, and manage multiple mints simultaneously.
-- [x] **Deterministic Restoration**: NIP-06 compatible backup and recovery. Restore all proofs across all mints using just your 12-word seed.
-- [x] **Parallel Recovery**: Optimized startup and restoration that checks historical keysets in parallel for maximum speed.
-- [x] **Transaction History**: Comprehensive audit trail with real-time status tracking and double-confirmation for claimed tokens.
+### 💰 Cashu (Ecash) & Bitcoin
+*   **Next-Gen Standards**: Support for V3 and V4 Cashu tokens for maximum compatibility.
+*   **Mint Management**: Professional mint dashboard to add, trust, and monitor multiple community mints.
+*   **One-Tap Setup**: Simplified onboarding that gets you started with reliable default mints in seconds.
+*   **Total Control**: Manage balances across different mints with real-time audit logs.
 
-### 🆔 Nostr Identity
-- [x] **Native Keys**: Automatic generation of `npub`/`nsec` from your wallet seed.
-- [x] **Profile Screen**: Display your Nostr identity with custom-styled QR codes (`npubQR`).
-- [x] **P2PK Support**: Send ecash locked to a receiver's Nostr public key for enhanced security.
-- [x] **Nostr Plug-in (NPC)**: Integrated background synchronization via `NPX` protocol.
+### 🆔 Nostr Integration
+*   **Built-in Identity**: Transparently generate your Nostr `npub` directly from your wallet seed.
+*   **Social Payments**: Send ecash locked to any receiver's Nostr public key (P2PK).
+*   **Cloud Sync**: Securely sync your mint preferences and history via your preferred Nostr relays.
 
-### 🛡️ Security & Privacy
-- [x] **Local-First Architecture**: All data (mints, proofs, history, keys) is stored locally using a high-performance SQLite engine.
-- [x] **Biometric Protection**: Secure your funds with Face ID, Touch ID, or device passcode.
-- [x] **Secure Storage**: Seed phrases and private keys never leave the device's secure enclave.
+### 🛡️ Privacy & Security
+*   **Local-First Design**: Your data stays on your device. Period. Powered by high-performance SQLite.
+*   **Secure Enclave**: Your recovery phrase and private keys are protected by hardware-level security.
+*   **Biometric Guard**: Face ID, Touch ID, or Passcode protection for every sensitive operation.
 
-### 💾 Backup & Restore
-- [x] **File Backup (Export)**: Export a complete `.bey` backup file from Settings → Security → Export Wallet File. Includes your seed phrase, all trusted mints, default mint, currency preference, and theme. Requires biometric authentication.
-- [x] **File Import (Onboarding)**: Restore your wallet from a `.bey` backup file on the Welcome screen — no need to type the 12-word seed phrase. Automatically re-trusts all mints and restores settings.
-- [x] **Seed Phrase Import**: Manual recovery via the standard 12-word BIP-39 mnemonic.
-- [x] **Relay-Based Sync (NPC)**: Mint list and history are also preserved on your Nostr relay and re-synced automatically on every restore.
-
-> **Backup file format (v2):** `{ version, mnemonic, mints[], defaultMintUrl, secondaryCurrency, theme, exportedAt }`  
-> v1 backup files (mnemonic only) are still accepted for backward compatibility.
-
-### 🚀 UX & Performance
-- [x] **Smart Scanner**: Intelligent QR/UR scanner that detects Cashu tokens, P2PK keys, and animated UR-encoded sequences.
-- [x] **Integrated Paste**: One-tap token entry directly from the scanner UI.
-- [x] **Optimized Onboarding**: Professional first-run experience with three entry points: Create, Import via Seed, Import from File.
-- [x] **Modern UI**: Built with Tamagui for a fluid, themeable, and responsive interface.
+### 💾 Reliability
+*   **Deterministic Recovery**: Restore your entire wallet balance across all mints with just 12 words.
+*   **Smart Backups**: Export and import complete wallet state via encrypted `.bey` files.
 
 ---
 
 ## 🛠️ Tech Stack
-- **Framework**: Expo SDK 54 / React Native
-- **UI Engine**: Tamagui (Inter Font, Lucide Icons)
-- **State Management**: Zustand
-- **Database**: Expo SQLite (Local-first)
-- **Cashu Core**: `coco-cashu-core`, `coco-cashu-react`
-- **Nostr**: `nostr-tools`, `coco-cashu-plugin-npc`
-- **File I/O**: `expo-file-system` (legacy API), `expo-sharing`, `expo-document-picker`
 
----
-
-## 🚧 Roadmap
-
-- [ ] **Lightning Integration**: Direct Lightning address and LNURL-Pay/Withdraw support.
-- [ ] **Mint Swaps**: One-tap swapping of ecash between different mints or units.
-- [ ] **Advanced Contacts**: NIP-02/NIP-05 integrated address book.
-- [ ] **Nostr Wallet Connect (NWC)**: Use Bey Wallet to pay from other Nostr clients.
-- [ ] **Offline Payments**: Native NFC support for in-person ecash transfers.
-- [ ] **Encrypted Backup**: Password-protected `.bey` backup files.
+*   **Engineering**: [Expo](https://expo.dev/) & [React Native](https://reactnative.dev/)
+*   **Design System**: [Tamagui](https://tamagui.dev/) (Dynamic, type-safe styles)
+*   **Logic**: [Zustand](https://docs.pmnd.rs/zustand/) & [TanStack Query](https://tanstack.com/query/latest)
+*   **Storage**: [Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/)
+*   **Core Protocols**: `cashu-ts`, `nostr-tools`
 
 ---
 
 ## 🏗️ Development
 
 ### Prerequisites
-- [Yarn](https://yarnpkg.com/)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
-- [EAS CLI](https://docs.expo.dev/eas/) (`npm install -g eas-cli`)
+*   Node.js & Yarn
+*   [Expo CLI](https://docs.expo.dev/get-started/installation/)
+*   [EAS CLI](https://docs.expo.dev/eas/) (`npm install -g eas-cli`)
 
-### Installation
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   yarn install
-   ```
-3. Start the development server:
-   ```bash
-   npx expo start
-   ```
+### Quick Start
+1.  **Clone the repo**:
+    ```bash
+    git clone https://github.com/arshfx01/bey-wallet.git
+    cd bey-wallet
+    ```
+2.  **Install dependencies**:
+    ```bash
+    yarn install
+    ```
+3.  **Start the app**:
+    ```bash
+    npx expo start
+    ```
 
-### Building a Dev Client
-A custom dev client is required (native modules — SQLite, biometrics, file system, camera):
+### Building for Production
+Bey Wallet uses EAS for builds. To build the production APK:
 ```bash
-eas build --profile development --platform android
-# or
-eas build --profile development --platform ios
+eas build -p android --profile production
 ```
 
 ---
 
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
+---
+
 ## ⚖️ License
-MIT © Bey Wallet
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+<p align="center">Made with ❤️ for the Bitcoin & Nostr communities.</p>
