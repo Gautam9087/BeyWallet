@@ -9,6 +9,7 @@ import {
 import type { MintInfo } from '../services/core';
 import { useSettingsStore } from './settingsStore';
 import { DEFAULT_MINT } from './constants';
+import { InteractionManager } from 'react-native';
 
 export type MintRestoreStatus = 'pending' | 'scanning' | 'done' | 'error';
 
@@ -142,8 +143,8 @@ export const useWalletStore = create<WalletState>()(
 
             addMint: async (url: string, options?: { trusted?: boolean }) => {
                 try {
+                    // Fast path — only trust the mint, same as Sovran's addMint
                     await mintManager.addMint(url, options);
-                    await mintManager.repairMintKeysets(url, 'sat');
 
                     const mintInfos = await mintManager.getMintInfoList();
 
@@ -152,11 +153,15 @@ export const useWalletStore = create<WalletState>()(
                         mints: mintInfos,
                     });
 
-                    // Trigger deterministic restoration in the background
-                    console.log(`[WalletStore] Triggering automatic deterministic restore for: ${url}`);
-                    get().restoreFromSeed(url);
-
                     get().refreshBalance();
+
+                    // Defer heavy background work AFTER all sheet animations settle
+                    // This matches Sovran — addMint never blocks the UI thread
+                    InteractionManager.runAfterInteractions(() => {
+                        console.log(`[WalletStore] 🔄 Background: repair keysets + restore for: ${url}`);
+                        mintManager.repairMintKeysets(url, 'sat').catch(console.warn);
+                        get().restoreFromSeed(url);
+                    });
                 } catch (err: any) {
                     console.error('[WalletStore] Failed to add mint:', err);
                     set({ error: err.message });
@@ -215,16 +220,20 @@ export const useWalletStore = create<WalletState>()(
                     try {
                         set({ isRestoring: true, restoringMintUrl: nextUrl });
 
-                        // Yield briefly for UI responsiveness
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        // Wait for all React Native animations/sheet transitions to complete
+                        // before starting heavy restore work — same philosophy as Sovran
+                        await new Promise<void>(resolve =>
+                            InteractionManager.runAfterInteractions(resolve)
+                        );
+                        // Extra buffer so sheet dismiss animation fully completes
+                        await new Promise(resolve => setTimeout(resolve, 1000));
 
-                        console.log(`[WalletStore] 🔄 Deterministic Restore (Sync): ${nextUrl}`);
+                        console.log(`[WalletStore] 🔄 Deterministic Restore: ${nextUrl}`);
 
-                        // Strategy: Multi-unit discovery + standard restore
-                        // 1. Ensure we have all current keysets for this mint
+                        // Ensure we have all current keysets for this mint
                         await mintManager.addMint(nextUrl, { trusted: true });
 
-                        // 2. Perform NIP-06 deterministic restore
+                        // Perform NIP-06 deterministic restore (10 min safety timeout)
                         const timeoutPromise = new Promise((_, reject) =>
                             setTimeout(() => reject(new Error('Deep restore timed out after 10 minutes')), 600000)
                         );
@@ -234,31 +243,25 @@ export const useWalletStore = create<WalletState>()(
                             timeoutPromise
                         ]);
 
-                        console.log(`[WalletStore] ✅ Deep Restore complete for: ${nextUrl}`);
+                        console.log(`[WalletStore] ✅ Restore complete for: ${nextUrl}`);
 
                     } catch (err: any) {
-                        // coco-cashu-core throws if even *one* historical keyset is missing from the mint API.
-                        // However, it successfully restores balances for the valid keysets!
-                        // So we log it as a warning and continue, rather than hard-failing the UI.
-                        console.warn(`[WalletStore] ⚠️ Deep Restore partial success/failure for ${nextUrl}:`, err);
+                        console.warn(`[WalletStore] ⚠️ Restore partial/failed for ${nextUrl}:`, err?.message);
                     } finally {
-                        // Rescue any valid proofs that got stuck in 'inflight' state when the restore routine crashed
+                        // Rescue any valid proofs stuck in 'inflight' state
                         await walletService.restoreInflightProofs(nextUrl);
 
-                        // Refresh balances to capture whatever DID successfully restore
+                        // Refresh balances to show restored funds — no reinit needed,
+                        // the SDK's watchers continue working without a restart
                         await get().refreshBalance();
-
-                        // Re-initialize the core Manager to pick up all restored counters and proofs
-                        // We use the new FAST path to avoid staggering delays
-                        console.log('[WalletStore] Syncing Manager state (Fast Reinit)...');
-                        await initService.reinitFast();
 
                         set(s => ({
                             restoreQueue: s.restoreQueue.filter(u => u !== nextUrl),
                             isRestoring: false,
                             restoringMintUrl: null
                         }));
-                        // Yield briefly before next mint
+
+                        // Yield before processing next mint in queue
                         await new Promise(resolve => setTimeout(resolve, 300));
                     }
                 }

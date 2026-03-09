@@ -1,4 +1,4 @@
-import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Button, Input, Text, YStack, XStack, Spinner, Paragraph, View, useTheme } from 'tamagui';
 import { Plus, Check, AlertCircle, Sprout, X } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
@@ -6,20 +6,12 @@ import AppBottomSheet, { AppBottomSheetRef } from './UI/AppBottomSheet';
 import { useWalletStore } from '../store/walletStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToastController } from '@tamagui/toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { BottomSheetTextInput, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 type Stage = 'input' | 'preview' | 'loading';
 
-import { BottomSheetTextInput, BottomSheetScrollView } from "@gorhom/bottom-sheet";
-
-// Basic URL validation
-const validateUrl = (url: string) => {
-    try {
-        new URL(url.startsWith('http') ? url : `https://${url}`);
-        return true;
-    } catch {
-        return false;
-    }
-};
+// ─── Mint info fetcher (direct HTTP, no DB write) ────────────────────────────
 
 interface MintPreviewInfo {
     name?: string;
@@ -27,8 +19,48 @@ interface MintPreviewInfo {
     mintUrl: string;
 }
 
+/**
+ * Fetches mint info directly from the mint's /v1/info endpoint.
+ * This is fast because it skips the Coco SDK's addMint() DB write.
+ */
+async function fetchMintPreview(mintUrl: string): Promise<MintPreviewInfo> {
+    const normalized = mintUrl.replace(/\/$/, '');
+    const url = `${normalized}/v1/info`;
+
+    // AbortSignal.timeout() is not available in Hermes — use manual controller
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`Mint returned ${res.status}`);
+        const data = await res.json();
+        return {
+            name: data.name || data.shortname || 'Unknown Mint',
+            description: data.description || data.description_long || undefined,
+            mintUrl: normalized,
+        };
+    } catch (err: any) {
+        clearTimeout(timer);
+        if (err?.name === 'AbortError') throw new Error('Request timed out — check the mint URL');
+        throw err;
+    }
+}
+
+function normalizeUrl(url: string) {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+        return 'https://' + trimmed;
+    }
+    return trimmed.replace(/\/$/, '');
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export interface AddMintModalRef {
-    present: () => void;
+    present: (url?: string) => void;
     dismiss: () => void;
 }
 
@@ -36,169 +68,147 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
     const sheetRef = useRef<AppBottomSheetRef>(null);
     const theme = useTheme();
     const [stage, setStage] = useState<Stage>('input');
-    const [mintUrl, setMintUrl] = useState('');
+    const [rawUrl, setRawUrl] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [previewInfo, setPreviewInfo] = useState<MintPreviewInfo | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isExistingUntrusted, setIsExistingUntrusted] = useState(false);
 
-    const { fetchMintInfo, addMint, refreshMintList, mints, trustMint } = useWalletStore();
+    const { addMint, refreshMintList, mints } = useWalletStore();
     const insets = useSafeAreaInsets();
     const toast = useToastController();
-    const [isExistingUntrusted, setIsExistingUntrusted] = useState(false);
+    const queryClient = useQueryClient();
+
+    // ── TanStack Query: mint preview ─────────────────────────────────────────
+    // Only fires when previewUrl is set (user tapped "Preview" or URL was injected).
+    // Results are cached by URL — re-opening for the same mint is instant.
+    const {
+        data: previewInfo,
+        isLoading: isPreviewLoading,
+        error: previewError,
+    } = useQuery({
+        queryKey: ['mint-preview', previewUrl],
+        queryFn: () => fetchMintPreview(previewUrl!),
+        enabled: !!previewUrl,
+        staleTime: 5 * 60 * 1000, // cached 5 min
+        retry: 1,
+    });
+
+    // Sync stage with query state
+    React.useEffect(() => {
+        if (!previewUrl) return;
+        if (isPreviewLoading) {
+            setStage('loading');
+        } else if (previewError) {
+            setError((previewError as Error).message || 'Failed to fetch mint info');
+            setStage('input');
+            setPreviewUrl(null);
+        } else if (previewInfo) {
+            setStage('preview');
+        }
+    }, [isPreviewLoading, previewError, previewInfo, previewUrl]);
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    const resetState = useCallback(() => {
+        setStage('input');
+        setRawUrl('');
+        setError(null);
+        setPreviewUrl(null);
+        setIsExistingUntrusted(false);
+    }, []);
+
+    const triggerPreview = useCallback((url: string) => {
+        const normalized = normalizeUrl(url);
+        if (!normalized) {
+            setError('Please enter a mint URL');
+            return;
+        }
+        setError(null);
+        // Check if already in mints list as untrusted
+        const existing = mints.find(m => m.mintUrl.replace(/\/$/, '') === normalized);
+        setIsExistingUntrusted(!!(existing && !existing.trusted));
+        setPreviewUrl(normalized);
+    }, [mints]);
+
+    // ── Imperative handle ────────────────────────────────────────────────────
 
     useImperativeHandle(ref, () => ({
         present: (url?: string) => {
             resetState();
             if (url) {
-                setMintUrl(url);
-                // Trigger fetch immediately if URL is provided
-                setTimeout(() => {
-                    handleFetchWithUrl(url);
-                }, 100);
+                const normalized = normalizeUrl(url);
+                setRawUrl(normalized);
+                // Pre-fetch immediately (will be cached for later)
+                queryClient.prefetchQuery({
+                    queryKey: ['mint-preview', normalized],
+                    queryFn: () => fetchMintPreview(normalized),
+                    staleTime: 5 * 60 * 1000,
+                });
+                setTimeout(() => triggerPreview(normalized), 50);
             }
             sheetRef.current?.present();
         },
         dismiss: () => sheetRef.current?.dismiss(),
     }));
 
-    const handleFetchWithUrl = async (url: string) => {
-        setStage('loading');
-        setError(null);
-        setIsExistingUntrusted(false);
-        try {
-            const existing = mints.find(m => m.mintUrl.replace(/\/$/, '') === url.replace(/\/$/, ''));
-            if (existing && !existing.trusted) {
-                setIsExistingUntrusted(true);
-            }
 
-            const info = await fetchMintInfo(url);
-            setPreviewInfo({
-                name: info?.name || 'Unknown Mint',
-                description: info?.description || 'No description available',
-                mintUrl: url,
-            });
-            setStage('preview');
-        } catch (err: any) {
-            setError(err.message || 'Failed to fetch mint info');
-            setStage('input');
-        }
-    };
+    // ── Actions ──────────────────────────────────────────────────────────────
 
-    const resetState = () => {
-        setStage('input');
-        setMintUrl('');
-        setError(null);
-        setPreviewInfo(null);
-        setIsExistingUntrusted(false);
-    };
-
-    const handleFetchMintInfo = async () => {
-        if (!mintUrl.trim()) {
+    const handleFetchMintInfo = () => {
+        if (!rawUrl.trim()) {
             setError('Please enter a mint URL');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             return;
         }
-
-        // Basic URL validation
-        let url = mintUrl.trim();
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            url = 'https://' + url;
-        }
-
-        setStage('loading');
-        setError(null);
-        setIsExistingUntrusted(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        try {
-            const existing = mints.find(m => m.mintUrl.replace(/\/$/, '') === url.replace(/\/$/, ''));
-            if (existing && !existing.trusted) {
-                setIsExistingUntrusted(true);
-            }
-
-            const info = await fetchMintInfo(url);
-            setPreviewInfo({
-                name: info?.name || 'Unknown Mint',
-                description: info?.description || 'No description available',
-                mintUrl: url,
-            });
-            setMintUrl(url);
-            setStage('preview');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch (err: any) {
-            console.error('[AddMintModal] Fetch error:', err);
-            setError(err.message || 'Failed to fetch mint info');
-            setStage('input');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
+        triggerPreview(rawUrl);
     };
 
     const handleTrustImmediately = async () => {
-        if (!mintUrl.trim()) {
+        const url = normalizeUrl(rawUrl);
+        if (!url) {
             setError('Please enter a mint URL');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             return;
         }
-
-        let url = mintUrl.trim();
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            url = 'https://' + url;
-        }
-
         setStage('loading');
         setError(null);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
         try {
             await addMint(url, { trusted: true });
             await refreshMintList();
-            toast.show('Mint Added', {
-                message: `Mint added successfully`,
-                duration: 2000
-            });
+            toast.show('Mint Added', { message: 'Mint added successfully', duration: 2000 });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             sheetRef.current?.dismiss();
             resetState();
         } catch (err: any) {
-            console.error('[AddMintModal] Trust Immediately error:', err);
             setError(err.message || 'Failed to add mint');
             setStage('input');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            toast.show('Error', {
-                message: err.message || 'Failed to add mint',
-                duration: 3000,
-            });
+            toast.show('Error', { message: err.message || 'Failed to add mint', duration: 3000 });
         }
     };
 
     const handleTrustMint = async () => {
         if (!previewInfo) return;
-
         setStage('loading');
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
         try {
             await addMint(previewInfo.mintUrl, { trusted: true });
             await refreshMintList();
-
-            toast.show('Mint Added', {
-                message: `${previewInfo.name} is now trusted`,
-                duration: 3000,
-            });
-
+            toast.show('Mint Added', { message: `${previewInfo.name} is now trusted`, duration: 3000 });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             sheetRef.current?.dismiss();
             resetState();
         } catch (err: any) {
-            console.error('[AddMintModal] Trust error:', err);
             setError(err.message || 'Failed to trust mint');
             setStage('preview');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            toast.show('Error', {
-                message: err.message || 'Failed to add mint',
-                duration: 3000,
-            });
+            toast.show('Error', { message: err.message || 'Failed to add mint', duration: 3000 });
         }
     };
+
+    // ── Render ───────────────────────────────────────────────────────────────
 
     const renderInputStage = () => (
         <YStack gap="$4">
@@ -209,11 +219,13 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
             <YStack gap="$2">
                 <BottomSheetTextInput
                     placeholder="https://mint.example.com"
-                    value={mintUrl}
-                    onChangeText={setMintUrl}
+                    value={rawUrl}
+                    onChangeText={setRawUrl}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="url"
+                    returnKeyType="done"
+                    onSubmitEditing={handleFetchMintInfo}
                     style={{
                         backgroundColor: theme.color2.val,
                         color: theme.color.val,
@@ -222,7 +234,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
                         borderWidth: 1,
                         borderColor: error ? theme.red10.val : theme.borderColor.val,
                         fontSize: 16,
-                        height: 56
+                        height: 56,
                     }}
                     placeholderTextColor={theme.gray10.val}
                 />
@@ -235,12 +247,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
             </YStack>
 
             <XStack gap="$3">
-                <Button
-                    flex={1}
-                    size="$4"
-                    theme="gray"
-                    onPress={handleTrustImmediately}
-                >
+                <Button flex={1} size="$4" theme="gray" onPress={handleTrustImmediately}>
                     Trust Immediately
                 </Button>
                 <Button
@@ -276,9 +283,7 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
                 </XStack>
 
                 {previewInfo?.description && (
-                    <Text color="$gray11" fontSize="$3">
-                        {previewInfo.description}
-                    </Text>
+                    <Text color="$gray11" fontSize="$3">{previewInfo.description}</Text>
                 )}
 
                 {isExistingUntrusted && (
@@ -298,21 +303,14 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
 
             <XStack gap="$3">
                 <Button
-                    flex={1}
-                    size="$4"
-                    theme="gray"
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setStage('input');
-                    }}
+                    flex={1} size="$4" theme="gray"
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStage('input'); setPreviewUrl(null); }}
                     icon={<X size={18} />}
                 >
                     Cancel
                 </Button>
                 <Button
-                    flex={1}
-                    size="$4"
-                    themeInverse
+                    flex={1} size="$4" themeInverse
                     onPress={handleTrustMint}
                     icon={<Check size={18} />}
                 >
@@ -325,13 +323,18 @@ const AddMintModal = forwardRef<AddMintModalRef>((_, ref) => {
     const renderLoadingStage = () => (
         <YStack gap="$4" items="center" py="$6">
             <Spinner size="large" color="$accent9" />
-            <Text color="$gray10">Loading mint info...</Text>
+            <Text color="$gray10">
+                {isPreviewLoading ? 'Fetching mint info…' : 'Adding mint…'}
+            </Text>
         </YStack>
     );
 
     return (
         <AppBottomSheet ref={sheetRef}>
-            <BottomSheetScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}>
+            <BottomSheetScrollView
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}
+                keyboardShouldPersistTaps="handled"
+            >
                 {stage === 'input' && renderInputStage()}
                 {stage === 'preview' && renderPreviewStage()}
                 {stage === 'loading' && renderLoadingStage()}

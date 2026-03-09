@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, forwardRef, useImperativeHandle, useEffect, useState } from "react";
-import { StyleSheet, BackHandler } from "react-native";
+import { StyleSheet, BackHandler, Platform } from "react-native";
 import {
     BottomSheetBackdrop,
     BottomSheetView,
@@ -26,7 +26,6 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
         const theme = useTheme();
         const [isOpen, setIsOpen] = useState(false);
 
-        // callbacks
         const handleSheetChanges = useCallback((index: number) => {
             setIsOpen(index >= 0);
             if (index === -1) {
@@ -80,7 +79,8 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
                 snapPoints={snapPoints}
                 backdropComponent={renderBackdrop}
                 stackBehavior="push"
-                keyboardBehavior="extend"
+                // Keyboard: sheet expands to fill space above keyboard (works with dynamic sizing)
+                keyboardBehavior="fillParent"
                 keyboardBlurBehavior="restore"
                 android_keyboardInputMode="adjustResize"
                 handleIndicatorStyle={{
@@ -96,7 +96,6 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
                 animationConfigs={{
                     duration: 250,
                 }}
-                // Ensure high priority
                 containerStyle={{ zIndex: 1000 }}
             >
                 {enableDynamicSizing ? (
@@ -113,7 +112,8 @@ const AppBottomSheet = forwardRef<AppBottomSheetRef, AppBottomSheetProps>(
 
 const styles = StyleSheet.create({
     contentContainer: {
-        paddingBottom: 40,
+        // Extra bottom padding so content clears the home indicator
+        paddingBottom: Platform.OS === 'ios' ? 8 : 16,
     },
 });
 
